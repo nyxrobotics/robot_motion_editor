@@ -14,19 +14,22 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 from sensor_msgs.msg import JointState
 
+from .feedback_expression_dialog import FeedbackExpressionDialog
 from .initial_pose_file_manager import load_initial_pose
 from .initial_pose_file_manager import save_initial_pose
 from .initial_pose_visualizer import InitialPoseVisualizer
+from .pid_config_dialog import PIDConfigDialog
 
 
 class InitialPoseEditor(QWidget):
     pose_updated = pyqtSignal()
 
-    def __init__(self, joint_names, joint_limits):
+    def __init__(self, joint_names, joint_limits, available_variables):
         super().__init__()
         self.motion_directory = "."
         self.joint_names = joint_names
         self.joint_limits = joint_limits
+        self.available_variables = available_variables
         self.joint_widgets = {}
         self.prev_pose = []
         self.visualizer = InitialPoseVisualizer(joint_names)
@@ -128,3 +131,18 @@ class InitialPoseEditor(QWidget):
             if name in self.joint_widgets:
                 _, spin = self.joint_widgets[name]
                 spin.setValue(deg)
+
+    def open_pid_dialog(self, joint_name):
+        current = self.pid_config.get(joint_name, (0.0, 0.0, 0.0))
+        dialog = PIDConfigDialog(joint_name, current, parent=self)
+        if dialog.exec_() and dialog.result:
+            self.pid_config[joint_name] = dialog.result
+            rospy.loginfo(f"Updated PID for {joint_name}: {dialog.result}")
+
+    def open_feedback_dialog(self, joint_name):
+        current_expr = self.feedback_expressions.get(joint_name, "")
+        variable_names = self.get_available_variables()
+        dialog = FeedbackExpressionDialog(joint_name, current_expr, variable_names, parent=self)
+        if dialog.exec_() and dialog.result:
+            self.feedback_expressions[joint_name] = dialog.result
+            rospy.loginfo(f"Updated Feedback expression for {joint_name}: {dialog.result}")

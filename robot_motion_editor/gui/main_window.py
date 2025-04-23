@@ -65,6 +65,8 @@ class MainWindow(QWidget):
         self.save_all_button = QPushButton("Save All")
         self.hardware_checkbox = QCheckBox("Use Real Robot")
 
+        self.variable_names = self.generate_variable_names()
+
         com_layout = QHBoxLayout()
         self.com_port_box = QComboBox()
         self.refresh_ports_button = QPushButton("Refresh Ports")
@@ -98,7 +100,8 @@ class MainWindow(QWidget):
         layout.addLayout(path_layout)
 
         self.tabs = QTabWidget()
-        self.initial_pose_editor = InitialPoseEditor(self.joint_names, self.joint_limits)
+        self.initial_pose_editor = InitialPoseEditor(
+            self.joint_names, self.joint_limits, available_variables=self.variable_names)
         self.tabs.addTab(self.initial_pose_editor, "Initial Pose")
         layout.addWidget(self.tabs)
 
