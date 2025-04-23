@@ -1,3 +1,4 @@
+# motion_editor_scene.py
 from PyQt5.QtCore import QPointF
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush
@@ -15,9 +16,12 @@ class FrameBlockItem(QGraphicsRectItem):
             self.ItemIsMovable
             | self.ItemIsSelectable
         )
-        text = QGraphicsTextItem(frame_name, self)
-        text.setPos(10, 20)
         self.name = frame_name
+
+        # Add label to display frame name
+        self.label = QGraphicsTextItem(frame_name, self)
+        self.label.setDefaultTextColor(QColor("black"))
+        self.label.setPos(10, 20)
 
 
 class MotionFlowScene(QGraphicsScene):
