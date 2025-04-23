@@ -2,6 +2,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDoubleSpinBox
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
@@ -15,6 +16,11 @@ class InitialPoseEditor(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout()
+
+        # Add Save Initial Pose button at the top
+        save_button = QPushButton("Save Initial Pose")
+        layout.addWidget(save_button)
+
         for joint in self.joint_names:
             row = QHBoxLayout()
             label = QLabel(joint)
