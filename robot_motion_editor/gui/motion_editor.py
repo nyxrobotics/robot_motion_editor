@@ -12,11 +12,11 @@ from PyQt5.QtWidgets import QInputDialog
 from PyQt5.QtWidgets import QLabel
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QPushButton
-from PyQt5.QtWidgets import QTreeWidget
 from PyQt5.QtWidgets import QTreeWidgetItem
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
+from .motion_editor_animation_tree_widget import AnimationTreeWidget
 from .motion_editor_scene import MotionFlowScene
 
 
@@ -24,10 +24,7 @@ class MotionEditorWidget(QWidget):
     def __init__(self, animation_root="."):
         super().__init__()
         self.animation_root = animation_root
-        self.animation_tree = QTreeWidget()
-        self.animation_tree.setHeaderHidden(True)
-        self.animation_tree.setDragEnabled(True)
-        self.animation_tree.setSelectionMode(QTreeWidget.SingleSelection)
+        self.animation_tree = AnimationTreeWidget()
 
         self.init_ui()
         self.load_animation_list()
@@ -162,12 +159,3 @@ class MotionEditorWidget(QWidget):
             if os.path.exists(path):
                 os.remove(path)
             self.load_animation_list()
-
-    def mouseMoveEvent(self, event):
-        item = self.animation_tree.currentItem()
-        if item and item.parent() is not None:
-            drag = QDrag(self)
-            mime = QMimeData()
-            mime.setText(item.text(0))
-            drag.setMimeData(mime)
-            drag.exec_(Qt.CopyAction)
