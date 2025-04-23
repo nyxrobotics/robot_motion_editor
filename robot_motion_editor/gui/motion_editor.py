@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
 from .motion_editor_animation_tree_widget import AnimationTreeWidget
+from .motion_editor_scene import FrameBlockItem
 from .motion_editor_scene import MotionFlowScene
 
 
@@ -25,6 +26,7 @@ class MotionEditorWidget(QWidget):
         super().__init__()
         self.animation_root = animation_root
         self.animation_tree = AnimationTreeWidget()
+        self.animation_tree.itemDoubleClicked.connect(self.on_animation_double_clicked)
 
         self.init_ui()
         self.load_animation_list()
@@ -95,7 +97,7 @@ class MotionEditorWidget(QWidget):
 
         os.makedirs(os.path.join(animation_path, "frames"), exist_ok=True)
         with open(os.path.join(animation_path, f"{name}.yaml"), "w") as f:
-            f.write("# animation flowchart\n")
+            f.write("nodes:\n")
         with open(os.path.join(animation_path, "frames", "initial_frame.yaml"), "w") as f:
             f.write("# initial frame\n")
 
@@ -103,11 +105,16 @@ class MotionEditorWidget(QWidget):
 
     def create_new_frame(self):
         current_item = self.animation_tree.currentItem()
-        if not current_item or current_item.parent() is not None:
+        if not current_item:
             QMessageBox.information(self, "Selection Error", "Please select an animation.")
             return
 
-        animation_name = current_item.text(0)
+        if current_item.parent():
+            animation_item = current_item.parent()
+        else:
+            animation_item = current_item
+
+        animation_name = animation_item.text(0)
         animation_path = os.path.join(self.animation_root, animation_name)
         frames_dir = os.path.join(animation_path, "frames")
 
@@ -159,3 +166,25 @@ class MotionEditorWidget(QWidget):
             if os.path.exists(path):
                 os.remove(path)
             self.load_animation_list()
+
+    def on_animation_double_clicked(self, item, column):
+        if item.parent() is not None:
+            return  # only respond to animation nodes
+
+        name = item.text(0)
+        path = os.path.join(self.animation_root, name, f"{name}.yaml")
+        if os.path.exists(path):
+            self.scene.clear()
+            try:
+                with open(path, "r") as f:
+                    import yaml
+                    data = yaml.safe_load(f) or {}
+                    for node in data.get("nodes", []):
+                        frame = node.get("frame")
+                        x = node.get("x", 0)
+                        y = node.get("y", 0)
+                        block = FrameBlockItem(frame)
+                        block.setPos(x, y)
+                        self.scene.addItem(block)
+            except Exception as e:
+                print(f"Failed to load flowchart: {e}")
