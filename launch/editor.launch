@@ -1,0 +1,11 @@
+<launch>
+  <!-- Start the GUI-based robot motion editor -->
+  <node
+    name="robot_motion_editor"
+    pkg="robot_motion_editor"
+    type="main.py"
+    output="screen"
+    required="true"
+    launch-prefix="python3"
+  />
+</launch>
