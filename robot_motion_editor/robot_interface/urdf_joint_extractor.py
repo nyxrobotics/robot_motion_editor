@@ -1,10 +1,14 @@
-from urdf_parser_py.urdf import URDF
+import xml.etree.ElementTree as ET
+
+import rospy
 
 
 def get_transmission_joints():
-    robot = URDF.from_parameter_server()
+    xml_string = rospy.get_param("/robot_description")
+    root = ET.fromstring(xml_string)
     joints = []
-    for t in robot.transmissions:
-        if hasattr(t, 'joint') and t.joint:
-            joints.append(t.joint.name)
+    for transmission in root.findall("transmission"):
+        joint_elem = transmission.find("joint")
+        if joint_elem is not None and 'name' in joint_elem.attrib:
+            joints.append(joint_elem.attrib["name"])
     return joints

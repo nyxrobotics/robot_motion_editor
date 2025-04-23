@@ -4,8 +4,8 @@ from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtWidgets import QComboBox
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QLineEdit
 from PyQt5.QtWidgets import QPushButton
-from PyQt5.QtWidgets import QSpinBox
 from PyQt5.QtWidgets import QTabWidget
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
@@ -59,16 +59,18 @@ class MainWindow(QWidget):
         com_layout.addWidget(self.com_port_box)
         com_layout.addWidget(self.refresh_ports_button)
 
-        self.baudrate_spin = QSpinBox()
-        self.baudrate_spin.setRange(9600, 1000000)
-        self.baudrate_spin.setValue(57600)
+        self.baudrate_combo = QComboBox()
+        baud_rates = ["4500000", "4000000", "3000000", "2000000", "1000000", "115200", "57600", "9600"]
+        self.baudrate_combo.addItems(baud_rates)
+        self.baudrate_combo.setEditable(True)
+        self.baudrate_combo.setCurrentText("115200")
 
         layout.addWidget(self.torque_checkbox)
         layout.addWidget(self.init_pose_button)
         layout.addWidget(self.save_all_button)
         layout.addLayout(com_layout)
         layout.addWidget(QLabel("Baudrate:"))
-        layout.addWidget(self.baudrate_spin)
+        layout.addWidget(self.baudrate_combo)
         layout.addWidget(self.hardware_checkbox)
 
         self.tabs = QTabWidget()
