@@ -3,7 +3,9 @@ import math
 import threading
 
 import rospy
+from moveit_msgs.msg import DisplayRobotState
 from moveit_msgs.msg import DisplayTrajectory
+from moveit_msgs.msg import RobotState
 from moveit_msgs.msg import RobotTrajectory
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory
@@ -19,6 +21,7 @@ class InitialPoseVisualizer:
 
         self.traj_pub = rospy.Publisher("/move_group/display_planned_path", DisplayTrajectory, queue_size=1)
         self.joint_state_sub = rospy.Subscriber("/joint_states", JointState, self.joint_state_callback)
+        self.goal_pub = rospy.Publisher("/move_group/display_robot_state", DisplayRobotState, queue_size=1)
 
     def joint_state_callback(self, msg):
         with self.lock:
@@ -75,5 +78,18 @@ class InitialPoseVisualizer:
         robot_traj.joint_trajectory = self.create_trajectory(start_state, target)
         traj_msg.trajectory.append(robot_traj)
         traj_msg.model_id = "robotis_op3"
-
         self.traj_pub.publish(traj_msg)
+
+    def publish_query_goal_state(self):
+        with self.lock:
+            if self.last_target is None:
+                return
+
+            robot_state = RobotState()
+            robot_state.joint_state = self.last_target
+
+            display_state = DisplayRobotState()
+            display_state.state = robot_state
+            display_state.highlight_links = []
+
+            self.goal_pub.publish(display_state)

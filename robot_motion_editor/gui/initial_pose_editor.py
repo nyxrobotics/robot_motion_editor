@@ -92,3 +92,4 @@ class InitialPoseEditor(QWidget):
                 msg.name = self.joint_names
                 msg.position = current
                 self.visualizer.update_target_pose(msg)
+                self.visualizer.publish_query_goal_state()
