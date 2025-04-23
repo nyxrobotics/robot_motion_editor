@@ -1,7 +1,9 @@
 import glob
+import os
 
 from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtWidgets import QComboBox
+from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
 from PyQt5.QtWidgets import QLineEdit
@@ -42,6 +44,11 @@ class MainWindow(QWidget):
         self.com_port_box.clear()
         self.com_port_box.addItems(ports if ports else ["(no ports found)"])
 
+    def browse_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select Motion Directory", os.getcwd())
+        if folder:
+            self.path_lineedit.setText(folder)
+
     def init_ui(self):
         layout = QVBoxLayout()
 
@@ -65,6 +72,14 @@ class MainWindow(QWidget):
         self.baudrate_combo.setEditable(True)
         self.baudrate_combo.setCurrentText("115200")
 
+        path_layout = QHBoxLayout()
+        self.path_lineedit = QLineEdit()
+        self.browse_button = QPushButton("Browse")
+        self.browse_button.clicked.connect(self.browse_folder)
+        path_layout.addWidget(QLabel("Motion Directory:"))
+        path_layout.addWidget(self.path_lineedit)
+        path_layout.addWidget(self.browse_button)
+
         layout.addWidget(self.torque_checkbox)
         layout.addWidget(self.init_pose_button)
         layout.addWidget(self.save_all_button)
@@ -72,6 +87,7 @@ class MainWindow(QWidget):
         layout.addWidget(QLabel("Baudrate:"))
         layout.addWidget(self.baudrate_combo)
         layout.addWidget(self.hardware_checkbox)
+        layout.addLayout(path_layout)
 
         self.tabs = QTabWidget()
         self.tabs.addTab(InitialPoseEditor(self.joint_names), "Initial Pose")
