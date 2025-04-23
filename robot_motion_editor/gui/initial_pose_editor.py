@@ -1,6 +1,7 @@
+import math
+
 import rospy
 from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QTimer
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QDoubleSpinBox
 from PyQt5.QtWidgets import QHBoxLayout
@@ -26,9 +27,6 @@ class InitialPoseEditor(QWidget):
         self.prev_pose = []
         self.visualizer = InitialPoseVisualizer(joint_names)
         self.init_ui()
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.publish_if_visible)
-        self.timer.start(3000)
 
     def init_ui(self):
         main_layout = QVBoxLayout()
@@ -58,9 +56,12 @@ class InitialPoseEditor(QWidget):
             spin.setSingleStep(1.0)
             spin.setRange(-180.0, 180.0)
 
+            # Synchronize slider and spin box
             slider.valueChanged.connect(lambda val, s=spin: s.setValue(float(val)))
             spin.valueChanged.connect(lambda val, sl=slider: sl.setValue(int(round(val))))
-            spin.valueChanged.connect(self.pose_updated.emit)
+
+            # Publish when value changes
+            spin.valueChanged.connect(self.on_pose_changed)
 
             row.addWidget(label)
             row.addWidget(slider)
@@ -77,16 +78,17 @@ class InitialPoseEditor(QWidget):
         positions = []
         for joint in self.joint_names:
             _, spin = self.joint_widgets[joint]
-            positions.append(spin.value())
+            degree = spin.value()
+            radian = math.radians(degree)
+            positions.append(radian)
         return positions
 
-    def publish_if_visible(self):
+    def on_pose_changed(self):
         if self.isVisible():
             current = self.get_target_joints()
             if current != self.prev_pose:
                 self.prev_pose = current
-            msg = JointState()
-            msg.name = self.joint_names
-            msg.position = current
-            self.visualizer.update_target_pose(msg)
-            self.visualizer.timer_callback(None)
+                msg = JointState()
+                msg.name = self.joint_names
+                msg.position = current
+                self.visualizer.update_target_pose(msg)
