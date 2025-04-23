@@ -3,6 +3,7 @@ import math
 import rospy
 from PyQt5.QtCore import Qt
 from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtWidgets import QDoubleSpinBox
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
@@ -30,7 +31,10 @@ class InitialPoseEditor(QWidget):
         self.joint_names = joint_names
         self.joint_limits = joint_limits
         self.available_variables = available_variables
+
         self.joint_widgets = {}
+        self.joint_enabled = {}
+        self.enable_checkbox_widgets = {}
         self.pid_config = {}
         self.feedback_expressions = {}
         self.prev_pose = []
@@ -45,15 +49,29 @@ class InitialPoseEditor(QWidget):
         content = QWidget()
         layout = QVBoxLayout(content)
 
+        # Save + All Enable row
+        save_row = QHBoxLayout()
+        self.all_enable_checkbox = QCheckBox("All Enable")
+        self.all_enable_checkbox.stateChanged.connect(self.set_all_enable_checkboxes)
+        save_row.addWidget(self.all_enable_checkbox)
+
         save_button = QPushButton("Save Initial Pose")
         save_button.clicked.connect(self.save_pose_to_file)
-        layout.addWidget(save_button)
+        save_row.addWidget(save_button)
+        layout.addLayout(save_row)
 
         max_label = QLabel(max(self.joint_names, key=len))
         max_label_width = max_label.sizeHint().width()
 
         for joint in self.joint_names:
             row = QHBoxLayout()
+
+            enable_cb = QCheckBox()
+            enable_cb.setChecked(True)
+            enable_cb.stateChanged.connect(self.update_all_enable_checkbox)
+            self.enable_checkbox_widgets[joint] = enable_cb
+            self.joint_enabled[joint] = True
+
             label = QLabel(joint)
             label.setFixedWidth(max_label_width)
 
@@ -83,6 +101,7 @@ class InitialPoseEditor(QWidget):
             fb_button.setFixedWidth(50)
             fb_button.clicked.connect(lambda _, j=joint, btn=fb_button: self.open_feedback_dialog(j, btn))
 
+            row.addWidget(enable_cb)
             row.addWidget(label)
             row.addWidget(slider)
             row.addWidget(spin)
@@ -138,6 +157,31 @@ class InitialPoseEditor(QWidget):
             if name in self.joint_widgets:
                 _, spin = self.joint_widgets[name]
                 spin.setValue(deg)
+
+    def set_all_enable_checkboxes(self, state):
+        checked = state == Qt.Checked
+        for joint, checkbox in self.enable_checkbox_widgets.items():
+            checkbox.blockSignals(True)
+            checkbox.setChecked(checked)
+            self.joint_enabled[joint] = checked
+            checkbox.blockSignals(False)
+
+    def update_all_enable_checkbox(self):
+        checked_count = sum(cb.isChecked() for cb in self.enable_checkbox_widgets.values())
+        total = len(self.enable_checkbox_widgets)
+        if checked_count == total:
+            self.all_enable_checkbox.blockSignals(True)
+            self.all_enable_checkbox.setCheckState(Qt.Checked)
+            self.all_enable_checkbox.blockSignals(False)
+        elif checked_count == 0:
+            self.all_enable_checkbox.blockSignals(True)
+            self.all_enable_checkbox.setCheckState(Qt.Unchecked)
+            self.all_enable_checkbox.blockSignals(False)
+        else:
+            self.all_enable_checkbox.blockSignals(True)
+            self.all_enable_checkbox.setTristate(True)
+            self.all_enable_checkbox.setCheckState(Qt.PartiallyChecked)
+            self.all_enable_checkbox.blockSignals(False)
 
     def open_pid_dialog(self, joint_name, button):
         current = self.pid_config.get(joint_name, (0.0, 0.0, 0.0))
