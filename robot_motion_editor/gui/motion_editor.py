@@ -1,10 +1,11 @@
+# motion_editor.py
 import os
-import shutil
 
+from PyQt5.QtCore import QMimeData
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QDrag
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QFileDialog
-from PyQt5.QtWidgets import QGraphicsScene
 from PyQt5.QtWidgets import QGraphicsView
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QInputDialog
@@ -16,6 +17,8 @@ from PyQt5.QtWidgets import QTreeWidgetItem
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
+from .motion_editor_scene import MotionFlowScene
+
 
 class MotionEditorWidget(QWidget):
     def __init__(self, animation_root="."):
@@ -23,6 +26,8 @@ class MotionEditorWidget(QWidget):
         self.animation_root = animation_root
         self.animation_tree = QTreeWidget()
         self.animation_tree.setHeaderHidden(True)
+        self.animation_tree.setDragEnabled(True)
+        self.animation_tree.setSelectionMode(QTreeWidget.SingleSelection)
 
         self.init_ui()
         self.load_animation_list()
@@ -30,9 +35,8 @@ class MotionEditorWidget(QWidget):
     def init_ui(self):
         main_layout = QHBoxLayout()
 
-        # --- Left: Animation List ---
+        # --- Left Panel ---
         left_panel = QVBoxLayout()
-
         self.save_anim_btn = QPushButton("Save Animation")
         self.save_frame_btn = QPushButton("Save Frame")
         self.new_anim_btn = QPushButton("New Animation")
@@ -40,23 +44,24 @@ class MotionEditorWidget(QWidget):
         self.delete_anim_btn = QPushButton("Delete Animation")
         self.delete_frame_btn = QPushButton("Delete Frame")
 
+        self.save_anim_btn.clicked.connect(lambda: print("Save Animation not implemented"))
+        self.save_frame_btn.clicked.connect(lambda: print("Save Frame not implemented"))
         self.new_anim_btn.clicked.connect(self.create_new_animation)
         self.new_frame_btn.clicked.connect(self.create_new_frame)
         self.delete_anim_btn.clicked.connect(self.delete_animation)
         self.delete_frame_btn.clicked.connect(self.delete_frame)
 
         left_panel.addWidget(QLabel("Animation List"))
-        left_panel.addWidget(self.save_anim_btn)
-        left_panel.addWidget(self.save_frame_btn)
-        left_panel.addWidget(self.new_anim_btn)
-        left_panel.addWidget(self.new_frame_btn)
+        for btn in [self.save_anim_btn, self.save_frame_btn, self.new_anim_btn, self.new_frame_btn,
+                    self.delete_anim_btn, self.delete_frame_btn]:
+            left_panel.addWidget(btn)
         left_panel.addWidget(self.animation_tree)
-        left_panel.addWidget(self.delete_anim_btn)
-        left_panel.addWidget(self.delete_frame_btn)
 
-        # --- Right: Flowchart View ---
-        self.scene = QGraphicsScene()
+        # --- Right Panel (Flowchart) ---
+        self.scene = MotionFlowScene()
+        self.scene.setSceneRect(0, 0, 2000, 2000)
         self.view = QGraphicsView(self.scene)
+        self.view.setAcceptDrops(True)
         self.view.setRenderHints(self.view.renderHints() | QPainter.Antialiasing)
 
         main_layout.addLayout(left_panel, stretch=1)
@@ -135,6 +140,7 @@ class MotionEditorWidget(QWidget):
                                      f"Are you sure you want to delete animation '{name}'?",
                                      QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
+            import shutil
             shutil.rmtree(path, ignore_errors=True)
             self.load_animation_list()
 
@@ -156,3 +162,12 @@ class MotionEditorWidget(QWidget):
             if os.path.exists(path):
                 os.remove(path)
             self.load_animation_list()
+
+    def mouseMoveEvent(self, event):
+        item = self.animation_tree.currentItem()
+        if item and item.parent() is not None:
+            drag = QDrag(self)
+            mime = QMimeData()
+            mime.setText(item.text(0))
+            drag.setMimeData(mime)
+            drag.exec_(Qt.CopyAction)
