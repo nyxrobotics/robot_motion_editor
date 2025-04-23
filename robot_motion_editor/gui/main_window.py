@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
 from robot_motion_editor.gui.initial_pose_editor import InitialPoseEditor
+from robot_motion_editor.robot_interface.urdf_joint_extractor import get_joint_limit
 from robot_motion_editor.robot_interface.urdf_joint_extractor import get_transmission_joints
 
 
@@ -23,6 +24,10 @@ class MainWindow(QWidget):
         self.resize(1000, 800)
 
         self.joint_names = get_transmission_joints()
+        self.joint_limits = {
+            name: get_joint_limit(name)
+            for name in self.joint_names
+        }
         self.variable_names = self.generate_variable_names()
         self.init_ui()
 
@@ -48,6 +53,9 @@ class MainWindow(QWidget):
         folder = QFileDialog.getExistingDirectory(self, "Select Motion Directory", os.getcwd())
         if folder:
             self.path_lineedit.setText(folder)
+            # Pass the directory to InitialPoseEditor
+            if self.initial_pose_editor:
+                self.initial_pose_editor.set_motion_directory(folder)
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -90,7 +98,8 @@ class MainWindow(QWidget):
         layout.addLayout(path_layout)
 
         self.tabs = QTabWidget()
-        self.tabs.addTab(InitialPoseEditor(self.joint_names), "Initial Pose")
+        self.initial_pose_editor = InitialPoseEditor(self.joint_names, self.joint_limits)
+        self.tabs.addTab(self.initial_pose_editor, "Initial Pose")
         layout.addWidget(self.tabs)
 
         self.setLayout(layout)

@@ -14,16 +14,20 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 from sensor_msgs.msg import JointState
 
+from .initial_pose_file_manager import load_initial_pose
+from .initial_pose_file_manager import save_initial_pose
 from .initial_pose_visualizer import InitialPoseVisualizer
 
 
 class InitialPoseEditor(QWidget):
     pose_updated = pyqtSignal()
 
-    def __init__(self, joint_names):
+    def __init__(self, joint_names, joint_limits):
         super().__init__()
+        self.motion_directory = "."
         self.joint_names = joint_names
-        self.joint_widgets = {}  # {name: (slider, spin)}
+        self.joint_limits = joint_limits
+        self.joint_widgets = {}
         self.prev_pose = []
         self.visualizer = InitialPoseVisualizer(joint_names)
         self.init_ui()
@@ -38,6 +42,7 @@ class InitialPoseEditor(QWidget):
 
         save_button = QPushButton("Save Initial Pose")
         layout.addWidget(save_button)
+        save_button.clicked.connect(self.save_pose_to_file)
 
         max_label = QLabel(max(self.joint_names, key=len))
         max_label_width = max_label.sizeHint().width()
@@ -48,13 +53,19 @@ class InitialPoseEditor(QWidget):
             label.setFixedWidth(max_label_width)
 
             slider = QSlider(Qt.Horizontal)
-            slider.setRange(-180, 180)
             slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
             spin = QDoubleSpinBox()
             spin.setDecimals(1)
             spin.setSingleStep(1.0)
-            spin.setRange(-180.0, 180.0)
+
+            # Get joint limit and convert to degrees
+            lower_rad, upper_rad = self.joint_limits.get(joint, (-math.pi, math.pi))
+            lower_deg = math.degrees(lower_rad)
+            upper_deg = math.degrees(upper_rad)
+
+            slider.setRange(int(lower_deg), int(upper_deg))
+            spin.setRange(lower_deg, upper_deg)
 
             # Synchronize slider and spin box
             slider.valueChanged.connect(lambda val, s=spin: s.setValue(float(val)))
@@ -93,3 +104,27 @@ class InitialPoseEditor(QWidget):
                 msg.position = current
                 self.visualizer.update_target_pose(msg)
                 self.visualizer.publish_query_goal_state()
+
+    def set_motion_directory(self, directory):
+        """
+        Set the motion directory and attempt to load the initial pose.
+        """
+        self.motion_directory = directory
+        self.load_pose_if_exists()
+
+    def save_pose_to_file(self):
+        positions = self.get_target_joints()
+        save_initial_pose(self.motion_directory, self.joint_names, positions)
+        rospy.loginfo("Initial pose saved.")
+
+    def load_pose_if_exists(self):
+        loaded = load_initial_pose(self.motion_directory)
+        if not loaded:
+            rospy.logwarn(f"No initial pose file found in {self.motion_directory}")
+            return
+
+        for name, rad in loaded.items():
+            deg = math.degrees(rad)
+            if name in self.joint_widgets:
+                _, spin = self.joint_widgets[name]
+                spin.setValue(deg)
