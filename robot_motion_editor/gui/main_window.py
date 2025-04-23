@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
 from robot_motion_editor.gui.initial_pose_editor import InitialPoseEditor
+from robot_motion_editor.gui.motion_editor import MotionEditorWidget
 from robot_motion_editor.robot_interface.urdf_joint_extractor import get_joint_limit
 from robot_motion_editor.robot_interface.urdf_joint_extractor import get_transmission_joints
 
@@ -100,9 +101,13 @@ class MainWindow(QWidget):
         layout.addLayout(path_layout)
 
         self.tabs = QTabWidget()
+        # Initial Pose Editor
         self.initial_pose_editor = InitialPoseEditor(
             self.joint_names, self.joint_limits, available_variables=self.variable_names)
         self.tabs.addTab(self.initial_pose_editor, "Initial Pose")
-        layout.addWidget(self.tabs)
+        # Motion Editor
+        self.motion_editor = MotionEditorWidget(animation_root="motion_directory")
+        self.tabs.addTab(self.motion_editor, "Motion Editor")
 
+        layout.addWidget(self.tabs)
         self.setLayout(layout)
