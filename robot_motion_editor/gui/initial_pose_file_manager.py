@@ -3,18 +3,27 @@ import os
 import yaml
 
 
-def save_initial_pose(directory, joint_names, positions, filename="initial_pose.yaml"):
+def save_initial_pose(
+        directory,
+        joint_names,
+        positions,
+        enabled,
+        pid_config,
+        feedback_exprs,
+        filename="initial_pose.yaml"):
     """
-    Save the initial pose to a YAML file.
+    Save initial pose and related settings to YAML.
+    """
+    data = {"joints": {}}
+    for name, pos in zip(joint_names, positions):
+        data["joints"][name] = {
+            "position": float(pos),
+            "enable": bool(enabled.get(name, True)),
+            "pid": list(pid_config.get(name, (0.0, 0.0, 0.0))),
+            "feedback": str(feedback_exprs.get(name, "")).strip()
+        }
 
-    :param directory: Target directory to save the file
-    :param joint_names: List of joint names
-    :param positions: List of joint angles in radians
-    :param filename: Output file name (default: initial_pose.yaml)
-    """
-    data = {"joints": {name: float(pos) for name, pos in zip(joint_names, positions)}}
     os.makedirs(directory, exist_ok=True)
-
     path = os.path.join(directory, filename)
     with open(path, "w") as f:
         yaml.safe_dump(data, f, default_flow_style=False)
@@ -22,11 +31,7 @@ def save_initial_pose(directory, joint_names, positions, filename="initial_pose.
 
 def load_initial_pose(directory, filename="initial_pose.yaml"):
     """
-    Load the initial pose from a YAML file.
-
-    :param directory: Directory containing the pose file
-    :param filename: File name to load (default: initial_pose.yaml)
-    :return: Dictionary mapping joint names to angles in radians
+    Load pose and related settings from YAML.
     """
     path = os.path.join(directory, filename)
     if not os.path.exists(path):

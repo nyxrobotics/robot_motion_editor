@@ -142,21 +142,50 @@ class InitialPoseEditor(QWidget):
     def save_pose_to_file(self):
         positions = self.get_target_joints()
         if self.motion_directory:
-            save_initial_pose(self.motion_directory, self.joint_names, positions)
+            save_initial_pose(
+                self.motion_directory,
+                self.joint_names,
+                positions,
+                enabled=self.joint_enabled,
+                pid_config=self.pid_config,
+                feedback_exprs=self.feedback_expressions
+            )
             rospy.loginfo("Initial pose saved.")
 
     def load_pose_if_exists(self):
         if not self.motion_directory:
             return
+
         loaded = load_initial_pose(self.motion_directory)
         if not loaded:
             return
 
-        for name, rad in loaded.items():
-            deg = math.degrees(rad)
-            if name in self.joint_widgets:
-                _, spin = self.joint_widgets[name]
-                spin.setValue(deg)
+        for name, settings in loaded.items():
+            if name not in self.joint_widgets:
+                continue
+
+            # Position
+            pos_rad = float(settings.get("position", 0.0))
+            deg = math.degrees(pos_rad)
+            _, spin = self.joint_widgets[name]
+            spin.setValue(deg)
+
+            # Enable
+            enable_cb = self.enable_checkbox_widgets.get(name)
+            if enable_cb:
+                state = bool(settings.get("enable", True))
+                enable_cb.setChecked(state)
+                self.joint_enabled[name] = state
+
+            # PID
+            pid = settings.get("pid", [0.0, 0.0, 0.0])
+            if isinstance(pid, list) and len(pid) == 3:
+                self.pid_config[name] = tuple(pid)
+
+            # Feedback
+            feedback = settings.get("feedback", "")
+            if isinstance(feedback, str):
+                self.feedback_expressions[name] = feedback
 
     def set_all_enable_checkboxes(self, state):
         checked = state == Qt.Checked
