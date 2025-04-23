@@ -45,6 +45,25 @@ class FeedbackExpressionDialog(QDialog):
         text = "\n".join(self.available_variables)
         QMessageBox.information(self, "Available Variables", text)
 
+    def validate_expression(self, expr):
+        if not expr.strip():
+            return True
+        try:
+            code = compile(expr, "<string>", "eval")
+        except SyntaxError:
+            return False
+        for name in code.co_names:
+            if name not in self.available_variables:
+                return False
+        return True
+
     def accept_and_store(self):
-        self.result = self.expr_edit.toPlainText().strip()
+        expr = self.expr_edit.toPlainText().strip()
+        if not self.validate_expression(expr):
+            QMessageBox.critical(
+                self, "Invalid Expression",
+                "The expression contains syntax errors or undefined variables."
+            )
+            return
+        self.result = expr
         self.accept()

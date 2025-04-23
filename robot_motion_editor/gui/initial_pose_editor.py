@@ -202,8 +202,6 @@ class InitialPoseEditor(QWidget):
         )
         if dialog.exec_() and dialog.result is not None:
             self.feedback_expressions[joint_name] = dialog.result
-            if dialog.result.strip():
-                button.setStyleSheet("background-color: lightblue;")
-            else:
-                button.setStyleSheet("")
+            expr = dialog.result.strip()
+            button.setStyleSheet("background-color: lightblue" if expr else "")
             rospy.loginfo(f"Updated Feedback expression for {joint_name}: {dialog.result}")
