@@ -1,3 +1,5 @@
+# motion_editor_scene.py（完全版、修正済み）
+
 import math
 
 from PyQt5.QtCore import QPointF
@@ -16,6 +18,15 @@ from PyQt5.QtWidgets import QGraphicsTextItem
 from PyQt5.QtWidgets import QMenu
 
 
+def compute_edge_point(center, target, width, height):
+    dx = target.x() - center.x()
+    dy = target.y() - center.y()
+    if dx == 0 and dy == 0:
+        return center
+    scale = 0.5 / max(abs(dx) / width, abs(dy) / height)
+    return QPointF(center.x() + dx * scale, center.y() + dy * scale)
+
+
 class FrameBlockItem(QGraphicsRectItem):
     def __init__(self, frame_name, uid=None):
         temp_label = QGraphicsTextItem(frame_name)
@@ -23,27 +34,19 @@ class FrameBlockItem(QGraphicsRectItem):
         text_width = font_metrics.width(frame_name)
         width = max(120, text_width + 20)
         height = 60
-
         super().__init__(0, 0, width, height)
         self.setBrush(QBrush(QColor("#1a1a1a")))
-        self.default_pen = QPen(QColor("#ffffff"))
-        self.highlight_pen = QPen(QColor("#00ff00"))
-        self.selected_pen = QPen(QColor("#00ffff"))
-        self.default_pen.setWidth(3)
-        self.highlight_pen.setWidth(3)
-        self.selected_pen.setWidth(4)
+        self.default_pen = QPen(QColor("#ffffff"), 3)
+        self.highlight_pen = QPen(QColor("#00ff00"), 3)
+        self.selected_pen = QPen(QColor("#00ffff"), 4)
         self.setPen(self.default_pen)
-
         self.setFlags(self.ItemIsMovable | self.ItemIsSelectable | self.ItemSendsGeometryChanges)
         self.name = frame_name
-        self.uid = uid if uid is not None else frame_name
-
+        self.uid = uid or frame_name
         self.label = QGraphicsTextItem(frame_name, self)
         self.label.setDefaultTextColor(QColor("white"))
-        label_width = self.label.boundingRect().width()
-        label_height = self.label.boundingRect().height()
-        self.label.setPos((width - label_width) / 2, (height - label_height) / 2)
-
+        self.label.setPos((width - self.label.boundingRect().width()) / 2,
+                          (height - self.label.boundingRect().height()) / 2)
         self.connection = {"output": {}}
         self.is_highlighted = False
 
@@ -52,30 +55,49 @@ class FrameBlockItem(QGraphicsRectItem):
         self.update()
 
     def paint(self, painter, option, widget=None):
-        if self.isSelected():
-            self.setPen(self.selected_pen)
-        elif self.is_highlighted:
-            self.setPen(self.highlight_pen)
-        else:
-            self.setPen(self.default_pen)
+        self.setPen(self.selected_pen if self.isSelected() else
+                    self.highlight_pen if self.is_highlighted else
+                    self.default_pen)
         super().paint(painter, option, widget)
 
     def itemChange(self, change, value):
-        if change == self.ItemPositionChange and self.scene() is not None:
+        if change == self.ItemPositionChange and self.scene():
             for item in self.scene().items():
-                if isinstance(item, ArrowItem):
-                    if item.start_item == self or item.end_item == self:
-                        item.update_path(force_edge_snap=True)
+                if isinstance(item, ArrowItem) and (item.start_item == self or item.end_item == self):
+                    item.update_path(force_edge_snap=True)
         return super().itemChange(change, value)
 
 
-def compute_edge_point(center, target, width, height):
-    dx = target.x() - center.x()
-    dy = target.y() - center.y()
-    if dx == 0 and dy == 0:
-        return center
-    scale = 0.5 / max(abs(dx) / width, abs(dy) / height)
-    return QPointF(center.x() + dx * scale, center.y() + dy * scale)
+class WaypointItem(QGraphicsEllipseItem):
+    def __init__(self, pos, arrow):
+        super().__init__(-4, -4, 8, 8)
+        self.setBrush(QBrush(QColor("yellow")))
+        self.setFlags(self.ItemIsMovable | self.ItemIsSelectable)
+        self.setZValue(1)
+        self.setPos(pos)
+        self.arrow = arrow
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        self.arrow.update_path()
+
+
+class HoverPoint(QGraphicsEllipseItem):
+    def __init__(self, pos, arrow, segment_index):
+        super().__init__(-5, -5, 10, 10)
+        self.setBrush(QBrush(QColor("white")))
+        self.setZValue(0.5)
+        self.setPos(pos)
+        self.setAcceptHoverEvents(True)
+        self.setFlag(self.ItemIsMovable, False)
+        self.arrow = arrow
+        self.segment_index = segment_index
+
+    def mousePressEvent(self, event):
+        waypoint = self.arrow.insert_waypoint(self.segment_index, self.scenePos())
+        self.scene().removeItem(self)
+        waypoint.setSelected(True)
+        waypoint.mousePressEvent(event)
 
 
 class ArrowEndpointHandle(QGraphicsEllipseItem):
@@ -90,10 +112,7 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
         pos = self.scenePos()
-        scene = self.scene()
-        if not scene:
-            return
-        for item in scene.items():
+        for item in self.scene().items():
             if isinstance(item, FrameBlockItem):
                 item.set_highlighted(item.sceneBoundingRect().contains(pos))
         self.arrow.update_path(force_edge_snap=False)
@@ -126,6 +145,8 @@ class ArrowItem(QGraphicsPathItem):
         self.end_item = None
         self.start_handle = ArrowEndpointHandle(self, True)
         self.end_handle = ArrowEndpointHandle(self, False)
+        self.waypoints = []
+        self.hover_points = []
         self.start_handle.setPos(0, 0)
         self.end_handle.setPos(100, 0)
 
@@ -134,57 +155,76 @@ class ArrowItem(QGraphicsPathItem):
         scene.addItem(self.start_handle)
         scene.addItem(self.end_handle)
 
+    def insert_waypoint(self, index, pos):
+        wp = WaypointItem(pos, self)
+        self.scene().addItem(wp)
+        self.waypoints.insert(index, wp)
+        self.update_path()
+        return wp
+
+    def remove_all_waypoints(self):
+        for wp in self.waypoints:
+            self.scene().removeItem(wp)
+        self.waypoints.clear()
+
+    def refresh_hover_points(self):
+        for hp in self.hover_points:
+            self.scene().removeItem(hp)
+        self.hover_points.clear()
+
+        points = [self.start_handle.scenePos()] + \
+                 [wp.scenePos() for wp in self.waypoints] + \
+                 [self.end_handle.scenePos()]
+        for i in range(len(points) - 1):
+            mid = (points[i] + points[i + 1]) * 0.5
+            hp = HoverPoint(mid, self, i)
+            self.scene().addItem(hp)
+            self.hover_points.append(hp)
+
     def update_path(self, force_edge_snap=False):
-        is_fully_connected = self.start_item is not None and self.end_item is not None
-        pen = QPen(QColor("white"), 4)
-        pen.setStyle(Qt.SolidLine if is_fully_connected else Qt.DashLine)
-        self.setPen(pen)
-
-        path = QPainterPath()
-
-        # 始点の位置
         if self.start_item:
             start_center = self.start_item.sceneBoundingRect().center()
             end_center = self.end_item.sceneBoundingRect().center() if self.end_item else self.end_handle.scenePos()
-            w = self.start_item.rect().width()
-            h = self.start_item.rect().height()
-            p1 = compute_edge_point(
-                start_center,
-                end_center,
-                w,
-                h) if force_edge_snap else self.start_handle.scenePos()
+            p1 = compute_edge_point(start_center, end_center,
+                                    self.start_item.rect().width(), self.start_item.rect().height()) \
+                if force_edge_snap else self.start_handle.scenePos()
             if force_edge_snap:
                 self.start_handle.setPos(p1)
         else:
             p1 = self.start_handle.scenePos()
 
-        # 終点の位置
         if self.end_item:
             end_center = self.end_item.sceneBoundingRect().center()
             start_center = self.start_item.sceneBoundingRect().center() if self.start_item else self.start_handle.scenePos()
-            w = self.end_item.rect().width()
-            h = self.end_item.rect().height()
-            p2 = compute_edge_point(end_center, start_center, w, h) if force_edge_snap else self.end_handle.scenePos()
+            p2 = compute_edge_point(end_center, start_center,
+                                    self.end_item.rect().width(), self.end_item.rect().height()) \
+                if force_edge_snap else self.end_handle.scenePos()
             if force_edge_snap:
                 self.end_handle.setPos(p2)
         else:
             p2 = self.end_handle.scenePos()
 
-        # 本体の線
+        path = QPainterPath()
         path.moveTo(p1)
+        for wp in self.waypoints:
+            path.lineTo(wp.scenePos())
         path.lineTo(p2)
 
-        # やじりの描画
-        angle = math.atan2(p2.y() - p1.y(), p2.x() - p1.x())
+        # Arrowhead
+        angle = math.atan2(p2.y() - path.elementAt(path.elementCount() - 2).y,
+                           p2.x() - path.elementAt(path.elementCount() - 2).x)
         arrow_size = 24
-        arrow_p1 = p2 - QPointF(arrow_size * math.cos(angle - math.pi / 6), arrow_size * math.sin(angle - math.pi / 6))
-        arrow_p2 = p2 - QPointF(arrow_size * math.cos(angle + math.pi / 6), arrow_size * math.sin(angle + math.pi / 6))
+        arrow_p1 = p2 - QPointF(arrow_size * math.cos(angle - math.pi / 6),
+                                arrow_size * math.sin(angle - math.pi / 6))
+        arrow_p2 = p2 - QPointF(arrow_size * math.cos(angle + math.pi / 6),
+                                arrow_size * math.sin(angle + math.pi / 6))
         path.moveTo(p2)
         path.lineTo(arrow_p1)
         path.moveTo(p2)
         path.lineTo(arrow_p2)
 
         self.setPath(path)
+        self.refresh_hover_points()
 
 
 class MotionFlowScene(QGraphicsScene):
@@ -212,18 +252,13 @@ class MotionFlowScene(QGraphicsScene):
         if isinstance(item, FrameBlockItem):
             item.setSelected(True)
             item.contextMenuEvent(event)
-            return
         else:
-            add_frame_action = QAction("Add New Frame", menu)
-            add_arrow_action = QAction("New Arrow", menu)
-            menu.addAction(add_frame_action)
-            menu.addAction(add_arrow_action)
+            menu.addAction(QAction("Add New Frame", menu))
+            arrow_action = QAction("New Arrow", menu)
+            menu.addAction(arrow_action)
             selected_action = menu.exec_(event.screenPos())
-            if selected_action == add_frame_action:
-                print("New Frame block requested")
-            elif selected_action == add_arrow_action:
-                arrow_id = self._generate_arrow_id()
-                arrow = ArrowItem(arrow_id)
+            if selected_action == arrow_action:
+                arrow = ArrowItem(self._generate_arrow_id())
                 pos = event.scenePos()
                 arrow.start_handle.setPos(pos)
                 arrow.end_handle.setPos(pos + QPointF(100, 0))
@@ -234,6 +269,8 @@ class MotionFlowScene(QGraphicsScene):
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete:
             for item in self.selectedItems():
+                if isinstance(item, WaypointItem):
+                    item.arrow.waypoints.remove(item)
                 self.removeItem(item)
         else:
             super().keyPressEvent(event)
