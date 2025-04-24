@@ -1,4 +1,3 @@
-# motion_editor_scene.py
 from PyQt5.QtCore import QPointF
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush
@@ -11,7 +10,7 @@ from PyQt5.QtWidgets import QGraphicsScene
 from PyQt5.QtWidgets import QGraphicsTextItem
 from PyQt5.QtWidgets import QMenu
 
-from .if_condition_editor import IfConditionEditorDialog
+from .if_condition_editor import IfConditionExpressionDialog
 
 
 class FrameBlockItem(QGraphicsRectItem):
@@ -95,16 +94,19 @@ class MotionFlowScene(QGraphicsScene):
             self.add_if_condition_block(event.scenePos())
 
     def add_if_condition_block(self, pos):
-        dialog = IfConditionEditorDialog(
-            frame_names=self.get_all_frame_names(),
-            available_variables=self.available_variables
+        dialog = IfConditionExpressionDialog(
+            available_variables=self.available_variables,
+            frame_names=self.get_all_frame_names()
         )
         if dialog.exec_():
-            result = dialog.get_result()
+            result = dialog.result
             block_name = f"if_{len(self.items())+1}"
             item = FrameBlockItem(block_name)
             item.label.setPlainText(f"if:{result['condition']}")
             item.setPos(pos)
+            item.condition = result['condition']
+            item.to_true = result['to_true']
+            item.to_false = result['to_false']
             self.addItem(item)
 
     def get_all_frame_names(self):

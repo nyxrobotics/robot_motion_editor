@@ -1,88 +1,89 @@
 from PyQt5.QtWidgets import QComboBox
 from PyQt5.QtWidgets import QDialog
-from PyQt5.QtWidgets import QGridLayout
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
-from PyQt5.QtWidgets import QLineEdit
+from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtWidgets import QVBoxLayout
 
 
-class IfConditionEditorDialog(QDialog):
-    def __init__(self, frame_names, available_variables, condition="", to_true="", to_false="", parent=None):
+class IfConditionExpressionDialog(QDialog):
+    def __init__(self, available_variables, frame_names, condition="", to_true="", to_false="", parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Edit If Condition")
-        self.resize(420, 260)
+        self.setWindowTitle("If Condition Editor")
+        self.result = None
+        self.available_variables = available_variables or []
 
-        self.available_variables = available_variables
-        self.condition = condition
-        self.to_true = to_true
-        self.to_false = to_false
+        self.init_ui(condition, frame_names, to_true, to_false)
 
-        self.init_ui(frame_names)
-
-    def init_ui(self, frame_names):
+    def init_ui(self, current_expr, frame_names, to_true, to_false):
         layout = QVBoxLayout()
 
-        # Condition input
-        cond_layout = QHBoxLayout()
-        cond_layout.addWidget(QLabel("Condition:"))
-        self.condition_input = QLineEdit(self.condition)
-        cond_layout.addWidget(self.condition_input)
-        layout.addLayout(cond_layout)
+        layout.addWidget(QLabel("Enter if condition (e.g., imu_pitch > 0.1):"))
 
-        # Target frames
-        grid = QGridLayout()
-        grid.addWidget(QLabel("If True →"), 0, 0)
+        self.expr_edit = QTextEdit()
+        self.expr_edit.setPlainText(current_expr)
+        layout.addWidget(self.expr_edit)
+
+        # to_true
+        true_layout = QHBoxLayout()
+        true_layout.addWidget(QLabel("If True →"))
         self.true_combo = QComboBox()
         self.true_combo.addItems(frame_names)
-        self.true_combo.setCurrentText(self.to_true)
-        grid.addWidget(self.true_combo, 0, 1)
+        self.true_combo.setCurrentText(to_true)
+        true_layout.addWidget(self.true_combo)
+        layout.addLayout(true_layout)
 
-        grid.addWidget(QLabel("If False →"), 1, 0)
+        # to_false
+        false_layout = QHBoxLayout()
+        false_layout.addWidget(QLabel("If False →"))
         self.false_combo = QComboBox()
         self.false_combo.addItems(frame_names)
-        self.false_combo.setCurrentText(self.to_false)
-        grid.addWidget(self.false_combo, 1, 1)
+        self.false_combo.setCurrentText(to_false)
+        false_layout.addWidget(self.false_combo)
+        layout.addLayout(false_layout)
 
-        layout.addLayout(grid)
+        btn_layout = QHBoxLayout()
+        show_vars_btn = QPushButton("Show Variables")
+        show_vars_btn.clicked.connect(self.show_variables)
+        ok_btn = QPushButton("OK")
+        ok_btn.clicked.connect(self.accept_and_store)
 
-        # Variable reference
-        var_button = QPushButton("Show Variables")
-        var_button.clicked.connect(self.show_variable_list)
-        layout.addWidget(var_button)
-
-        # Buttons
-        button_layout = QHBoxLayout()
-        self.ok_button = QPushButton("OK")
-        self.cancel_button = QPushButton("Cancel")
-        self.ok_button.clicked.connect(self.accept)
-        self.cancel_button.clicked.connect(self.reject)
-        button_layout.addStretch()
-        button_layout.addWidget(self.ok_button)
-        button_layout.addWidget(self.cancel_button)
-        layout.addLayout(button_layout)
+        btn_layout.addWidget(show_vars_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(ok_btn)
+        layout.addLayout(btn_layout)
 
         self.setLayout(layout)
 
-    def show_variable_list(self):
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Available Variables")
-        dlg.resize(300, 250)
-        vbox = QVBoxLayout()
-        label = QLabel("\n".join(self.available_variables))
-        label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        vbox.addWidget(label)
-        close_btn = QPushButton("Close")
-        close_btn.clicked.connect(dlg.accept)
-        vbox.addWidget(close_btn)
-        dlg.setLayout(vbox)
-        dlg.exec_()
+    def show_variables(self):
+        text = "\n".join(self.available_variables)
+        QMessageBox.information(self, "Available Variables", text)
 
-    def get_result(self):
-        return {
-            "condition": self.condition_input.text().strip(),
+    def validate_expression(self, expr):
+        if not expr.strip():
+            return True
+        try:
+            code = compile(expr, "<string>", "eval")
+        except SyntaxError:
+            return False
+        for name in code.co_names:
+            if name not in self.available_variables:
+                return False
+        return True
+
+    def accept_and_store(self):
+        expr = self.expr_edit.toPlainText().strip()
+        if not self.validate_expression(expr):
+            QMessageBox.critical(
+                self, "Invalid Expression",
+                "The expression contains syntax errors or undefined variables."
+            )
+            return
+        self.result = {
+            "condition": expr,
             "to_true": self.true_combo.currentText(),
             "to_false": self.false_combo.currentText()
         }
+        self.accept()
