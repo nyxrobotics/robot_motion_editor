@@ -135,8 +135,14 @@ class ArrowItem(QGraphicsPathItem):
         scene.addItem(self.end_handle)
 
     def update_path(self, force_edge_snap=False):
+        is_fully_connected = self.start_item is not None and self.end_item is not None
+        pen = QPen(QColor("white"), 4)
+        pen.setStyle(Qt.SolidLine if is_fully_connected else Qt.DashLine)
+        self.setPen(pen)
+
         path = QPainterPath()
 
+        # 始点の位置
         if self.start_item:
             start_center = self.start_item.sceneBoundingRect().center()
             end_center = self.end_item.sceneBoundingRect().center() if self.end_item else self.end_handle.scenePos()
@@ -152,6 +158,7 @@ class ArrowItem(QGraphicsPathItem):
         else:
             p1 = self.start_handle.scenePos()
 
+        # 終点の位置
         if self.end_item:
             end_center = self.end_item.sceneBoundingRect().center()
             start_center = self.start_item.sceneBoundingRect().center() if self.start_item else self.start_handle.scenePos()
@@ -163,11 +170,13 @@ class ArrowItem(QGraphicsPathItem):
         else:
             p2 = self.end_handle.scenePos()
 
+        # 本体の線
         path.moveTo(p1)
         path.lineTo(p2)
 
+        # やじりの描画
         angle = math.atan2(p2.y() - p1.y(), p2.x() - p1.x())
-        arrow_size = 12
+        arrow_size = 24
         arrow_p1 = p2 - QPointF(arrow_size * math.cos(angle - math.pi / 6), arrow_size * math.sin(angle - math.pi / 6))
         arrow_p2 = p2 - QPointF(arrow_size * math.cos(angle + math.pi / 6), arrow_size * math.sin(angle + math.pi / 6))
         path.moveTo(p2)
