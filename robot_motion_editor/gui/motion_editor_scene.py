@@ -84,6 +84,20 @@ class WaypointItem(QGraphicsEllipseItem):
         super().mouseReleaseEvent(event)
         self.ungrabMouse()
 
+        index = self.arrow.waypoints.index(self)
+
+        # 隣接する前後の waypoint を取得
+        prev_wp = self.arrow.waypoints[index - 1] if index > 0 else None
+        next_wp = self.arrow.waypoints[index + 1] if index + 1 < len(self.arrow.waypoints) else None
+
+        def is_too_close(wp):
+            return wp and (self.pos() - wp.pos()).manhattanLength() < 10  # 距離が10以下なら重なりと見なす
+
+        if is_too_close(prev_wp) or is_too_close(next_wp):
+            self.arrow.scene().removeItem(self)
+            self.arrow.waypoints.remove(self)
+            self.arrow.update_path()
+
 
 class HoverPoint(QGraphicsEllipseItem):
     def __init__(self, pos, arrow, segment_index):
