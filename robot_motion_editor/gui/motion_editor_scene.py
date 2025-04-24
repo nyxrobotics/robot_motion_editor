@@ -1,5 +1,3 @@
-# motion_editor_scene.py（最終版・完全修正版）
-
 import math
 
 from PyQt5.QtCore import QPointF
@@ -115,6 +113,11 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         self.setZValue(2)
         self.arrow = arrow
         self.is_start = is_start
+        self.is_dragging = False  # ← 追加
+
+    def mousePressEvent(self, event):
+        self.is_dragging = True  # ← 開始
+        super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
@@ -125,6 +128,7 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         self.arrow.update_path()
 
     def mouseReleaseEvent(self, event):
+        self.is_dragging = False  # ← 終了
         scene = self.scene()
         target = None
         for item in scene.items(self.scenePos()):
@@ -170,6 +174,7 @@ class ArrowItem(QGraphicsPathItem):
         wp = WaypointItem(pos, self)
         self.scene().addItem(wp)
         self.waypoints.insert(index, wp)
+        self.notify_waypoint_moved(wp)
         self.update_path()
         return wp
 
@@ -193,35 +198,27 @@ class ArrowItem(QGraphicsPathItem):
             self.hover_points.append(hp)
 
     def update_path(self):
-        # --- p1 計算 ---
-        if self.start_item:
-            should_update_p1 = (
-                not self.waypoints or self._recently_moved_waypoint == self.waypoints[0]
-            )
-            start_center = self.start_item.sceneBoundingRect().center()
-            neighbor = self.waypoints[0].scenePos() if self.waypoints else self.end_handle.scenePos()
-            p1 = compute_edge_point(start_center, neighbor,
-                                    self.start_item.rect().width(), self.start_item.rect().height()) \
-                if should_update_p1 else self.start_handle.scenePos()
-            if should_update_p1:
+        # --- p1 ---
+        if self.start_item and not self.start_handle.is_dragging:
+            update = not self.waypoints or self._recently_moved_waypoint is self.waypoints[0]
+            if update:
+                neighbor = self.waypoints[0].scenePos() if self.waypoints else self.end_handle.scenePos()
+                center = self.start_item.sceneBoundingRect().center()
+                p1 = compute_edge_point(center, neighbor,
+                                        self.start_item.rect().width(), self.start_item.rect().height())
                 self.start_handle.setPos(p1)
-        else:
-            p1 = self.start_handle.scenePos()
+        p1 = self.start_handle.scenePos()
 
-        # --- p2 計算 ---
-        if self.end_item:
-            should_update_p2 = (
-                not self.waypoints or self._recently_moved_waypoint == self.waypoints[-1]
-            )
-            end_center = self.end_item.sceneBoundingRect().center()
-            neighbor = self.waypoints[-1].scenePos() if self.waypoints else self.start_handle.scenePos()
-            p2 = compute_edge_point(end_center, neighbor,
-                                    self.end_item.rect().width(), self.end_item.rect().height()) \
-                if should_update_p2 else self.end_handle.scenePos()
-            if should_update_p2:
+        # --- p2 ---
+        if self.end_item and not self.end_handle.is_dragging:
+            update = not self.waypoints or self._recently_moved_waypoint is self.waypoints[-1]
+            if update:
+                neighbor = self.waypoints[-1].scenePos() if self.waypoints else self.start_handle.scenePos()
+                center = self.end_item.sceneBoundingRect().center()
+                p2 = compute_edge_point(center, neighbor,
+                                        self.end_item.rect().width(), self.end_item.rect().height())
                 self.end_handle.setPos(p2)
-        else:
-            p2 = self.end_handle.scenePos()
+        p2 = self.end_handle.scenePos()
 
         # --- path ---
         path = QPainterPath()
