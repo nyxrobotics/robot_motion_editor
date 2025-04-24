@@ -1,3 +1,5 @@
+import math
+
 from PyQt5.QtCore import QPointF
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush
@@ -98,10 +100,19 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         super().mouseReleaseEvent(event)
 
 
+def compute_edge_point(center, target, width, height):
+    dx = target.x() - center.x()
+    dy = target.y() - center.y()
+    if dx == 0 and dy == 0:
+        return center
+    scale = 0.5 / max(abs(dx) / width, abs(dy) / height)
+    return QPointF(center.x() + dx * scale, center.y() + dy * scale)
+
+
 class ArrowItem(QGraphicsPathItem):
     def __init__(self, arrow_id):
         super().__init__()
-        self.setPen(QPen(QColor("white"), 2))
+        self.setPen(QPen(QColor("white"), 4))
         self.setZValue(-1)
         self.arrow_id = arrow_id
         self.start_item = None
@@ -109,7 +120,7 @@ class ArrowItem(QGraphicsPathItem):
         self.start_handle = ArrowEndpointHandle(self, True)
         self.end_handle = ArrowEndpointHandle(self, False)
         self.start_handle.setPos(0, 0)
-        self.end_handle.setPos(100, 100)
+        self.end_handle.setPos(100, 0)
 
     def add_to_scene(self, scene):
         scene.addItem(self)
@@ -119,17 +130,35 @@ class ArrowItem(QGraphicsPathItem):
     def update_path(self):
         path = QPainterPath()
         if self.start_item:
-            p1 = self.start_item.sceneBoundingRect().center()
+            start_center = self.start_item.sceneBoundingRect().center()
+            end_center = self.end_item.sceneBoundingRect().center() if self.end_item else self.end_handle.scenePos()
+            w = self.start_item.rect().width()
+            h = self.start_item.rect().height()
+            p1 = compute_edge_point(start_center, end_center, w, h)
         else:
             p1 = self.start_handle.scenePos()
 
         if self.end_item:
-            p2 = self.end_item.sceneBoundingRect().center()
+            end_center = self.end_item.sceneBoundingRect().center()
+            start_center = self.start_item.sceneBoundingRect().center() if self.start_item else self.start_handle.scenePos()
+            w = self.end_item.rect().width()
+            h = self.end_item.rect().height()
+            p2 = compute_edge_point(end_center, start_center, w, h)
         else:
             p2 = self.end_handle.scenePos()
 
         path.moveTo(p1)
         path.lineTo(p2)
+
+        angle = math.atan2(p2.y() - p1.y(), p2.x() - p1.x())
+        arrow_size = 12
+        arrow_p1 = p2 - QPointF(arrow_size * math.cos(angle - math.pi / 6), arrow_size * math.sin(angle - math.pi / 6))
+        arrow_p2 = p2 - QPointF(arrow_size * math.cos(angle + math.pi / 6), arrow_size * math.sin(angle + math.pi / 6))
+        path.moveTo(p2)
+        path.lineTo(arrow_p1)
+        path.moveTo(p2)
+        path.lineTo(arrow_p2)
+
         self.setPath(path)
 
 
