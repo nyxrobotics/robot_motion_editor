@@ -214,6 +214,13 @@ class ArrowItem(QGraphicsPathItem):
             self.hover_points.append(hp)
 
     def update_path(self):
+        # --- 線のスタイルを接続状態に応じて設定 ---
+        pen = QPen(QColor("white"), 4)
+        is_connected = self.start_item is not None and self.end_item is not None
+        pen.setStyle(Qt.SolidLine if is_connected else Qt.DashLine)
+        self.setPen(pen)
+
+        # --- p1 計算 ---
         if self.start_item and (self._force_snap_start or (
                 not self.start_handle.is_dragging and (
                     not self.waypoints or self._recently_moved_waypoint is self.waypoints[0]
@@ -227,6 +234,7 @@ class ArrowItem(QGraphicsPathItem):
             p1 = self.start_handle.pos()
         self._force_snap_start = False
 
+        # --- p2 計算 ---
         if self.end_item and (self._force_snap_end or (
                 not self.end_handle.is_dragging and (
                     not self.waypoints or self._recently_moved_waypoint is self.waypoints[-1]
@@ -240,12 +248,14 @@ class ArrowItem(QGraphicsPathItem):
             p2 = self.end_handle.pos()
         self._force_snap_end = False
 
+        # --- path を再構築 ---
         path = QPainterPath()
         path.moveTo(p1)
         for wp in self.waypoints:
             path.lineTo(wp.pos())
         path.lineTo(p2)
 
+        # --- 矢印描画（arrowhead） ---
         if path.elementCount() >= 2:
             angle = math.atan2(p2.y() - path.elementAt(path.elementCount() - 2).y,
                                p2.x() - path.elementAt(path.elementCount() - 2).x)
