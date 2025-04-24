@@ -1,8 +1,6 @@
 import os
 
-from PyQt5.QtCore import QMimeData
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QDrag
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtWidgets import QGraphicsView
@@ -16,9 +14,7 @@ from PyQt5.QtWidgets import QTreeWidgetItem
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
-from ..logic.animation_file_manager import create_empty_animation
 from ..logic.animation_file_manager import load_animation_file
-from ..logic.animation_file_manager import prune_invalid_entries
 from ..logic.animation_file_manager import save_animation_file
 from .motion_editor_animation_tree_widget import AnimationTreeWidget
 from .motion_editor_scene import FrameBlockItem
@@ -30,13 +26,7 @@ class MotionEditorWidget(QWidget):
         super().__init__()
         self.animation_root = animation_root
         self.animation_tree = AnimationTreeWidget()
-
         self.current_animation_name = None
-        self.layout_data = {}
-        self.connections = []
-        self.if_conditions = []
-        self.switch_conditions = []
-
         self.init_ui()
         self.load_animation_list()
 
@@ -110,68 +100,22 @@ class MotionEditorWidget(QWidget):
     def load_animation_by_name(self, animation_name):
         self.current_animation_name = animation_name
         anim_path = os.path.join(self.animation_root, animation_name, f"{animation_name}.yaml")
-        frames_dir = os.path.join(self.animation_root, animation_name, "frames")
-        available_frames = [f.replace(".yaml", "") for f in os.listdir(frames_dir) if f.endswith(".yaml")]
-
-        layout, connections, if_conditions, switch_conditions = load_animation_file(anim_path)
-        layout, connections, if_conditions, switch_conditions = prune_invalid_entries(
-            layout, connections, if_conditions, switch_conditions, available_frames
-        )
-
-        self.layout_data = layout
-        self.connections = connections
-        self.if_conditions = if_conditions
-        self.switch_conditions = switch_conditions
-
-        self.scene.clear()
-        for name, pos in layout.items():
-            item = FrameBlockItem(name)
-            item.setPos(pos["x"], pos["y"])
-            self.scene.addItem(item)
-
-        for cond in if_conditions:
-            item = FrameBlockItem(cond["from"])
-            item.setPos(300, 100)
-            item.label.setPlainText(f"if:\n{cond['condition']}")
-            item.condition = cond["condition"]
-            item.to_true = cond["to_true"]
-            item.to_false = cond["to_false"]
-            self.scene.addItem(item)
+        result = load_animation_file(anim_path)
+        layout = result.get("layout", {})
+        self.scene.load_layout_dict(layout)
 
     def save_current_animation(self):
         if not self.current_animation_name:
             QMessageBox.information(self, "Save", "No animation selected to save.")
             return
 
-        layout = {}
-        if_conditions = []
-
-        for item in self.scene.items():
-            if isinstance(item, FrameBlockItem):
-                pos = item.pos()
-                layout[item.name] = {"x": pos.x(), "y": pos.y()}
-                if hasattr(item, "condition"):
-                    if_conditions.append({
-                        "from": item.name,
-                        "condition": item.condition,
-                        "to_true": item.to_true,
-                        "to_false": item.to_false
-                    })
-
-        self.layout_data = layout
-        self.if_conditions = if_conditions
-
+        layout = self.scene.to_layout_dict()
+        print("[DEBUG] Final layout from scene:", layout)  # デバッグ出力
         anim_path = os.path.join(
             self.animation_root,
             self.current_animation_name,
             f"{self.current_animation_name}.yaml")
-        save_animation_file(
-            anim_path,
-            self.layout_data,
-            self.connections,
-            self.if_conditions,
-            self.switch_conditions
-        )
+        save_animation_file(anim_path, layout)
         print("Saved:", self.current_animation_name)
 
     def create_new_animation(self):
@@ -199,14 +143,9 @@ class MotionEditorWidget(QWidget):
             QMessageBox.information(self, "Selection Error", "Please select an animation.")
             return
 
-        if current_item.parent():
-            animation_item = current_item.parent()
-        else:
-            animation_item = current_item
-
+        animation_item = current_item.parent() if current_item.parent() else current_item
         animation_name = animation_item.text(0)
-        animation_path = os.path.join(self.animation_root, animation_name)
-        frames_dir = os.path.join(animation_path, "frames")
+        frames_dir = os.path.join(self.animation_root, animation_name, "frames")
 
         name, ok = QInputDialog.getText(self, "New Frame", "Enter frame name:")
         if not ok or not name.strip():
