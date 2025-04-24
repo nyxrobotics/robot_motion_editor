@@ -135,37 +135,36 @@ class MotionFlowScene(QGraphicsScene):
 
     def to_layout_dict(self):
         layout = {"block": {}, "arrow": {}}
-        block_id_counter = 0
-        arrow_id_counter = 0
         used_uids = set()
 
+        items = [item for item in self.items() if isinstance(item, FrameBlockItem)]
+        items.sort(key=lambda i: i.uid)  # UID順にソートして安定化
+
         print("\n[DEBUG] Items in scene:")
-        for item in self.items():
+        for item in items:
             print(f" - {type(item)} uid={getattr(item, 'uid', None)} name={getattr(item, 'name', None)}")
 
-        for item in self.items():
-            if isinstance(item, FrameBlockItem):
-                if not hasattr(item, 'uid') or not item.uid:
-                    item.uid = self._generate_uid(item.name)
-                while item.uid in used_uids:
-                    item.uid = self._generate_uid(item.name)
-                used_uids.add(item.uid)
+        for idx, item in enumerate(items):
+            if not hasattr(item, 'uid') or not item.uid:
+                item.uid = self._generate_uid(item.name)
+            while item.uid in used_uids:
+                item.uid = self._generate_uid(item.name)
+            used_uids.add(item.uid)
 
-                uid = item.uid
-                layout["block"][uid] = {
-                    "info": {
-                        "type": "frame",
-                        "filename": item.name,
-                        "id": block_id_counter
-                    },
-                    "place": {
-                        "x": int(item.pos().x()),
-                        "y": int(item.pos().y())
-                    },
-                    "connection": item.connection if hasattr(item, "connection") else {"output": {}}
-                }
-                print(f"[DEBUG] Block saved: {uid} at ({item.pos().x()}, {item.pos().y()})")
-                block_id_counter += 1
+            uid = item.uid
+            layout["block"][uid] = {
+                "info": {
+                    "type": "frame",
+                    "filename": item.name,
+                    "id": idx  # ← 0から連番で詰めていく
+                },
+                "place": {
+                    "x": int(item.pos().x()),
+                    "y": int(item.pos().y())
+                },
+                "connection": item.connection if hasattr(item, "connection") else {"output": {}}
+            }
+            print(f"[DEBUG] Block saved: {uid} at ({item.pos().x()}, {item.pos().y()})")
 
         print("[DEBUG] Block count to save:", len(layout["block"]))
         return layout
