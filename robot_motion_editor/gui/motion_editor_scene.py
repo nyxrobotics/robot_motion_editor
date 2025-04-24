@@ -61,8 +61,13 @@ class FrameBlockItem(QGraphicsRectItem):
     def itemChange(self, change, value):
         if change == self.ItemPositionChange and self.scene():
             for item in self.scene().items():
-                if isinstance(item, ArrowItem) and (item.start_item == self or item.end_item == self):
-                    item.update_path()
+                if isinstance(item, ArrowItem):
+                    if item.start_item == self:
+                        item._force_snap_start = True
+                    if item.end_item == self:
+                        item._force_snap_end = True
+                    if item.start_item == self or item.end_item == self:
+                        item.update_path()
         return super().itemChange(change, value)
 
 
@@ -149,12 +154,23 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         target = None
         for item in scene.items(self.scenePos()):
             if isinstance(item, FrameBlockItem):
+                if self.is_start:
+                    if any(a.start_item == item for a in scene.items()
+                           if isinstance(a, ArrowItem) and a != self.arrow):
+                        target = None
+                        break
+                else:
+                    if any(a.end_item == item for a in scene.items() if isinstance(a, ArrowItem) and a != self.arrow):
+                        target = None
+                        break
                 target = item
                 break
+
         if self.is_start:
             self.arrow.start_item = target
         else:
             self.arrow.end_item = target
+
         for item in scene.items():
             if hasattr(item, "set_highlighted"):
                 item.set_highlighted(False)
@@ -165,9 +181,8 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
 class ArrowItem(QGraphicsPathItem):
     def __init__(self, arrow_id):
         super().__init__()
-        self.setPen(QPen(QColor("white"), 4))
-        self.setZValue(-1)
         self.arrow_id = arrow_id
+        self.setZValue(-1)
         self.start_item = None
         self.end_item = None
         self.start_handle = ArrowEndpointHandle(self, True)
@@ -214,13 +229,11 @@ class ArrowItem(QGraphicsPathItem):
             self.hover_points.append(hp)
 
     def update_path(self):
-        # --- 線のスタイルを接続状態に応じて設定 ---
         pen = QPen(QColor("white"), 4)
         is_connected = self.start_item is not None and self.end_item is not None
         pen.setStyle(Qt.SolidLine if is_connected else Qt.DashLine)
         self.setPen(pen)
 
-        # --- p1 計算 ---
         if self.start_item and (self._force_snap_start or (
                 not self.start_handle.is_dragging and (
                     not self.waypoints or self._recently_moved_waypoint is self.waypoints[0]
@@ -234,7 +247,6 @@ class ArrowItem(QGraphicsPathItem):
             p1 = self.start_handle.pos()
         self._force_snap_start = False
 
-        # --- p2 計算 ---
         if self.end_item and (self._force_snap_end or (
                 not self.end_handle.is_dragging and (
                     not self.waypoints or self._recently_moved_waypoint is self.waypoints[-1]
@@ -248,14 +260,12 @@ class ArrowItem(QGraphicsPathItem):
             p2 = self.end_handle.pos()
         self._force_snap_end = False
 
-        # --- path を再構築 ---
         path = QPainterPath()
         path.moveTo(p1)
         for wp in self.waypoints:
             path.lineTo(wp.pos())
         path.lineTo(p2)
 
-        # --- 矢印描画（arrowhead） ---
         if path.elementCount() >= 2:
             angle = math.atan2(p2.y() - path.elementAt(path.elementCount() - 2).y,
                                p2.x() - path.elementAt(path.elementCount() - 2).x)
