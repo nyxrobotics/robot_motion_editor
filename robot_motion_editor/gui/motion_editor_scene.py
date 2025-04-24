@@ -1,4 +1,4 @@
-# motion_editor_scene.py（修正済み・完全ファイル）
+# motion_editor_scene.py（最終版・完全修正版）
 
 import math
 
@@ -79,6 +79,7 @@ class WaypointItem(QGraphicsEllipseItem):
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
+        self.arrow.notify_waypoint_moved(self)
         self.arrow.update_path()
 
     def mouseReleaseEvent(self, event):
@@ -153,8 +154,12 @@ class ArrowItem(QGraphicsPathItem):
         self.end_handle = ArrowEndpointHandle(self, False)
         self.waypoints = []
         self.hover_points = []
+        self._recently_moved_waypoint = None
         self.start_handle.setPos(0, 0)
         self.end_handle.setPos(100, 0)
+
+    def notify_waypoint_moved(self, waypoint):
+        self._recently_moved_waypoint = waypoint
 
     def add_to_scene(self, scene):
         scene.addItem(self)
@@ -188,44 +193,60 @@ class ArrowItem(QGraphicsPathItem):
             self.hover_points.append(hp)
 
     def update_path(self):
+        # --- p1 計算 ---
         if self.start_item:
+            should_update_p1 = (
+                not self.waypoints or self._recently_moved_waypoint == self.waypoints[0]
+            )
             start_center = self.start_item.sceneBoundingRect().center()
-            end_center = self.end_item.sceneBoundingRect().center() if self.end_item else self.end_handle.scenePos()
-            p1 = compute_edge_point(start_center, end_center,
-                                    self.start_item.rect().width(), self.start_item.rect().height())
-            self.start_handle.setPos(p1)
+            neighbor = self.waypoints[0].scenePos() if self.waypoints else self.end_handle.scenePos()
+            p1 = compute_edge_point(start_center, neighbor,
+                                    self.start_item.rect().width(), self.start_item.rect().height()) \
+                if should_update_p1 else self.start_handle.scenePos()
+            if should_update_p1:
+                self.start_handle.setPos(p1)
         else:
             p1 = self.start_handle.scenePos()
 
+        # --- p2 計算 ---
         if self.end_item:
+            should_update_p2 = (
+                not self.waypoints or self._recently_moved_waypoint == self.waypoints[-1]
+            )
             end_center = self.end_item.sceneBoundingRect().center()
-            start_center = self.start_item.sceneBoundingRect().center() if self.start_item else self.start_handle.scenePos()
-            p2 = compute_edge_point(end_center, start_center,
-                                    self.end_item.rect().width(), self.end_item.rect().height())
-            self.end_handle.setPos(p2)
+            neighbor = self.waypoints[-1].scenePos() if self.waypoints else self.start_handle.scenePos()
+            p2 = compute_edge_point(end_center, neighbor,
+                                    self.end_item.rect().width(), self.end_item.rect().height()) \
+                if should_update_p2 else self.end_handle.scenePos()
+            if should_update_p2:
+                self.end_handle.setPos(p2)
         else:
             p2 = self.end_handle.scenePos()
 
+        # --- path ---
         path = QPainterPath()
         path.moveTo(p1)
         for wp in self.waypoints:
             path.lineTo(wp.scenePos())
         path.lineTo(p2)
 
-        angle = math.atan2(p2.y() - path.elementAt(path.elementCount() - 2).y,
-                           p2.x() - path.elementAt(path.elementCount() - 2).x)
-        arrow_size = 24
-        arrow_p1 = p2 - QPointF(arrow_size * math.cos(angle - math.pi / 6),
-                                arrow_size * math.sin(angle - math.pi / 6))
-        arrow_p2 = p2 - QPointF(arrow_size * math.cos(angle + math.pi / 6),
-                                arrow_size * math.sin(angle + math.pi / 6))
-        path.moveTo(p2)
-        path.lineTo(arrow_p1)
-        path.moveTo(p2)
-        path.lineTo(arrow_p2)
+        # arrowhead
+        if path.elementCount() >= 2:
+            angle = math.atan2(p2.y() - path.elementAt(path.elementCount() - 2).y,
+                               p2.x() - path.elementAt(path.elementCount() - 2).x)
+            arrow_size = 24
+            arrow_p1 = p2 - QPointF(arrow_size * math.cos(angle - math.pi / 6),
+                                    arrow_size * math.sin(angle - math.pi / 6))
+            arrow_p2 = p2 - QPointF(arrow_size * math.cos(angle + math.pi / 6),
+                                    arrow_size * math.sin(angle + math.pi / 6))
+            path.moveTo(p2)
+            path.lineTo(arrow_p1)
+            path.moveTo(p2)
+            path.lineTo(arrow_p2)
 
         self.setPath(path)
         self.refresh_hover_points()
+        self._recently_moved_waypoint = None
 
 
 class MotionFlowScene(QGraphicsScene):
