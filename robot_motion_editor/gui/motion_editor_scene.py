@@ -85,13 +85,11 @@ class WaypointItem(QGraphicsEllipseItem):
         self.ungrabMouse()
 
         index = self.arrow.waypoints.index(self)
-
-        # 隣接する前後の waypoint を取得
         prev_wp = self.arrow.waypoints[index - 1] if index > 0 else None
         next_wp = self.arrow.waypoints[index + 1] if index + 1 < len(self.arrow.waypoints) else None
 
         def is_too_close(wp):
-            return wp and (self.pos() - wp.pos()).manhattanLength() < 10  # 距離が10以下なら重なりと見なす
+            return wp and (self.pos() - wp.pos()).manhattanLength() < 10
 
         if is_too_close(prev_wp) or is_too_close(next_wp):
             self.arrow.scene().removeItem(self)
@@ -127,22 +125,26 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         self.setZValue(2)
         self.arrow = arrow
         self.is_start = is_start
-        self.is_dragging = False  # ← 追加
+        self.is_dragging = False
 
     def mousePressEvent(self, event):
-        self.is_dragging = True  # ← 開始
+        self.is_dragging = True
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
-        pos = self.scenePos()
         for item in self.scene().items():
             if isinstance(item, FrameBlockItem):
-                item.set_highlighted(item.sceneBoundingRect().contains(pos))
+                item.set_highlighted(item.sceneBoundingRect().contains(self.scenePos()))
         self.arrow.update_path()
 
     def mouseReleaseEvent(self, event):
-        self.is_dragging = False  # ← 終了
+        self.is_dragging = False
+        if self.is_start:
+            self.arrow._force_snap_start = True
+        else:
+            self.arrow._force_snap_end = True
+
         scene = self.scene()
         target = None
         for item in scene.items(self.scenePos()):
@@ -173,6 +175,8 @@ class ArrowItem(QGraphicsPathItem):
         self.waypoints = []
         self.hover_points = []
         self._recently_moved_waypoint = None
+        self._force_snap_start = False
+        self._force_snap_end = False
         self.start_handle.setPos(0, 0)
         self.end_handle.setPos(100, 0)
 
@@ -202,9 +206,7 @@ class ArrowItem(QGraphicsPathItem):
             self.scene().removeItem(hp)
         self.hover_points.clear()
 
-        points = [self.start_handle.pos()] + \
-                 [wp.pos() for wp in self.waypoints] + \
-                 [self.end_handle.pos()]
+        points = [self.start_handle.pos()] + [wp.pos() for wp in self.waypoints] + [self.end_handle.pos()]
         for i in range(len(points) - 1):
             mid = (points[i] + points[i + 1]) * 0.5
             hp = HoverPoint(mid, self, i)
@@ -212,32 +214,36 @@ class ArrowItem(QGraphicsPathItem):
             self.hover_points.append(hp)
 
     def update_path(self):
-        # --- p1 ---
-        if self.start_item and not self.start_handle.is_dragging:
-            update = not self.waypoints or self._recently_moved_waypoint is self.waypoints[0]
-            if update:
-                neighbor = self.waypoints[0].pos() if self.waypoints else self.end_handle.pos()
-                center = self.start_item.sceneBoundingRect().center()
-                p1 = compute_edge_point(center, neighbor,
-                                        self.start_item.rect().width(), self.start_item.rect().height())
-                self.start_handle.setPos(p1)
-        p1 = self.start_handle.pos()
+        if self.start_item and (self._force_snap_start or (
+                not self.start_handle.is_dragging and (
+                    not self.waypoints or self._recently_moved_waypoint is self.waypoints[0]
+                ))):
+            neighbor = self.waypoints[0].pos() if self.waypoints else self.end_handle.pos()
+            center = self.start_item.sceneBoundingRect().center()
+            p1 = compute_edge_point(center, neighbor,
+                                    self.start_item.rect().width(), self.start_item.rect().height())
+            self.start_handle.setPos(p1)
+        else:
+            p1 = self.start_handle.pos()
+        self._force_snap_start = False
 
-        # --- p2 ---
-        if self.end_item and not self.end_handle.is_dragging:
-            update = not self.waypoints or self._recently_moved_waypoint is self.waypoints[-1]
-            if update:
-                neighbor = self.waypoints[-1].pos() if self.waypoints else self.start_handle.pos()
-                center = self.end_item.sceneBoundingRect().center()
-                p2 = compute_edge_point(center, neighbor,
-                                        self.end_item.rect().width(), self.end_item.rect().height())
-                self.end_handle.setPos(p2)
-        p2 = self.end_handle.pos()
+        if self.end_item and (self._force_snap_end or (
+                not self.end_handle.is_dragging and (
+                    not self.waypoints or self._recently_moved_waypoint is self.waypoints[-1]
+                ))):
+            neighbor = self.waypoints[-1].pos() if self.waypoints else self.start_handle.pos()
+            center = self.end_item.sceneBoundingRect().center()
+            p2 = compute_edge_point(center, neighbor,
+                                    self.end_item.rect().width(), self.end_item.rect().height())
+            self.end_handle.setPos(p2)
+        else:
+            p2 = self.end_handle.pos()
+        self._force_snap_end = False
 
         path = QPainterPath()
         path.moveTo(p1)
         for wp in self.waypoints:
-            path.lineTo(wp.pos())  # ← scenePos ではなく pos
+            path.lineTo(wp.pos())
         path.lineTo(p2)
 
         if path.elementCount() >= 2:
