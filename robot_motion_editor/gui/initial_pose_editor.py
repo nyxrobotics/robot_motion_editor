@@ -15,9 +15,9 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 from sensor_msgs.msg import JointState
 
+from ..logic.initial_pose_file_manager import load_initial_pose
+from ..logic.initial_pose_file_manager import save_initial_pose
 from .feedback_expression_dialog import FeedbackExpressionDialog
-from .initial_pose_file_manager import load_initial_pose
-from .initial_pose_file_manager import save_initial_pose
 from .initial_pose_visualizer import InitialPoseVisualizer
 from .pid_config_dialog import PIDConfigDialog
 
