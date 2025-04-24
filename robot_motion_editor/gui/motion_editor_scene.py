@@ -11,6 +11,8 @@ from PyQt5.QtWidgets import QGraphicsScene
 from PyQt5.QtWidgets import QGraphicsTextItem
 from PyQt5.QtWidgets import QMenu
 
+from .if_condition_editor import IfConditionEditorDialog
+
 
 class FrameBlockItem(QGraphicsRectItem):
     def __init__(self, frame_name):
@@ -25,10 +27,7 @@ class FrameBlockItem(QGraphicsRectItem):
         pen = QPen(QColor("#ffffff"))
         pen.setWidth(2)
         self.setPen(pen)
-        self.setFlags(
-            self.ItemIsMovable
-            | self.ItemIsSelectable
-        )
+        self.setFlags(self.ItemIsMovable | self.ItemIsSelectable)
         self.name = frame_name
 
         self.label = QGraphicsTextItem(frame_name, self)
@@ -58,8 +57,9 @@ class FrameBlockItem(QGraphicsRectItem):
 
 
 class MotionFlowScene(QGraphicsScene):
-    def __init__(self, parent=None):
+    def __init__(self, available_variables=None, parent=None):
         super().__init__(parent)
+        self.available_variables = available_variables or []
         self.setBackgroundBrush(QColor("#111111"))
 
     def dragEnterEvent(self, event):
@@ -81,11 +81,31 @@ class MotionFlowScene(QGraphicsScene):
         menu = QMenu()
         add_frame_action = QAction("Add New Frame", menu)
         add_existing_action = QAction("Add Existing Frame", menu)
+        add_if_condition_action = QAction("Add If Condition", menu)
         menu.addAction(add_frame_action)
         menu.addAction(add_existing_action)
+        menu.addAction(add_if_condition_action)
 
         selected_action = menu.exec_(event.screenPos())
         if selected_action == add_frame_action:
             print("New Frame block requested")
         elif selected_action == add_existing_action:
             print("Add Existing Frame requested")
+        elif selected_action == add_if_condition_action:
+            self.add_if_condition_block(event.scenePos())
+
+    def add_if_condition_block(self, pos):
+        dialog = IfConditionEditorDialog(
+            frame_names=self.get_all_frame_names(),
+            available_variables=self.available_variables
+        )
+        if dialog.exec_():
+            result = dialog.get_result()
+            block_name = f"if_{len(self.items())+1}"
+            item = FrameBlockItem(block_name)
+            item.label.setPlainText(f"if:{result['condition']}")
+            item.setPos(pos)
+            self.addItem(item)
+
+    def get_all_frame_names(self):
+        return [item.name for item in self.items() if isinstance(item, FrameBlockItem)]
