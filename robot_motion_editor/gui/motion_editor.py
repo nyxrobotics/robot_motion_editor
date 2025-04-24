@@ -1,4 +1,3 @@
-# motion_editor.py
 import os
 
 from PyQt5.QtCore import QMimeData
@@ -86,11 +85,8 @@ class MotionEditorWidget(QWidget):
     def on_tree_item_clicked(self, item):
         animation_item = item if item.parent() is None else item.parent()
         name = animation_item.text(0)
-
-        # Avoid reloading if already selected
         if name == self.current_animation_name:
             return
-
         self.load_animation_by_name(name)
 
     def load_animation_list(self):
@@ -133,18 +129,37 @@ class MotionEditorWidget(QWidget):
             item.setPos(pos["x"], pos["y"])
             self.scene.addItem(item)
 
+        for cond in if_conditions:
+            item = FrameBlockItem(cond["from"])
+            item.setPos(300, 100)
+            item.label.setPlainText(f"if:\n{cond['condition']}")
+            item.condition = cond["condition"]
+            item.to_true = cond["to_true"]
+            item.to_false = cond["to_false"]
+            self.scene.addItem(item)
+
     def save_current_animation(self):
         if not self.current_animation_name:
             QMessageBox.information(self, "Save", "No animation selected to save.")
             return
 
         layout = {}
+        if_conditions = []
+
         for item in self.scene.items():
             if isinstance(item, FrameBlockItem):
                 pos = item.pos()
                 layout[item.name] = {"x": pos.x(), "y": pos.y()}
+                if hasattr(item, "condition"):
+                    if_conditions.append({
+                        "from": item.name,
+                        "condition": item.condition,
+                        "to_true": item.to_true,
+                        "to_false": item.to_false
+                    })
 
         self.layout_data = layout
+        self.if_conditions = if_conditions
 
         anim_path = os.path.join(
             self.animation_root,
@@ -171,9 +186,9 @@ class MotionEditorWidget(QWidget):
 
         os.makedirs(os.path.join(animation_path, "frames"), exist_ok=True)
         with open(os.path.join(animation_path, f"{name}.yaml"), "w") as f:
-            f.write("# animation flowchart\n")
+            f.write("  # animation flowchart\n")
         with open(os.path.join(animation_path, "frames", "initial_frame.yaml"), "w") as f:
-            f.write("# initial frame\n")
+            f.write("  # initial frame\n")
 
         self.load_animation_list()
         self.load_animation_by_name(name)
@@ -203,7 +218,7 @@ class MotionEditorWidget(QWidget):
             return
 
         with open(frame_path, "w") as f:
-            f.write("# frame content\n")
+            f.write("  # frame content\n")
 
         self.load_animation_list()
         self.load_animation_by_name(animation_name)

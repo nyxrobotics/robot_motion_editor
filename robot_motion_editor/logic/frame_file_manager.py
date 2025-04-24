@@ -30,3 +30,9 @@ def create_default_frame():
             # }
         }
     }
+
+
+def list_frame_files(folder):
+    if not os.path.exists(folder):
+        return []
+    return [f[:-5] for f in os.listdir(folder) if f.endswith(".yaml")]
