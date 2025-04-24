@@ -1,4 +1,4 @@
-# motion_editor_scene.py（完全版、修正済み）
+# motion_editor_scene.py（修正済み・完全ファイル）
 
 import math
 
@@ -64,7 +64,7 @@ class FrameBlockItem(QGraphicsRectItem):
         if change == self.ItemPositionChange and self.scene():
             for item in self.scene().items():
                 if isinstance(item, ArrowItem) and (item.start_item == self or item.end_item == self):
-                    item.update_path(force_edge_snap=True)
+                    item.update_path()
         return super().itemChange(change, value)
 
 
@@ -81,6 +81,10 @@ class WaypointItem(QGraphicsEllipseItem):
         super().mouseMoveEvent(event)
         self.arrow.update_path()
 
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        self.ungrabMouse()
+
 
 class HoverPoint(QGraphicsEllipseItem):
     def __init__(self, pos, arrow, segment_index):
@@ -95,8 +99,10 @@ class HoverPoint(QGraphicsEllipseItem):
 
     def mousePressEvent(self, event):
         waypoint = self.arrow.insert_waypoint(self.segment_index, self.scenePos())
-        self.scene().removeItem(self)
+        if self.scene():
+            self.scene().removeItem(self)
         waypoint.setSelected(True)
+        waypoint.grabMouse()
         waypoint.mousePressEvent(event)
 
 
@@ -115,7 +121,7 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         for item in self.scene().items():
             if isinstance(item, FrameBlockItem):
                 item.set_highlighted(item.sceneBoundingRect().contains(pos))
-        self.arrow.update_path(force_edge_snap=False)
+        self.arrow.update_path()
 
     def mouseReleaseEvent(self, event):
         scene = self.scene()
@@ -131,7 +137,7 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         for item in scene.items():
             if hasattr(item, "set_highlighted"):
                 item.set_highlighted(False)
-        self.arrow.update_path(force_edge_snap=True)
+        self.arrow.update_path()
         super().mouseReleaseEvent(event)
 
 
@@ -181,15 +187,13 @@ class ArrowItem(QGraphicsPathItem):
             self.scene().addItem(hp)
             self.hover_points.append(hp)
 
-    def update_path(self, force_edge_snap=False):
+    def update_path(self):
         if self.start_item:
             start_center = self.start_item.sceneBoundingRect().center()
             end_center = self.end_item.sceneBoundingRect().center() if self.end_item else self.end_handle.scenePos()
             p1 = compute_edge_point(start_center, end_center,
-                                    self.start_item.rect().width(), self.start_item.rect().height()) \
-                if force_edge_snap else self.start_handle.scenePos()
-            if force_edge_snap:
-                self.start_handle.setPos(p1)
+                                    self.start_item.rect().width(), self.start_item.rect().height())
+            self.start_handle.setPos(p1)
         else:
             p1 = self.start_handle.scenePos()
 
@@ -197,10 +201,8 @@ class ArrowItem(QGraphicsPathItem):
             end_center = self.end_item.sceneBoundingRect().center()
             start_center = self.start_item.sceneBoundingRect().center() if self.start_item else self.start_handle.scenePos()
             p2 = compute_edge_point(end_center, start_center,
-                                    self.end_item.rect().width(), self.end_item.rect().height()) \
-                if force_edge_snap else self.end_handle.scenePos()
-            if force_edge_snap:
-                self.end_handle.setPos(p2)
+                                    self.end_item.rect().width(), self.end_item.rect().height())
+            self.end_handle.setPos(p2)
         else:
             p2 = self.end_handle.scenePos()
 
@@ -210,7 +212,6 @@ class ArrowItem(QGraphicsPathItem):
             path.lineTo(wp.scenePos())
         path.lineTo(p2)
 
-        # Arrowhead
         angle = math.atan2(p2.y() - path.elementAt(path.elementCount() - 2).y,
                            p2.x() - path.elementAt(path.elementCount() - 2).x)
         arrow_size = 24
