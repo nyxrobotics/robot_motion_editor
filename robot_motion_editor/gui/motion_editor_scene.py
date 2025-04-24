@@ -5,14 +5,15 @@ from PyQt5.QtGui import QBrush
 from PyQt5.QtGui import QColor
 from PyQt5.QtGui import QFontMetricsF
 from PyQt5.QtGui import QPen
+from PyQt5.QtWidgets import QAction
 from PyQt5.QtWidgets import QGraphicsRectItem
 from PyQt5.QtWidgets import QGraphicsScene
 from PyQt5.QtWidgets import QGraphicsTextItem
+from PyQt5.QtWidgets import QMenu
 
 
 class FrameBlockItem(QGraphicsRectItem):
     def __init__(self, frame_name):
-        # Create temporary text item to measure width
         temp_label = QGraphicsTextItem(frame_name)
         font_metrics = QFontMetricsF(temp_label.font())
         text_width = font_metrics.width(frame_name)
@@ -20,9 +21,9 @@ class FrameBlockItem(QGraphicsRectItem):
         height = 60
 
         super().__init__(0, 0, width, height)
-        self.setBrush(QBrush(QColor("#1a1a1a")))  # Darker block background
-        pen = QPen(QColor("#ffffff"))  # Bright white border
-        pen.setWidth(2)  # Thicker border
+        self.setBrush(QBrush(QColor("#1a1a1a")))
+        pen = QPen(QColor("#ffffff"))
+        pen.setWidth(2)
         self.setPen(pen)
         self.setFlags(
             self.ItemIsMovable
@@ -30,18 +31,36 @@ class FrameBlockItem(QGraphicsRectItem):
         )
         self.name = frame_name
 
-        # Add label to display frame name, centered in box
         self.label = QGraphicsTextItem(frame_name, self)
         self.label.setDefaultTextColor(QColor("white"))
         label_width = self.label.boundingRect().width()
         label_height = self.label.boundingRect().height()
         self.label.setPos((width - label_width) / 2, (height - label_height) / 2)
 
+    def contextMenuEvent(self, event):
+        menu = QMenu()
+        edit_action = QAction("Edit Frame", menu)
+        delete_action = QAction("Delete Block", menu)
+        connect_action = QAction("Connect To...", menu)
+        menu.addAction(edit_action)
+        menu.addAction(delete_action)
+        menu.addAction(connect_action)
+
+        selected_action = menu.exec_(event.screenPos())
+        if selected_action == edit_action:
+            print(f"Edit Frame: {self.name}")
+        elif selected_action == delete_action:
+            scene = self.scene()
+            if scene:
+                scene.removeItem(self)
+        elif selected_action == connect_action:
+            print(f"Connect from: {self.name}")
+
 
 class MotionFlowScene(QGraphicsScene):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setBackgroundBrush(QColor("#111111"))  # Darker theme background
+        self.setBackgroundBrush(QColor("#111111"))
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasText():
@@ -57,3 +76,16 @@ class MotionFlowScene(QGraphicsScene):
         item.setPos(pos)
         self.addItem(item)
         event.acceptProposedAction()
+
+    def contextMenuEvent(self, event):
+        menu = QMenu()
+        add_frame_action = QAction("Add New Frame", menu)
+        add_existing_action = QAction("Add Existing Frame", menu)
+        menu.addAction(add_frame_action)
+        menu.addAction(add_existing_action)
+
+        selected_action = menu.exec_(event.screenPos())
+        if selected_action == add_frame_action:
+            print("New Frame block requested")
+        elif selected_action == add_existing_action:
+            print("Add Existing Frame requested")

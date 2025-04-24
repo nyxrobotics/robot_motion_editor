@@ -12,12 +12,12 @@ from PyQt5.QtWidgets import QInputDialog
 from PyQt5.QtWidgets import QLabel
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QPushButton
+from PyQt5.QtWidgets import QSplitter
 from PyQt5.QtWidgets import QTreeWidgetItem
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
 from .motion_editor_animation_tree_widget import AnimationTreeWidget
-from .motion_editor_scene import FrameBlockItem
 from .motion_editor_scene import MotionFlowScene
 
 
@@ -26,16 +26,16 @@ class MotionEditorWidget(QWidget):
         super().__init__()
         self.animation_root = animation_root
         self.animation_tree = AnimationTreeWidget()
-        self.animation_tree.itemDoubleClicked.connect(self.on_animation_double_clicked)
 
         self.init_ui()
         self.load_animation_list()
 
     def init_ui(self):
-        main_layout = QHBoxLayout()
+        splitter = QSplitter(Qt.Horizontal)
 
         # --- Left Panel ---
-        left_panel = QVBoxLayout()
+        left_widget = QWidget()
+        left_panel = QVBoxLayout(left_widget)
         self.save_anim_btn = QPushButton("Save Animation")
         self.save_frame_btn = QPushButton("Save Frame")
         self.new_anim_btn = QPushButton("New Animation")
@@ -63,9 +63,14 @@ class MotionEditorWidget(QWidget):
         self.view.setAcceptDrops(True)
         self.view.setRenderHints(self.view.renderHints() | QPainter.Antialiasing)
 
-        main_layout.addLayout(left_panel, stretch=1)
-        main_layout.addWidget(self.view, stretch=3)
-        self.setLayout(main_layout)
+        splitter.addWidget(left_widget)
+        splitter.addWidget(self.view)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 3)
+
+        layout = QVBoxLayout()
+        layout.addWidget(splitter)
+        self.setLayout(layout)
 
     def load_animation_list(self):
         self.animation_tree.clear()
@@ -97,7 +102,7 @@ class MotionEditorWidget(QWidget):
 
         os.makedirs(os.path.join(animation_path, "frames"), exist_ok=True)
         with open(os.path.join(animation_path, f"{name}.yaml"), "w") as f:
-            f.write("nodes:\n")
+            f.write("# animation flowchart\n")
         with open(os.path.join(animation_path, "frames", "initial_frame.yaml"), "w") as f:
             f.write("# initial frame\n")
 
@@ -109,6 +114,7 @@ class MotionEditorWidget(QWidget):
             QMessageBox.information(self, "Selection Error", "Please select an animation.")
             return
 
+        # Allow selecting either animation or frame item
         if current_item.parent():
             animation_item = current_item.parent()
         else:
@@ -166,25 +172,3 @@ class MotionEditorWidget(QWidget):
             if os.path.exists(path):
                 os.remove(path)
             self.load_animation_list()
-
-    def on_animation_double_clicked(self, item, column):
-        if item.parent() is not None:
-            return  # only respond to animation nodes
-
-        name = item.text(0)
-        path = os.path.join(self.animation_root, name, f"{name}.yaml")
-        if os.path.exists(path):
-            self.scene.clear()
-            try:
-                with open(path, "r") as f:
-                    import yaml
-                    data = yaml.safe_load(f) or {}
-                    for node in data.get("nodes", []):
-                        frame = node.get("frame")
-                        x = node.get("x", 0)
-                        y = node.get("y", 0)
-                        block = FrameBlockItem(frame)
-                        block.setPos(x, y)
-                        self.scene.addItem(block)
-            except Exception as e:
-                print(f"Failed to load flowchart: {e}")

@@ -54,7 +54,6 @@ class MainWindow(QWidget):
         folder = QFileDialog.getExistingDirectory(self, "Select Motion Directory", os.getcwd())
         if folder:
             self.path_lineedit.setText(folder)
-            # Pass the directory to InitialPoseEditor
             if self.initial_pose_editor:
                 self.initial_pose_editor.set_motion_directory(folder)
 
@@ -68,6 +67,11 @@ class MainWindow(QWidget):
 
         self.variable_names = self.generate_variable_names()
 
+        checkbox_row = QHBoxLayout()
+        checkbox_row.addWidget(self.torque_checkbox)
+        checkbox_row.addStretch()
+        checkbox_row.addWidget(self.hardware_checkbox)
+
         com_layout = QHBoxLayout()
         self.com_port_box = QComboBox()
         self.refresh_ports_button = QPushButton("Refresh Ports")
@@ -77,11 +81,14 @@ class MainWindow(QWidget):
         com_layout.addWidget(self.com_port_box)
         com_layout.addWidget(self.refresh_ports_button)
 
+        baud_layout = QHBoxLayout()
         self.baudrate_combo = QComboBox()
         baud_rates = ["4500000", "4000000", "3000000", "2000000", "1000000", "115200", "57600", "9600"]
         self.baudrate_combo.addItems(baud_rates)
         self.baudrate_combo.setEditable(True)
         self.baudrate_combo.setCurrentText("115200")
+        baud_layout.addWidget(QLabel("Baudrate:"))
+        baud_layout.addWidget(self.baudrate_combo)
 
         path_layout = QHBoxLayout()
         self.path_lineedit = QLineEdit()
@@ -91,21 +98,17 @@ class MainWindow(QWidget):
         path_layout.addWidget(self.path_lineedit)
         path_layout.addWidget(self.browse_button)
 
-        layout.addWidget(self.torque_checkbox)
+        layout.addLayout(checkbox_row)
         layout.addWidget(self.init_pose_button)
         layout.addWidget(self.save_all_button)
         layout.addLayout(com_layout)
-        layout.addWidget(QLabel("Baudrate:"))
-        layout.addWidget(self.baudrate_combo)
-        layout.addWidget(self.hardware_checkbox)
+        layout.addLayout(baud_layout)
         layout.addLayout(path_layout)
 
         self.tabs = QTabWidget()
-        # Initial Pose Editor
         self.initial_pose_editor = InitialPoseEditor(
             self.joint_names, self.joint_limits, available_variables=self.variable_names)
         self.tabs.addTab(self.initial_pose_editor, "Initial Pose")
-        # Motion Editor
         self.motion_editor = MotionEditorWidget(animation_root="motion_directory")
         self.tabs.addTab(self.motion_editor, "Motion Editor")
 
