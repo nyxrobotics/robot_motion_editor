@@ -94,20 +94,22 @@ class MotionFlowScene(QGraphicsScene):
             self.add_if_condition_block(event.scenePos())
 
     def add_if_condition_block(self, pos):
+        existing_names = [item.name for item in self.items() if hasattr(item, "condition") and hasattr(item, "name")]
         dialog = IfConditionExpressionDialog(
             available_variables=self.available_variables,
-            frame_names=self.get_all_frame_names()
+            frame_names=self.get_all_frame_names(),
+            existing_names=existing_names
         )
         if dialog.exec_():
             result = dialog.result
-            block_name = f"if_{len(self.items())+1}"
-            item = FrameBlockItem(block_name)
-            item.label.setPlainText(f"if:{result['condition']}")
-            item.setPos(pos)
-            item.condition = result['condition']
-            item.to_true = result['to_true']
-            item.to_false = result['to_false']
-            self.addItem(item)
+            block = FrameBlockItem(result["name"])
+            block.setPos(pos)
+            block.label.setPlainText(f"if:\n{result['condition']}")
+            block.condition = result["condition"]
+            block.to_true = result["to_true"]
+            block.to_false = result["to_false"]
+            block.name = result["name"]
+            self.addItem(block)
 
     def get_all_frame_names(self):
         return [item.name for item in self.items() if isinstance(item, FrameBlockItem)]

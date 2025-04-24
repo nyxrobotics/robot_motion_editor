@@ -2,8 +2,6 @@ import os
 
 import yaml
 
-from .frame_file_manager import list_frame_files
-from .frame_file_manager import load_frame_file
 from .frame_file_manager import save_frame_file
 from .if_condition_file_manager import load_if_condition
 from .if_condition_file_manager import save_if_condition
@@ -15,19 +13,24 @@ def load_animation_file(filepath):
     if not os.path.exists(filepath):
         return {}, [], [], []
 
-    with open(filepath, 'r') as f:
+    with open(filepath, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f) or {}
 
-    layout = data.get("layout", {})
+    raw_layout = data.get("layout", {})
     connections = data.get("connections", [])
-    if_conditions_refs = data.get("if_conditions", [])
-    switch_conditions_refs = data.get("switch_conditions", [])
+    if_condition_refs = data.get("if_conditions", [])
+    switch_condition_refs = data.get("switch_conditions", [])
 
     animation_dir = os.path.dirname(filepath)
     conditions_dir = os.path.join(animation_dir, "conditions")
 
+    layout = {}
+    for uid, meta in raw_layout.items():
+        if "type" in meta and "x" in meta and "y" in meta:
+            layout[uid] = meta
+
     if_conditions = []
-    for ref in if_conditions_refs:
+    for ref in if_condition_refs:
         name = ref.get("name")
         if not name:
             continue
@@ -37,7 +40,7 @@ def load_animation_file(filepath):
             if_conditions.append(cond_data)
 
     switch_conditions = []
-    for ref in switch_conditions_refs:
+    for ref in switch_condition_refs:
         name = ref.get("name")
         if not name:
             continue
@@ -72,7 +75,6 @@ def save_animation_file(filepath, layout, connections, if_conditions, switch_con
         save_switch_condition(conditions_dir, name, {k: v for k, v in cond.items() if k != "name"})
         switch_condition_refs.append({"name": name})
 
-    # Save frames if provided
     if frame_data_map:
         for name, data in frame_data_map.items():
             frame_path = os.path.join(frames_dir, f"{name}.yaml")
@@ -85,12 +87,19 @@ def save_animation_file(filepath, layout, connections, if_conditions, switch_con
         "switch_conditions": switch_condition_refs
     }
 
-    with open(filepath, 'w') as f:
-        yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
 
 def prune_invalid_entries(layout, connections, if_conditions, switch_conditions, available_frames):
-    layout = {k: v for k, v in layout.items() if k in available_frames}
+    layout = {
+        k: v for k, v in layout.items()
+        if (
+            v.get("type") == "frame" and v.get("file_name") in available_frames
+            or v.get("type") == "if_condition" and v.get("name")
+            or v.get("type") == "switch_condition" and v.get("name")
+        )
+    }
 
     def valid_frame(f):
         return f in available_frames
@@ -146,3 +155,36 @@ def create_switch_condition(name, from_frame, variable, cases):
         "variable": variable,
         "cases": cases
     }
+
+
+def normalize_layout_ids(layout):
+    used_ids = set()
+    renamed = {}
+    id_map = {}
+
+    def base_id_key(entry):
+        t = entry.get("type", "unknown")
+        n = entry.get("file_name") if t == "frame" else entry.get("name", "")
+        safe = "".join(c if c.isalnum() else "_" for c in n)
+        return f"{t}_{safe}"
+
+    counters = {}
+
+    for uid, meta in layout.items():
+        key = base_id_key(meta)
+        counters.setdefault(key, 0)
+        new_id = f"{key}_id{counters[key]:03}"
+        while new_id in used_ids:
+            counters[key] += 1
+            new_id = f"{key}_id{counters[key]:03}"
+        used_ids.add(new_id)
+        if new_id != uid:
+            renamed[uid] = new_id
+        id_map[uid] = new_id
+        counters[key] += 1
+
+    new_layout = {}
+    for old_id, meta in layout.items():
+        new_id = id_map[old_id]
+        new_layout[new_id] = meta
+    return new_layout, id_map

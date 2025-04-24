@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QComboBox
 from PyQt5.QtWidgets import QDialog
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QLineEdit
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QTextEdit
@@ -9,16 +10,24 @@ from PyQt5.QtWidgets import QVBoxLayout
 
 
 class IfConditionExpressionDialog(QDialog):
-    def __init__(self, available_variables, frame_names, condition="", to_true="", to_false="", parent=None):
+    def __init__(self, available_variables, frame_names, existing_names=None,
+                 name="", condition="", to_true="", to_false="", parent=None):
         super().__init__(parent)
         self.setWindowTitle("If Condition Editor")
         self.result = None
         self.available_variables = available_variables or []
+        self.existing_names = set(existing_names or [])
 
-        self.init_ui(condition, frame_names, to_true, to_false)
+        self.init_ui(name, condition, frame_names, to_true, to_false)
 
-    def init_ui(self, current_expr, frame_names, to_true, to_false):
+    def init_ui(self, name, current_expr, frame_names, to_true, to_false):
         layout = QVBoxLayout()
+
+        name_layout = QHBoxLayout()
+        name_layout.addWidget(QLabel("Condition Name:"))
+        self.name_edit = QLineEdit(name)
+        name_layout.addWidget(self.name_edit)
+        layout.addLayout(name_layout)
 
         layout.addWidget(QLabel("Enter if condition (e.g., imu_pitch > 0.1):"))
 
@@ -74,14 +83,26 @@ class IfConditionExpressionDialog(QDialog):
         return True
 
     def accept_and_store(self):
+        name = self.name_edit.text().strip()
         expr = self.expr_edit.toPlainText().strip()
+
+        if not name:
+            QMessageBox.warning(self, "Missing Name", "Please provide a unique condition name.")
+            return
+
+        if name in self.existing_names:
+            QMessageBox.warning(self, "Name Conflict", f"'{name}' already exists. Choose another name.")
+            return
+
         if not self.validate_expression(expr):
             QMessageBox.critical(
                 self, "Invalid Expression",
                 "The expression contains syntax errors or undefined variables."
             )
             return
+
         self.result = {
+            "name": name,
             "condition": expr,
             "to_true": self.true_combo.currentText(),
             "to_false": self.false_combo.currentText()
