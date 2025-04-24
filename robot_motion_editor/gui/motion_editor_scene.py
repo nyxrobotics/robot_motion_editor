@@ -21,9 +21,12 @@ class FrameBlockItem(QGraphicsRectItem):
 
         super().__init__(0, 0, width, height)
         self.setBrush(QBrush(QColor("#1a1a1a")))
-        pen = QPen(QColor("#ffffff"))
-        pen.setWidth(3)
-        self.setPen(pen)
+        self.default_pen = QPen(QColor("#ffffff"))
+        self.selected_pen = QPen(QColor("#00ffff"))
+        self.default_pen.setWidth(3)
+        self.selected_pen.setWidth(4)
+        self.setPen(self.default_pen)
+
         self.setFlags(self.ItemIsMovable | self.ItemIsSelectable)
         self.name = frame_name
         self.uid = uid if uid is not None else frame_name
@@ -34,7 +37,7 @@ class FrameBlockItem(QGraphicsRectItem):
         label_height = self.label.boundingRect().height()
         self.label.setPos((width - label_width) / 2, (height - label_height) / 2)
 
-        self.connection = {"output": {}}  # 初期接続情報
+        self.connection = {"output": {}}
 
     def contextMenuEvent(self, event):
         menu = QMenu()
@@ -54,6 +57,10 @@ class FrameBlockItem(QGraphicsRectItem):
                 scene.removeItem(self)
         elif selected_action == connect_action:
             print(f"Connect from: {self.name} (id: {self.uid})")
+
+    def paint(self, painter, option, widget=None):
+        self.setPen(self.selected_pen if self.isSelected() else self.default_pen)
+        super().paint(painter, option, widget)
 
 
 class MotionFlowScene(QGraphicsScene):
@@ -85,21 +92,24 @@ class MotionFlowScene(QGraphicsScene):
         event.acceptProposedAction()
 
     def contextMenuEvent(self, event):
-        menu = QMenu()
-        add_frame_action = QAction("Add New Frame", menu)
-        add_existing_action = QAction("Add Existing Frame", menu)
-        add_if_condition_action = QAction("Add If Condition", menu)
-        menu.addAction(add_frame_action)
-        menu.addAction(add_existing_action)
-        menu.addAction(add_if_condition_action)
+        item = self.itemAt(event.scenePos(), self.views()[0].transform())
+        if item and isinstance(item, FrameBlockItem):
+            item.setSelected(True)
+            item.contextMenuEvent(event)
+        else:
+            menu = QMenu()
+            add_frame_action = QAction("Add New Frame", menu)
+            menu.addAction(add_frame_action)
+            selected_action = menu.exec_(event.screenPos())
+            if selected_action == add_frame_action:
+                print("New Frame block requested")
 
-        selected_action = menu.exec_(event.screenPos())
-        if selected_action == add_frame_action:
-            print("New Frame block requested")
-        elif selected_action == add_existing_action:
-            print("Add Existing Frame requested")
-        elif selected_action == add_if_condition_action:
-            self.add_if_condition_block(event.scenePos())
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Delete:
+            for item in self.selectedItems():
+                self.removeItem(item)
+        else:
+            super().keyPressEvent(event)
 
     def add_if_condition_block(self, pos):
         existing_names = [item.name for item in self.items() if hasattr(item, "condition") and hasattr(item, "name")]
@@ -167,5 +177,3 @@ class MotionFlowScene(QGraphicsScene):
             if "connection" in block:
                 item.connection = block["connection"]
             self.addItem(item)
-
-        # 矢印の復元も必要ならここに追加
