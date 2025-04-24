@@ -188,9 +188,9 @@ class ArrowItem(QGraphicsPathItem):
             self.scene().removeItem(hp)
         self.hover_points.clear()
 
-        points = [self.start_handle.scenePos()] + \
-                 [wp.scenePos() for wp in self.waypoints] + \
-                 [self.end_handle.scenePos()]
+        points = [self.start_handle.pos()] + \
+                 [wp.pos() for wp in self.waypoints] + \
+                 [self.end_handle.pos()]
         for i in range(len(points) - 1):
             mid = (points[i] + points[i + 1]) * 0.5
             hp = HoverPoint(mid, self, i)
@@ -202,32 +202,30 @@ class ArrowItem(QGraphicsPathItem):
         if self.start_item and not self.start_handle.is_dragging:
             update = not self.waypoints or self._recently_moved_waypoint is self.waypoints[0]
             if update:
-                neighbor = self.waypoints[0].scenePos() if self.waypoints else self.end_handle.scenePos()
+                neighbor = self.waypoints[0].pos() if self.waypoints else self.end_handle.pos()
                 center = self.start_item.sceneBoundingRect().center()
                 p1 = compute_edge_point(center, neighbor,
                                         self.start_item.rect().width(), self.start_item.rect().height())
                 self.start_handle.setPos(p1)
-        p1 = self.start_handle.scenePos()
+        p1 = self.start_handle.pos()
 
         # --- p2 ---
         if self.end_item and not self.end_handle.is_dragging:
             update = not self.waypoints or self._recently_moved_waypoint is self.waypoints[-1]
             if update:
-                neighbor = self.waypoints[-1].scenePos() if self.waypoints else self.start_handle.scenePos()
+                neighbor = self.waypoints[-1].pos() if self.waypoints else self.start_handle.pos()
                 center = self.end_item.sceneBoundingRect().center()
                 p2 = compute_edge_point(center, neighbor,
                                         self.end_item.rect().width(), self.end_item.rect().height())
                 self.end_handle.setPos(p2)
-        p2 = self.end_handle.scenePos()
+        p2 = self.end_handle.pos()
 
-        # --- path ---
         path = QPainterPath()
         path.moveTo(p1)
         for wp in self.waypoints:
-            path.lineTo(wp.scenePos())
+            path.lineTo(wp.pos())  # ← scenePos ではなく pos
         path.lineTo(p2)
 
-        # arrowhead
         if path.elementCount() >= 2:
             angle = math.atan2(p2.y() - path.elementAt(path.elementCount() - 2).y,
                                p2.x() - path.elementAt(path.elementCount() - 2).x)
