@@ -137,6 +137,7 @@ class MotionFlowScene(QGraphicsScene):
         layout = {"block": {}, "arrow": {}}
         block_id_counter = 0
         arrow_id_counter = 0
+        used_uids = set()
 
         print("\n[DEBUG] Items in scene:")
         for item in self.items():
@@ -146,6 +147,9 @@ class MotionFlowScene(QGraphicsScene):
             if isinstance(item, FrameBlockItem):
                 if not hasattr(item, 'uid') or not item.uid:
                     item.uid = self._generate_uid(item.name)
+                while item.uid in used_uids:
+                    item.uid = self._generate_uid(item.name)
+                used_uids.add(item.uid)
 
                 uid = item.uid
                 layout["block"][uid] = {
