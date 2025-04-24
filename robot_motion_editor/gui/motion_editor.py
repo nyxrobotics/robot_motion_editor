@@ -17,7 +17,12 @@ from PyQt5.QtWidgets import QTreeWidgetItem
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
+from ..logic.animation_file_manager import create_empty_animation
+from ..logic.animation_file_manager import load_animation_file
+from ..logic.animation_file_manager import prune_invalid_entries
+from ..logic.animation_file_manager import save_animation_file
 from .motion_editor_animation_tree_widget import AnimationTreeWidget
+from .motion_editor_scene import FrameBlockItem
 from .motion_editor_scene import MotionFlowScene
 
 
@@ -27,13 +32,18 @@ class MotionEditorWidget(QWidget):
         self.animation_root = animation_root
         self.animation_tree = AnimationTreeWidget()
 
+        self.current_animation_name = None
+        self.layout_data = {}
+        self.connections = []
+        self.if_conditions = []
+        self.switch_conditions = []
+
         self.init_ui()
         self.load_animation_list()
 
     def init_ui(self):
         splitter = QSplitter(Qt.Horizontal)
 
-        # --- Left Panel ---
         left_widget = QWidget()
         left_panel = QVBoxLayout(left_widget)
         self.save_anim_btn = QPushButton("Save Animation")
@@ -43,7 +53,7 @@ class MotionEditorWidget(QWidget):
         self.delete_anim_btn = QPushButton("Delete Animation")
         self.delete_frame_btn = QPushButton("Delete Frame")
 
-        self.save_anim_btn.clicked.connect(lambda: print("Save Animation not implemented"))
+        self.save_anim_btn.clicked.connect(self.save_current_animation)
         self.save_frame_btn.clicked.connect(lambda: print("Save Frame not implemented"))
         self.new_anim_btn.clicked.connect(self.create_new_animation)
         self.new_frame_btn.clicked.connect(self.create_new_frame)
@@ -56,7 +66,8 @@ class MotionEditorWidget(QWidget):
             left_panel.addWidget(btn)
         left_panel.addWidget(self.animation_tree)
 
-        # --- Right Panel (Flowchart) ---
+        self.animation_tree.itemClicked.connect(self.on_tree_item_clicked)
+
         self.scene = MotionFlowScene()
         self.scene.setSceneRect(0, 0, 2000, 2000)
         self.view = QGraphicsView(self.scene)
@@ -71,6 +82,16 @@ class MotionEditorWidget(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(splitter)
         self.setLayout(layout)
+
+    def on_tree_item_clicked(self, item):
+        animation_item = item if item.parent() is None else item.parent()
+        name = animation_item.text(0)
+
+        # Avoid reloading if already selected
+        if name == self.current_animation_name:
+            return
+
+        self.load_animation_by_name(name)
 
     def load_animation_list(self):
         self.animation_tree.clear()
@@ -90,6 +111,54 @@ class MotionEditorWidget(QWidget):
                         QTreeWidgetItem(animation_item, [frame_name.replace(".yaml", "")])
             self.animation_tree.addTopLevelItem(animation_item)
 
+    def load_animation_by_name(self, animation_name):
+        self.current_animation_name = animation_name
+        anim_path = os.path.join(self.animation_root, animation_name, f"{animation_name}.yaml")
+        frames_dir = os.path.join(self.animation_root, animation_name, "frames")
+        available_frames = [f.replace(".yaml", "") for f in os.listdir(frames_dir) if f.endswith(".yaml")]
+
+        layout, connections, if_conditions, switch_conditions = load_animation_file(anim_path)
+        layout, connections, if_conditions, switch_conditions = prune_invalid_entries(
+            layout, connections, if_conditions, switch_conditions, available_frames
+        )
+
+        self.layout_data = layout
+        self.connections = connections
+        self.if_conditions = if_conditions
+        self.switch_conditions = switch_conditions
+
+        self.scene.clear()
+        for name, pos in layout.items():
+            item = FrameBlockItem(name)
+            item.setPos(pos["x"], pos["y"])
+            self.scene.addItem(item)
+
+    def save_current_animation(self):
+        if not self.current_animation_name:
+            QMessageBox.information(self, "Save", "No animation selected to save.")
+            return
+
+        layout = {}
+        for item in self.scene.items():
+            if isinstance(item, FrameBlockItem):
+                pos = item.pos()
+                layout[item.name] = {"x": pos.x(), "y": pos.y()}
+
+        self.layout_data = layout
+
+        anim_path = os.path.join(
+            self.animation_root,
+            self.current_animation_name,
+            f"{self.current_animation_name}.yaml")
+        save_animation_file(
+            anim_path,
+            self.layout_data,
+            self.connections,
+            self.if_conditions,
+            self.switch_conditions
+        )
+        print("Saved:", self.current_animation_name)
+
     def create_new_animation(self):
         name, ok = QInputDialog.getText(self, "New Animation", "Enter animation name:")
         if not ok or not name.strip():
@@ -107,6 +176,7 @@ class MotionEditorWidget(QWidget):
             f.write("# initial frame\n")
 
         self.load_animation_list()
+        self.load_animation_by_name(name)
 
     def create_new_frame(self):
         current_item = self.animation_tree.currentItem()
@@ -114,7 +184,6 @@ class MotionEditorWidget(QWidget):
             QMessageBox.information(self, "Selection Error", "Please select an animation.")
             return
 
-        # Allow selecting either animation or frame item
         if current_item.parent():
             animation_item = current_item.parent()
         else:
@@ -137,6 +206,7 @@ class MotionEditorWidget(QWidget):
             f.write("# frame content\n")
 
         self.load_animation_list()
+        self.load_animation_by_name(animation_name)
 
     def delete_animation(self):
         item = self.animation_tree.currentItem()
@@ -153,6 +223,7 @@ class MotionEditorWidget(QWidget):
             import shutil
             shutil.rmtree(path, ignore_errors=True)
             self.load_animation_list()
+            self.current_animation_name = None
 
     def delete_frame(self):
         item = self.animation_tree.currentItem()
@@ -172,3 +243,4 @@ class MotionEditorWidget(QWidget):
             if os.path.exists(path):
                 os.remove(path)
             self.load_animation_list()
+            self.load_animation_by_name(anim_name)
