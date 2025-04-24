@@ -92,14 +92,17 @@ robot_motion_editor/
 ├── gui/
 │   ├── main_window.py             # メインウィンドウと全体のタブ構成
 │   ├── editor_configs.py          # フォント/設定ユーティリティ
-│   ├── initial_pose_editor.py     # 初期姿勢編集画面（関節角度の編集、描画トリガ）
-│   ├── motion_editor.py           # フローチャート形式の編集画面（Simulink風）
-│   ├── motion_offset_editor.py    # モーション初期オフセットのUI
-
+│   ├── initial_pose_editor.py     # 初期姿勢編集タブ
+│   ├── initial_pose_visualizer.py # 初期姿勢をRvizに表示する機能
 │   ├── pid_config_dialog.py        # PIDゲイン設定用のダイアログ（関節ごとにP/I/D入力）
 │   ├── feedback_expression_dialog.py # フィードバック数式入力ダイアログ（式構文/変数チェック付き）
+│   ├── motion_editor.py           # Motion Editorタブ
+│   ├── motion_editor_animation_tree_widget.py # モーションファイルの読み出し・書き込み
+│   ├── motion_editor_scene.py.py  # フローチャート形式の編集画面（Simulink風）
+│   ├── motion_offset_editor.py    # モーション初期オフセット編集用UI
 │   ├── frame_editor.py            # 通常のモーションフレーム編集画面
-│   ├── condition_editor.py        # 条件分岐のUI（ボタン、IMUなど）
+│   ├── if_condition_editor.py     # True/False 条件分岐のUI（ボタン、IMUなど）
+│   ├── switch_condition_editor.py # Switch Case 条件分岐
 │
 ├── robot_interface/
 │   ├── __init__.py
@@ -109,10 +112,11 @@ robot_motion_editor/
 │   ├── urdf_joint_extractor.py    # robot_descriptionからのtransmission設定関節の抽出 + 関節リミット取得
 │
 ├── logic/
-│   ├── motion_loader.py           # モーション/ポーズファイルの保存・読み込み
 │   ├── trajectory_executor.py     # RViz表示用のJointTrajectory生成
 │   ├── expression_evaluator.py    # 数式評価エンジン（IMUや他関節を式に組み込む）
-│   ├── block_data.py              # モーションのブロック・遷移データ構造
+│   ├── animation_file_manager.py  # アニメーシの読み込み・書き出し用
+│   ├── frame_file_manager.py      # 初期フレーム・通常フレームの読み込み・書き出し用
+│   ├── initial_pose_file_manager.py # 初期姿勢の読み込み・書き出し用
 │
 ├── rviz_interface/
 │   ├── trajectory_visualizer.py   # /move_group/display_planned_pathやQuery Goal Stateの可視化処理
