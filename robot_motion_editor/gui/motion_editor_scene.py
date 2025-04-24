@@ -3,8 +3,11 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush
 from PyQt5.QtGui import QColor
 from PyQt5.QtGui import QFontMetricsF
+from PyQt5.QtGui import QPainterPath
 from PyQt5.QtGui import QPen
 from PyQt5.QtWidgets import QAction
+from PyQt5.QtWidgets import QGraphicsEllipseItem
+from PyQt5.QtWidgets import QGraphicsPathItem
 from PyQt5.QtWidgets import QGraphicsRectItem
 from PyQt5.QtWidgets import QGraphicsScene
 from PyQt5.QtWidgets import QGraphicsTextItem
@@ -22,8 +25,10 @@ class FrameBlockItem(QGraphicsRectItem):
         super().__init__(0, 0, width, height)
         self.setBrush(QBrush(QColor("#1a1a1a")))
         self.default_pen = QPen(QColor("#ffffff"))
+        self.highlight_pen = QPen(QColor("#00ff00"))
         self.selected_pen = QPen(QColor("#00ffff"))
         self.default_pen.setWidth(3)
+        self.highlight_pen.setWidth(3)
         self.selected_pen.setWidth(4)
         self.setPen(self.default_pen)
 
@@ -38,29 +43,94 @@ class FrameBlockItem(QGraphicsRectItem):
         self.label.setPos((width - label_width) / 2, (height - label_height) / 2)
 
         self.connection = {"output": {}}
+        self.is_highlighted = False
 
-    def contextMenuEvent(self, event):
-        menu = QMenu()
-        edit_action = QAction("Edit Frame", menu)
-        delete_action = QAction("Delete Block", menu)
-        connect_action = QAction("Connect To...", menu)
-        menu.addAction(edit_action)
-        menu.addAction(delete_action)
-        menu.addAction(connect_action)
-
-        selected_action = menu.exec_(event.screenPos())
-        if selected_action == edit_action:
-            print(f"Edit Frame: {self.name} (id: {self.uid})")
-        elif selected_action == delete_action:
-            scene = self.scene()
-            if scene:
-                scene.removeItem(self)
-        elif selected_action == connect_action:
-            print(f"Connect from: {self.name} (id: {self.uid})")
+    def set_highlighted(self, state):
+        self.is_highlighted = state
+        self.update()
 
     def paint(self, painter, option, widget=None):
-        self.setPen(self.selected_pen if self.isSelected() else self.default_pen)
+        if self.isSelected():
+            self.setPen(self.selected_pen)
+        elif self.is_highlighted:
+            self.setPen(self.highlight_pen)
+        else:
+            self.setPen(self.default_pen)
         super().paint(painter, option, widget)
+
+
+class ArrowEndpointHandle(QGraphicsEllipseItem):
+    def __init__(self, arrow, is_start):
+        super().__init__(-6, -6, 12, 12)
+        self.setBrush(QBrush(QColor("red" if is_start else "blue")))
+        self.setFlags(self.ItemIsMovable | self.ItemIsSelectable)
+        self.setZValue(2)
+        self.arrow = arrow
+        self.is_start = is_start
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        pos = self.scenePos()
+        scene = self.scene()
+        if not scene:
+            return
+        for item in scene.items():
+            if isinstance(item, FrameBlockItem):
+                item.set_highlighted(item.sceneBoundingRect().contains(pos))
+        self.arrow.update_path()
+
+    def mouseReleaseEvent(self, event):
+        scene = self.scene()
+        target = None
+        for item in scene.items(self.scenePos()):
+            if isinstance(item, FrameBlockItem):
+                target = item
+                break
+        if target:
+            if self.is_start:
+                self.arrow.start_item = target
+            else:
+                self.arrow.end_item = target
+        for item in scene.items():
+            if hasattr(item, "set_highlighted"):
+                item.set_highlighted(False)
+        self.arrow.update_path()
+        super().mouseReleaseEvent(event)
+
+
+class ArrowItem(QGraphicsPathItem):
+    def __init__(self, arrow_id):
+        super().__init__()
+        self.setPen(QPen(QColor("white"), 2))
+        self.setZValue(-1)
+        self.arrow_id = arrow_id
+        self.start_item = None
+        self.end_item = None
+        self.start_handle = ArrowEndpointHandle(self, True)
+        self.end_handle = ArrowEndpointHandle(self, False)
+        self.start_handle.setPos(0, 0)
+        self.end_handle.setPos(100, 100)
+
+    def add_to_scene(self, scene):
+        scene.addItem(self)
+        scene.addItem(self.start_handle)
+        scene.addItem(self.end_handle)
+
+    def update_path(self):
+        path = QPainterPath()
+        if self.start_item:
+            p1 = self.start_item.sceneBoundingRect().center()
+        else:
+            p1 = self.start_handle.scenePos()
+
+        if self.end_item:
+            p2 = self.end_item.sceneBoundingRect().center()
+        else:
+            p2 = self.end_handle.scenePos()
+
+        path.moveTo(p1)
+        path.lineTo(p2)
+        self.setPath(path)
 
 
 class MotionFlowScene(QGraphicsScene):
@@ -68,6 +138,8 @@ class MotionFlowScene(QGraphicsScene):
         super().__init__(parent)
         self.setBackgroundBrush(QColor("#111111"))
         self.id_counter = 0
+        self.arrow_counter = 0
+        self.arrows = []
 
     def _generate_uid(self, name):
         safe = "".join(c if c.isalnum() else "_" for c in name)
@@ -75,34 +147,35 @@ class MotionFlowScene(QGraphicsScene):
         self.id_counter += 1
         return uid
 
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasText():
-            event.acceptProposedAction()
-
-    def dragMoveEvent(self, event):
-        event.acceptProposedAction()
-
-    def dropEvent(self, event):
-        name = event.mimeData().text()
-        pos = event.scenePos()
-        uid = self._generate_uid(name)
-        item = FrameBlockItem(name, uid=uid)
-        item.setPos(pos)
-        self.addItem(item)
-        event.acceptProposedAction()
+    def _generate_arrow_id(self):
+        aid = f"arrow_{self.arrow_counter:03}"
+        self.arrow_counter += 1
+        return aid
 
     def contextMenuEvent(self, event):
         item = self.itemAt(event.scenePos(), self.views()[0].transform())
-        if item and isinstance(item, FrameBlockItem):
+        menu = QMenu()
+        if isinstance(item, FrameBlockItem):
             item.setSelected(True)
             item.contextMenuEvent(event)
+            return
         else:
-            menu = QMenu()
             add_frame_action = QAction("Add New Frame", menu)
+            add_arrow_action = QAction("New Arrow", menu)
             menu.addAction(add_frame_action)
+            menu.addAction(add_arrow_action)
             selected_action = menu.exec_(event.screenPos())
             if selected_action == add_frame_action:
                 print("New Frame block requested")
+            elif selected_action == add_arrow_action:
+                arrow_id = self._generate_arrow_id()
+                arrow = ArrowItem(arrow_id)
+                pos = event.scenePos()
+                arrow.start_handle.setPos(pos)
+                arrow.end_handle.setPos(pos + QPointF(100, 0))
+                arrow.add_to_scene(self)
+                arrow.update_path()
+                self.arrows.append(arrow)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete:
@@ -111,38 +184,11 @@ class MotionFlowScene(QGraphicsScene):
         else:
             super().keyPressEvent(event)
 
-    def add_if_condition_block(self, pos):
-        existing_names = [item.name for item in self.items() if hasattr(item, "condition") and hasattr(item, "name")]
-        dialog = IfConditionExpressionDialog(
-            available_variables=self.available_variables,
-            frame_names=self.get_all_frame_names(),
-            existing_names=existing_names
-        )
-        if dialog.exec_():
-            result = dialog.result
-            uid = self._generate_uid(result["name"])
-            block = FrameBlockItem(result["name"], uid=uid)
-            block.setPos(pos)
-            block.label.setPlainText(f"if:\n{result['condition']}")
-            block.condition = result["condition"]
-            block.to_true = result["to_true"]
-            block.to_false = result["to_false"]
-            block.name = result["name"]
-            self.addItem(block)
-
-    def get_all_frame_names(self):
-        return [item.name for item in self.items() if isinstance(item, FrameBlockItem)]
-
     def to_layout_dict(self):
         layout = {"block": {}, "arrow": {}}
         used_uids = set()
-
         items = [item for item in self.items() if isinstance(item, FrameBlockItem)]
-        items.sort(key=lambda i: i.uid)  # UID順にソートして安定化
-
-        print("\n[DEBUG] Items in scene:")
-        for item in items:
-            print(f" - {type(item)} uid={getattr(item, 'uid', None)} name={getattr(item, 'name', None)}")
+        items.sort(key=lambda i: i.uid)
 
         for idx, item in enumerate(items):
             if not hasattr(item, 'uid') or not item.uid:
@@ -156,7 +202,7 @@ class MotionFlowScene(QGraphicsScene):
                 "info": {
                     "type": "frame",
                     "filename": item.name,
-                    "id": idx  # ← 0から連番で詰めていく
+                    "id": idx
                 },
                 "place": {
                     "x": int(item.pos().x()),
@@ -164,13 +210,20 @@ class MotionFlowScene(QGraphicsScene):
                 },
                 "connection": item.connection if hasattr(item, "connection") else {"output": {}}
             }
-            print(f"[DEBUG] Block saved: {uid} at ({item.pos().x()}, {item.pos().y()})")
 
-        print("[DEBUG] Block count to save:", len(layout["block"]))
+        for arrow in self.arrows:
+            if arrow.start_item and arrow.end_item:
+                layout["arrow"][arrow.arrow_id] = {
+                    "info": {
+                        "id": int(arrow.arrow_id.split("_")[-1])
+                    },
+                    "waypoints": []  # waypoints 未実装
+                }
         return layout
 
     def load_layout_dict(self, layout):
         self.clear()
+        self.arrows = []
         for uid, block in layout.get("block", {}).items():
             name = block["info"]["filename"]
             x = block["place"]["x"]
