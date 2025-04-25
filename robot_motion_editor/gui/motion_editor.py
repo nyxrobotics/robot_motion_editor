@@ -101,17 +101,10 @@ class MotionEditorWidget(QWidget):
 
             offset_path = os.path.join(self.animation_root, animation_name, "offset.yaml")
 
-            # self.joint_names / joint_limits / available_variables は __init__ で保持されている
-            joints = {
-                name: {
-                    "position": 0.0,
-                    "enable": True,
-                    "pid": [0.0, 0.0, 0.0],
-                    "feedback": ""
-                } for name in self.joint_names
-            }
-
-            dlg = OffsetEditorDialog(joints=joints, offset_path=offset_path)
+            dlg = OffsetEditorDialog(joint_names=self.joint_names,
+                                     joint_limits=self.joint_limits,
+                                     available_variables=self.available_variables,
+                                     offset_path=offset_path)
             if dlg.exec_():
                 updated_data = dlg.get_joint_data()
                 save_initial_pose(

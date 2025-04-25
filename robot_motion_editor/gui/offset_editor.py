@@ -18,16 +18,20 @@ from PyQt5.QtWidgets import QWidget
 
 from ..logic.initial_pose_file_manager import load_initial_pose
 from ..logic.initial_pose_file_manager import save_initial_pose
+from .feedback_expression_dialog import FeedbackExpressionDialog
+from .pid_config_dialog import PIDConfigDialog
 
 
 class OffsetEditorDialog(QDialog):
-    def __init__(self, joints, offset_path=None, parent=None):
+    def __init__(self, joint_names, joint_limits, available_variables, offset_path=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Edit Initial Offset")
+
+        self.joint_names = joint_names
+        self.joint_limits = joint_limits
+        self.available_variables = available_variables or {}
         self.offset_path = offset_path
 
-        self.joint_names = list(joints.keys())
-        self.joint_limits = {name: (-math.pi, math.pi) for name in self.joint_names}
         self.joint_widgets = {}
         self.joint_enabled = {}
         self.pid_config = {}
@@ -35,16 +39,7 @@ class OffsetEditorDialog(QDialog):
         self.enable_checkbox_widgets = {}
 
         self.init_ui()
-        self.set_joint_data(joints)
-
-        if offset_path and os.path.exists(offset_path):
-            try:
-                offset_data = load_initial_pose(os.path.dirname(offset_path), os.path.basename(offset_path))
-                rospy.loginfo(f"Loaded offset data: {offset_data}")
-                filtered_data = {k: v for k, v in offset_data.items() if k in joints}
-                self.set_joint_data(filtered_data)
-            except Exception as e:
-                rospy.logwarn(f"Failed to load offset data: {e}")
+        self.load_joint_pose_from_file(offset_path)
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -53,14 +48,17 @@ class OffsetEditorDialog(QDialog):
         content = QWidget()
         content_layout = QVBoxLayout(content)
 
-        # Save + All Enable
         top_row = QHBoxLayout()
         self.all_enable_checkbox = QCheckBox("All Enable")
         self.all_enable_checkbox.stateChanged.connect(self.set_all_enable)
         top_row.addWidget(self.all_enable_checkbox)
+
+        self.reset_all_button = QPushButton("Reset All")
+        self.reset_all_button.clicked.connect(self.reset_all_angles)
+        top_row.addWidget(self.reset_all_button)
+
         content_layout.addLayout(top_row)
 
-        # Joint rows
         if self.joint_names:
             max_label = QLabel(max(self.joint_names, key=len))
         else:
@@ -97,10 +95,20 @@ class OffsetEditorDialog(QDialog):
             slider.valueChanged.connect(lambda val, s=spin: s.setValue(float(val)))
             spin.valueChanged.connect(lambda val, sl=slider: sl.setValue(int(round(val))))
 
+            pid_btn = QPushButton("PID")
+            pid_btn.setFixedWidth(50)
+            pid_btn.clicked.connect(lambda _, j=joint, b=pid_btn: self.open_pid_dialog(j, b))
+
+            fb_btn = QPushButton("FB")
+            fb_btn.setFixedWidth(50)
+            fb_btn.clicked.connect(lambda _, j=joint, b=fb_btn: self.open_feedback_dialog(j, b))
+
             row.addWidget(enable_cb)
             row.addWidget(label)
             row.addWidget(slider)
             row.addWidget(spin)
+            row.addWidget(pid_btn)
+            row.addWidget(fb_btn)
             content_layout.addLayout(row)
 
             self.joint_widgets[joint] = (slider, spin)
@@ -110,7 +118,6 @@ class OffsetEditorDialog(QDialog):
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
-        # OK / Cancel
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.on_accept)
         buttons.rejected.connect(self.reject)
@@ -125,17 +132,30 @@ class OffsetEditorDialog(QDialog):
             self.joint_enabled[joint] = checked
             cb.blockSignals(False)
 
-    def set_joint_data(self, data):
-        for name, config in data.items():
-            if name not in self.joint_widgets:
-                continue
-            _, spin = self.joint_widgets[name]
-            spin.setValue(math.degrees(config.get("position", 0.0)))
-            self.joint_enabled[name] = config.get("enable", True)
-            if name in self.enable_checkbox_widgets:
-                self.enable_checkbox_widgets[name].setChecked(self.joint_enabled[name])
-            self.pid_config[name] = config.get("pid", [0.0, 0.0, 0.0])
-            self.feedback_expressions[name] = config.get("feedback", "")
+    def reset_all_angles(self):
+        for name, (slider, spin) in self.joint_widgets.items():
+            spin.setValue(0.0)
+
+    def load_joint_pose_from_file(self, yaml_path):
+        if not yaml_path or not os.path.exists(yaml_path):
+            rospy.loginfo(f"No offset.yaml found at {yaml_path}")
+            return
+
+        try:
+            loaded = load_initial_pose(os.path.dirname(yaml_path), os.path.basename(yaml_path))
+            for name in self.joint_names:
+                if name not in loaded:
+                    continue
+                data = loaded[name]
+                _, spin = self.joint_widgets[name]
+                spin.setValue(math.degrees(data.get("position", 0.0)))
+                self.joint_enabled[name] = data.get("enable", True)
+                if name in self.enable_checkbox_widgets:
+                    self.enable_checkbox_widgets[name].setChecked(self.joint_enabled[name])
+                self.pid_config[name] = data.get("pid", [0.0, 0.0, 0.0])
+                self.feedback_expressions[name] = data.get("feedback", "")
+        except Exception as e:
+            rospy.logwarn(f"Failed to load offset data: {e}")
 
     def get_joint_data(self):
         result = {}
@@ -164,3 +184,23 @@ class OffsetEditorDialog(QDialog):
             )
             rospy.loginfo(f"Offset saved to {self.offset_path}")
         self.accept()
+
+    def open_pid_dialog(self, joint_name, button):
+        current = self.pid_config.get(joint_name, [0.0, 0.0, 0.0])
+        dialog = PIDConfigDialog(joint_name, current, parent=self)
+        if dialog.exec_() and dialog.result:
+            self.pid_config[joint_name] = dialog.result
+            if any(val != 0.0 for val in dialog.result):
+                button.setStyleSheet("background-color: lightblue")
+            else:
+                button.setStyleSheet("")
+
+    def open_feedback_dialog(self, joint_name, button):
+        current = self.feedback_expressions.get(joint_name, "")
+        dialog = FeedbackExpressionDialog(
+            joint_name, current, self.available_variables, parent=self
+        )
+        if dialog.exec_() and dialog.result is not None:
+            self.feedback_expressions[joint_name] = dialog.result
+            expr = dialog.result.strip()
+            button.setStyleSheet("background-color: lightblue" if expr else "")
