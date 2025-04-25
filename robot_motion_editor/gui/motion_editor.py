@@ -99,8 +99,7 @@ class MotionEditorWidget(QWidget):
 
     def load_animation_by_name(self, animation_name):
         self.current_animation_name = animation_name
-        anim_path = os.path.join(self.animation_root, animation_name, f"{animation_name}.yaml")
-        result = load_animation_file(anim_path)
+        result = load_animation_file(self.animation_root, animation_name)
         layout = result.get("layout", {})
         self.scene.load_layout_dict(layout)
 
@@ -110,12 +109,8 @@ class MotionEditorWidget(QWidget):
             return
 
         layout = self.scene.to_layout_dict()
-        print("[DEBUG] Final layout from scene:", layout)  # デバッグ出力
-        anim_path = os.path.join(
-            self.animation_root,
-            self.current_animation_name,
-            f"{self.current_animation_name}.yaml")
-        save_animation_file(anim_path, layout)
+        print("[DEBUG] Final layout from scene:", layout)
+        save_animation_file(self.animation_root, self.current_animation_name, layout)
         print("Saved:", self.current_animation_name)
 
     def create_new_animation(self):

@@ -4,7 +4,7 @@ import yaml
 
 
 def save_initial_pose(
-        directory,
+        project_root,
         joint_names,
         positions,
         enabled,
@@ -12,7 +12,7 @@ def save_initial_pose(
         feedback_exprs,
         filename="initial_pose.yaml"):
     """
-    Save initial pose and related settings to YAML.
+    Save initial pose and related settings to YAML under <project_root>/initial_pose.yaml.
     """
     data = {"joints": {}}
     for name, pos in zip(joint_names, positions):
@@ -23,17 +23,17 @@ def save_initial_pose(
             "feedback": str(feedback_exprs.get(name, "")).strip()
         }
 
-    os.makedirs(directory, exist_ok=True)
-    path = os.path.join(directory, filename)
+    os.makedirs(project_root, exist_ok=True)
+    path = os.path.join(project_root, filename)
     with open(path, "w") as f:
         yaml.safe_dump(data, f, default_flow_style=False)
 
 
-def load_initial_pose(directory, filename="initial_pose.yaml"):
+def load_initial_pose(project_root, filename="initial_pose.yaml"):
     """
-    Load pose and related settings from YAML.
+    Load pose and related settings from <project_root>/initial_pose.yaml.
     """
-    path = os.path.join(directory, filename)
+    path = os.path.join(project_root, filename)
     if not os.path.exists(path):
         return {}
 
