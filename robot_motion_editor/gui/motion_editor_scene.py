@@ -73,7 +73,7 @@ class FrameBlockItem(QGraphicsRectItem):
 
 class WaypointItem(QGraphicsEllipseItem):
     def __init__(self, pos, arrow):
-        super().__init__(-4, -4, 8, 8)
+        super().__init__(-8, -8, 16, 16)
         self.setBrush(QBrush(QColor("yellow")))
         self.setFlags(self.ItemIsMovable | self.ItemIsSelectable)
         self.setZValue(1)
@@ -121,7 +121,7 @@ class WaypointItem(QGraphicsEllipseItem):
 
 class HoverPoint(QGraphicsEllipseItem):
     def __init__(self, pos, arrow, segment_index):
-        super().__init__(-5, -5, 10, 10)
+        super().__init__(-6, -6, 12, 12)
         self.setBrush(QBrush(QColor("white")))
         self.setZValue(0.5)
         self.setPos(pos)
@@ -141,7 +141,7 @@ class HoverPoint(QGraphicsEllipseItem):
 
 class ArrowEndpointHandle(QGraphicsEllipseItem):
     def __init__(self, arrow, is_start):
-        super().__init__(-6, -6, 12, 12)
+        super().__init__(-8, -8, 16, 16)
         self.setBrush(QBrush(QColor("red" if is_start else "blue")))
         self.setFlags(self.ItemIsMovable | self.ItemIsSelectable)
         self.setZValue(2)
