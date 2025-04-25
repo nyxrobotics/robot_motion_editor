@@ -16,9 +16,12 @@ from PyQt5.QtWidgets import QWidget
 
 from ..logic.animation_file_manager import load_animation_file
 from ..logic.animation_file_manager import save_animation_file
+from ..logic.initial_pose_file_manager import load_initial_pose
+from ..logic.initial_pose_file_manager import save_initial_pose
 from .motion_editor_animation_tree_widget import AnimationTreeWidget
 from .motion_editor_scene import FrameBlockItem
 from .motion_editor_scene import MotionFlowScene
+from .offset_editor import OffsetEditorDialog
 
 
 class MotionEditorWidget(QWidget):
@@ -56,6 +59,7 @@ class MotionEditorWidget(QWidget):
         left_panel.addWidget(self.animation_tree)
 
         self.animation_tree.itemClicked.connect(self.on_tree_item_clicked)
+        self.animation_tree.itemDoubleClicked.connect(self.on_tree_item_double_clicked)
 
         self.scene = MotionFlowScene()
         self.scene.setSceneRect(0, 0, 2000, 2000)
@@ -84,6 +88,33 @@ class MotionEditorWidget(QWidget):
             return
 
         self.load_animation_by_name(name)
+
+    def on_tree_item_double_clicked(self, item):
+        if item.text(0) == "offset":
+            animation_item = item
+            while animation_item.parent() is not None:
+                animation_item = animation_item.parent()
+            animation_name = animation_item.text(0)
+
+            offset_path = os.path.join(self.animation_root, animation_name, "offset.yaml")
+
+            if os.path.exists(offset_path):
+                joints = load_initial_pose(os.path.join(self.animation_root, animation_name), filename="offset.yaml")
+            else:
+                joints = {}
+
+            dlg = OffsetEditorDialog(joints=joints)
+            if dlg.exec_():
+                updated_data = dlg.get_joint_data()
+                save_initial_pose(
+                    os.path.join(self.animation_root, animation_name),
+                    joint_names=list(updated_data.keys()),
+                    positions=[v["position"] for v in updated_data.values()],
+                    enabled={k: v["enable"] for k, v in updated_data.items()},
+                    pid_config={k: v["pid"] for k, v in updated_data.items()},
+                    feedback_exprs={k: v["feedback"] for k, v in updated_data.items()},
+                    filename="offset.yaml"
+                )
 
     def load_animation_list(self):
         self.animation_tree.clear()
@@ -158,8 +189,8 @@ class MotionEditorWidget(QWidget):
         os.makedirs(os.path.join(animation_path, "frames"), exist_ok=True)
         with open(os.path.join(animation_path, f"{name}.yaml"), "w") as f:
             f.write("  # animation flowchart\n")
-        with open(os.path.join(animation_path, "frames", "initial_frame.yaml"), "w") as f:
-            f.write("  # initial frame\n")
+        with open(os.path.join(animation_path, "offset.yaml"), "w") as f:
+            f.write("  # initial frame offset\n")
 
         self.load_animation_list()
         self.load_animation_by_name(name)
