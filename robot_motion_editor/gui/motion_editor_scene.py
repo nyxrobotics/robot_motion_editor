@@ -322,6 +322,22 @@ class MotionFlowScene(QGraphicsScene):
         self.arrow_counter += 1
         return aid
 
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasText():
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):
+        event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        name = event.mimeData().text()
+        pos = event.scenePos()
+        uid = self._generate_uid(name)
+        item = FrameBlockItem(name, uid=uid)
+        item.setPos(pos)
+        self.addItem(item)
+        event.acceptProposedAction()
+
     def contextMenuEvent(self, event):
         item = self.itemAt(event.scenePos(), self.views()[0].transform())
         menu = QMenu()
