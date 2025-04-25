@@ -111,13 +111,6 @@ class MotionEditorWidget(QWidget):
                 } for name in self.joint_names
             }
 
-            # offset.yaml があれば一致するキーだけ上書き
-            if os.path.exists(offset_path):
-                loaded = load_initial_pose(os.path.join(self.animation_root, animation_name), filename="offset.yaml")
-                for name in self.joint_names:
-                    if name in loaded:
-                        joints[name] = loaded[name]
-
             dlg = OffsetEditorDialog(joints=joints, offset_path=offset_path)
             if dlg.exec_():
                 updated_data = dlg.get_joint_data()
