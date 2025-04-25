@@ -40,6 +40,26 @@ Simulink風の状態遷移形式で複雑な動作を視覚的に編集でき、
   - Enable状態（true/false）
   - PIDゲイン（[P, I, D]）
   - フィードバック式（Python文字列）
+3.1 初期姿勢ファイル（<motion_dir>/initial_pose.yaml）
+
+joints:
+  head_joint_1:
+    enable: true
+    feedback: ''
+    pid:
+    - 0.0
+    - 0.0
+    - 0.0
+    position: 0.0
+  head_joint_2:
+    enable: true
+    feedback: ''
+    pid:
+    - 0.0
+    - 0.0
+    - 0.0
+    position: 0.0
+
 
 4. モーション作成タブ（motion_editor.py）
 -------------------------------
@@ -100,18 +120,17 @@ Simulink風の状態遷移形式で複雑な動作を視覚的に編集でき、
 -------------------------------
 8.1 保存ディレクトリ構成（1アニメーションごと）
 
-<animation_name>/
-├── animation.yaml                 # 全体レイアウト・接続情報
-├── initial_pose/
-│   └── offset.yaml               # 初期姿勢との差分
+<motion_dir>/<animation_name>/
+├── animation.yaml            # 全体レイアウト・接続情報
+├── offset.yaml               # 初期姿勢との差分
 ├── frames/
-│   ├── pose0.yaml                # フレーム個別定義
+│   ├── pose0.yaml            # フレーム個別定義
 │   └── pose2.yaml
 ├── conditions/
 │   ├── if/
-│   │   └── step_if.yaml
+│   │   └── imu_if.yaml
 │   └── switch/
-│       └── mode_switch.yaml
+│       └── button_switch.yaml
 
 8.2 animation.yaml（例）
 
@@ -140,36 +159,62 @@ layout:
         - [200, 150]
         - [300, 200]
 
-8.3 frame.yaml（例）
+8.3 初期姿勢からのオフセット（initial_pose/offset.yaml）
+- ファイルは初期姿勢ファイルと同じ書式
+- エディタも同じ
+- positionは初期姿勢に対して追加する差分の値
+- enable, feedback, pidは上書き
 
-angles:
-  joint1: 0.5
-enabled:
-  joint1: true
-pid:
-  joint1: [5.0, 0.1, 0.01]
-feedback:
-  joint1: "imu_pitch + 0.05"
-duration: 2.0
-wait: 1.0
+8.4 frame.yaml（例）
+
+time:
+  duration: 2.0
+  wait: 1.0
+
 velocity_scale:
-  joint1: 1.0
+  head_joint_1: 1.0
+  head_joint_2: 1.0
 
-8.4 if条件（conditions/if/*.yaml）
+joints:
+  head_joint_1:
+    enable: true
+    feedback: ''
+    pid:
+    - 0.0
+    - 0.0
+    - 0.0
+    position: 0.0
+  head_joint_2:
+    enable: true
+    feedback: ''
+    pid:
+    - 0.0
+    - 0.0
+    - 0.0
+    position: 0.0
+
+8.5 if条件（conditions/if/*.yaml）
 
 例：step_if.yaml
-condition: "imu_gyro_x > 0.5"
-to_true: frame_walk
-to_false: frame_stop
 
-8.5 switch条件（conditions/switch/*.yaml）
+expression: "def imu_norm = fabs(imu_gyro_x)"
+condition: "imu_norm > 0.5"
+cases:
+  0: frame_stop
+  1: frame_walk
+
+8.6 switch条件（conditions/switch/*.yaml）
 
 例：mode_switch.yaml
-expression: "button_id"
+
+expression: "def button_id = 1"
+condition: "button_id"
 cases:
   0: frame_idle
   1: frame_run
   2: frame_turn
+  3: frame_turn
+  4: frame_turn
 
 9. RViz連携（trajectory_visualizer.py）
 -------------------------------
