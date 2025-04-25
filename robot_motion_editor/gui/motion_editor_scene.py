@@ -96,10 +96,27 @@ class WaypointItem(QGraphicsEllipseItem):
         def is_too_close(wp):
             return wp and (self.pos() - wp.pos()).manhattanLength() < 10
 
+        # waypoint同士で重なったら削除
         if is_too_close(prev_wp) or is_too_close(next_wp):
-            self.arrow.waypoints.remove(self)
             self.arrow.scene().removeItem(self)
+            self.arrow.waypoints.remove(self)
             self.arrow.update_path()
+            return
+
+        # 始点に近ければ削除
+        if index == 0 and (self.pos() - self.arrow.start_handle.pos()).manhattanLength() < 10:
+            self.arrow.scene().removeItem(self)
+            self.arrow.waypoints.remove(self)
+            self.arrow.update_path()
+            return
+
+        # 終点に近ければ削除
+        if index == len(self.arrow.waypoints) - 1 and (self.pos()
+                                                       - self.arrow.end_handle.pos()).manhattanLength() < 10:
+            self.arrow.scene().removeItem(self)
+            self.arrow.waypoints.remove(self)
+            self.arrow.update_path()
+            return
 
 
 class HoverPoint(QGraphicsEllipseItem):
