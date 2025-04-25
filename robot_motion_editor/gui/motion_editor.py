@@ -73,10 +73,16 @@ class MotionEditorWidget(QWidget):
         self.setLayout(layout)
 
     def on_tree_item_clicked(self, item):
-        animation_item = item if item.parent() is None else item.parent()
+        # Get the top animation name from any hierarchy
+        animation_item = item
+        while animation_item.parent() is not None:
+            animation_item = animation_item.parent()
+
         name = animation_item.text(0)
+        # Do nothing if the animation is already selected
         if name == self.current_animation_name:
             return
+
         self.load_animation_by_name(name)
 
     def load_animation_list(self):
@@ -89,13 +95,39 @@ class MotionEditorWidget(QWidget):
             if not os.path.isdir(animation_dir):
                 continue
 
-            animation_item = QTreeWidgetItem([animation_name])
+            anim_item = QTreeWidgetItem([animation_name])
+            self.animation_tree.addTopLevelItem(anim_item)
+
+            # Edit initial offset for the frames
+            QTreeWidgetItem(anim_item, ["offset"])
+
+            # frames
             frames_dir = os.path.join(animation_dir, "frames")
+            frames_item = QTreeWidgetItem(anim_item, ["frames"])
             if os.path.isdir(frames_dir):
-                for frame_name in sorted(os.listdir(frames_dir)):
-                    if frame_name.endswith(".yaml"):
-                        QTreeWidgetItem(animation_item, [frame_name.replace(".yaml", "")])
-            self.animation_tree.addTopLevelItem(animation_item)
+                for fname in sorted(os.listdir(frames_dir)):
+                    if fname.lower().endswith(".yaml"):
+                        QTreeWidgetItem(frames_item, [fname[:-5]])
+
+            # conditions
+            conditions_dir = os.path.join(animation_dir, "conditions")
+            conditions_item = QTreeWidgetItem(anim_item, ["conditions"])
+
+            # if
+            if_dir = os.path.join(conditions_dir, "if")
+            if_item = QTreeWidgetItem(conditions_item, ["if"])
+            if os.path.isdir(if_dir):
+                for fname in sorted(os.listdir(if_dir)):
+                    if fname.lower().endswith(".yaml"):
+                        QTreeWidgetItem(if_item, [fname[:-5]])
+
+            # switch
+            switch_dir = os.path.join(conditions_dir, "switch")
+            switch_item = QTreeWidgetItem(conditions_item, ["switch"])
+            if os.path.isdir(switch_dir):
+                for fname in sorted(os.listdir(switch_dir)):
+                    if fname.lower().endswith(".yaml"):
+                        QTreeWidgetItem(switch_item, [fname[:-5]])
 
     def load_animation_by_name(self, animation_name):
         self.current_animation_name = animation_name
