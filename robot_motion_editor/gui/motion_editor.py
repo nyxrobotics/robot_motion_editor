@@ -18,6 +18,7 @@ from ..logic.animation_file_manager import load_animation_file
 from ..logic.animation_file_manager import save_animation_file
 from ..logic.initial_pose_file_manager import load_initial_pose
 from ..logic.initial_pose_file_manager import save_initial_pose
+from .frame_editor import FrameEditorDialog
 from .motion_editor_animation_tree_widget import AnimationTreeWidget
 from .motion_editor_scene import FrameBlockItem
 from .motion_editor_scene import MotionFlowScene
@@ -116,6 +117,26 @@ class MotionEditorWidget(QWidget):
                     feedback_exprs={k: v["feedback"] for k, v in updated_data.items()},
                     filename="offset.yaml"
                 )
+
+        elif item.parent() and item.parent().text(0) == "frames":
+            animation_item = item
+            while animation_item.parent() is not None:
+                animation_item = animation_item.parent()
+            animation_name = animation_item.text(0)
+            frame_name = item.text(0)
+
+            frame_path = os.path.join(self.animation_root, animation_name, "frames", f"{frame_name}.yaml")
+            if not os.path.exists(frame_path):
+                QMessageBox.warning(self, "Missing File", f"{frame_path} not found.")
+                return
+
+            dlg = FrameEditorDialog(
+                joint_names=self.joint_names,
+                joint_limits=self.joint_limits,
+                available_variables=self.available_variables,
+                frame_path=frame_path
+            )
+            dlg.exec_()
 
     def load_animation_list(self):
         self.animation_tree.clear()
