@@ -25,9 +25,12 @@ from .offset_editor import OffsetEditorDialog
 
 
 class MotionEditorWidget(QWidget):
-    def __init__(self, animation_root="."):
+    def __init__(self, animation_root=".", joint_names=None, joint_limits=None, available_variables=None):
         super().__init__()
         self.animation_root = animation_root
+        self.joint_names = joint_names or []
+        self.joint_limits = joint_limits or {}
+        self.available_variables = available_variables or []
         self.animation_tree = AnimationTreeWidget()
         self.current_animation_name = None
         self.init_ui()
@@ -98,12 +101,24 @@ class MotionEditorWidget(QWidget):
 
             offset_path = os.path.join(self.animation_root, animation_name, "offset.yaml")
 
-            if os.path.exists(offset_path):
-                joints = load_initial_pose(os.path.join(self.animation_root, animation_name), filename="offset.yaml")
-            else:
-                joints = {}
+            # self.joint_names / joint_limits / available_variables は __init__ で保持されている
+            joints = {
+                name: {
+                    "position": 0.0,
+                    "enable": True,
+                    "pid": [0.0, 0.0, 0.0],
+                    "feedback": ""
+                } for name in self.joint_names
+            }
 
-            dlg = OffsetEditorDialog(joints=joints)
+            # offset.yaml があれば一致するキーだけ上書き
+            if os.path.exists(offset_path):
+                loaded = load_initial_pose(os.path.join(self.animation_root, animation_name), filename="offset.yaml")
+                for name in self.joint_names:
+                    if name in loaded:
+                        joints[name] = loaded[name]
+
+            dlg = OffsetEditorDialog(joints=joints, offset_path=offset_path)
             if dlg.exec_():
                 updated_data = dlg.get_joint_data()
                 save_initial_pose(

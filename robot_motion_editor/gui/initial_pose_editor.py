@@ -60,7 +60,11 @@ class InitialPoseEditor(QWidget):
         save_row.addWidget(save_button)
         layout.addLayout(save_row)
 
-        max_label = QLabel(max(self.joint_names, key=len))
+        if self.joint_names:
+            max_label = QLabel(max(self.joint_names, key=len))
+        else:
+            max_label = QLabel("Joint")
+            rospy.logwarn("No joints found.")
         max_label_width = max_label.sizeHint().width()
 
         for joint in self.joint_names:
@@ -137,7 +141,7 @@ class InitialPoseEditor(QWidget):
 
     def set_motion_directory(self, directory):
         self.motion_directory = directory
-        self.load_pose_if_exists()
+        self.load_joint_pose_from_file()
 
     def save_pose_to_file(self):
         positions = self.get_target_joints()
@@ -152,12 +156,21 @@ class InitialPoseEditor(QWidget):
             )
             rospy.loginfo("Initial pose saved.")
 
-    def load_pose_if_exists(self):
-        if not self.motion_directory:
+    def load_joint_pose_from_file(self, path=None, filename="initial_pose.yaml"):
+        """
+        Read initial_pose.yaml or offset.yaml, etc. and reflect them in the GUI.
+        If there is no specified path, self.motion_directory is used.
+        """
+        if path is None:
+            path = self.motion_directory
+        if not path:
+            rospy.logwarn("No path specified for loading pose.")
             return
 
-        loaded = load_initial_pose(self.motion_directory)
-        if not loaded:
+        try:
+            loaded = load_initial_pose(path, filename=filename)
+        except Exception as e:
+            rospy.logwarn(f"Failed to load pose from {path}/{filename}: {e}")
             return
 
         for name, settings in loaded.items():

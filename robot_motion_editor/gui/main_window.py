@@ -109,7 +109,13 @@ class MainWindow(QWidget):
         self.initial_pose_editor = InitialPoseEditor(
             self.joint_names, self.joint_limits, available_variables=self.variable_names)
         self.tabs.addTab(self.initial_pose_editor, "Initial Pose")
-        self.motion_editor = MotionEditorWidget(animation_root="motion_directory")
+
+        self.motion_editor = MotionEditorWidget(
+            animation_root="motion_directory",
+            joint_names=self.joint_names,
+            joint_limits=self.joint_limits,
+            available_variables=self.variable_names
+        )
         self.tabs.addTab(self.motion_editor, "Motion Editor")
 
         layout.addWidget(self.tabs)
