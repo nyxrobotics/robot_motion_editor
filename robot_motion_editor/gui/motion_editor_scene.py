@@ -358,6 +358,7 @@ class MotionFlowScene(QGraphicsScene):
         used_uids = set()
         items = [item for item in self.items() if isinstance(item, FrameBlockItem)]
         items.sort(key=lambda i: i.uid)
+
         for idx, item in enumerate(items):
             if not hasattr(item, 'uid') or not item.uid:
                 item.uid = self._generate_uid(item.name)
@@ -368,19 +369,45 @@ class MotionFlowScene(QGraphicsScene):
             layout["block"][uid] = {
                 "info": {"type": "frame", "filename": item.name, "id": idx},
                 "place": {"x": int(item.pos().x()), "y": int(item.pos().y())},
-                "connection": item.connection if hasattr(item, "connection") else {"output": {}}
+                "connection": {"output": {}}
             }
+
+        # save arrows and waypoints
+        for arrow in self.arrows:
+            layout["arrow"][arrow.arrow_id] = {
+                "info": {"id": int(arrow.arrow_id.split("_")[-1])},
+                "waypoints": (
+                    [[int(arrow.start_handle.pos().x()), int(arrow.start_handle.pos().y())]]
+                    + [[int(wp.pos().x()), int(wp.pos().y())] for wp in arrow.waypoints]
+                    + [[int(arrow.end_handle.pos().x()), int(arrow.end_handle.pos().y())]]
+                )
+            }
+
+        # build output connection (with out_0, out_1, ...)
+        arrow_outputs = {}
         for arrow in self.arrows:
             if arrow.start_item and arrow.end_item:
-                layout["arrow"][arrow.arrow_id] = {
-                    "info": {"id": int(arrow.arrow_id.split("_")[-1])},
-                    "waypoints": []
-                }
+                sid = arrow.start_item.uid
+                tid = arrow.end_item.uid
+                block = layout["block"].get(sid)
+                if block is not None:
+                    output_conn = block["connection"]["output"]
+                    idx = arrow_outputs.get(sid, 0)
+                    out_key = f"out_{idx}"
+                    output_conn[out_key] = {
+                        "target": tid,
+                        "ch": 0,
+                        "arrow": arrow.arrow_id
+                    }
+                    arrow_outputs[sid] = idx + 1
         return layout
 
     def load_layout_dict(self, layout):
         self.clear()
         self.arrows = []
+        uid_to_item = {}
+
+        # 1. ブロックを先に復元
         for uid, block in layout.get("block", {}).items():
             name = block["info"]["filename"]
             x = block["place"]["x"]
@@ -390,3 +417,35 @@ class MotionFlowScene(QGraphicsScene):
             if "connection" in block:
                 item.connection = block["connection"]
             self.addItem(item)
+            uid_to_item[uid] = item
+
+        # 2. 矢印を作成（まずシーンに追加してから waypoint を復元）
+        arrow_map = {}
+        for arrow_id, arrow_data in layout.get("arrow", {}).items():
+            arrow = ArrowItem(arrow_id)
+            arrow.add_to_scene(self)  # ← 先に追加
+            waypoints = arrow_data.get("waypoints", [])
+            for idx, [x, y] in enumerate(waypoints):
+                if idx == 0:
+                    arrow.start_handle.setPos(QPointF(x, y))
+                elif idx == len(waypoints) - 1:
+                    arrow.end_handle.setPos(QPointF(x, y))
+                else:
+                    arrow.insert_waypoint(idx - 1, QPointF(x, y))
+            arrow_map[arrow_id] = arrow
+
+        # 3. block.connection.output から start/end を設定
+        for uid, block in layout.get("block", {}).items():
+            outputs = block.get("connection", {}).get("output", {})
+            for out in outputs.values():
+                arrow_id = out.get("arrow")
+                target_uid = out.get("target")
+                if arrow_id in arrow_map:
+                    arrow = arrow_map[arrow_id]
+                    arrow.start_item = uid_to_item.get(uid)
+                    arrow.end_item = uid_to_item.get(target_uid)
+
+        # 4. path 再描画 + リスト登録
+        for arrow in arrow_map.values():
+            arrow.update_path()
+            self.arrows.append(arrow)
