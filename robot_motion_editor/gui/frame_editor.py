@@ -1,5 +1,7 @@
 import math
+import os
 
+import yaml
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtWidgets import QDialog
@@ -36,6 +38,9 @@ class FrameEditorDialog(QDialog):
         self.enable_checkbox_widgets = {}
 
         self.init_ui()
+
+        if frame_path and os.path.exists(frame_path):
+            self.load_frame_data(frame_path)
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -81,7 +86,8 @@ class FrameEditorDialog(QDialog):
             enable_cb.setChecked(True)
             self.joint_enabled[joint] = True
             enable_cb.stateChanged.connect(
-                lambda state, j=joint: self.joint_enabled.__setitem__(j, state == Qt.Checked))
+                lambda state, j=joint: self.joint_enabled.__setitem__(
+                    j, state == Qt.Checked))
             self.enable_checkbox_widgets[joint] = enable_cb
 
             label = QLabel(joint)
