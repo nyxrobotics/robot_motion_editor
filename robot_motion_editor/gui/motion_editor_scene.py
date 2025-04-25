@@ -48,6 +48,9 @@ class FrameBlockItem(QGraphicsRectItem):
         self.connection = {"output": {}}
         self.is_highlighted = False
 
+        self.input_arrows = []       # 入力側：矢印を複数受け付けるため追加
+        self.output_arrow = None     # 出力側：1本まで（従来通り）
+
     def set_highlighted(self, state):
         self.is_highlighted = state
         self.update()
@@ -172,14 +175,13 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         for item in scene.items(self.scenePos()):
             if isinstance(item, FrameBlockItem):
                 if self.is_start:
-                    if any(a.start_item == item for a in scene.items()
-                           if isinstance(a, ArrowItem) and a != self.arrow):
+                    if item.output_arrow is not None and item.output_arrow != self.arrow:
                         target = None
                         break
+                    item.output_arrow = self.arrow  # 出力は1本のみ
                 else:
-                    if any(a.end_item == item for a in scene.items() if isinstance(a, ArrowItem) and a != self.arrow):
-                        target = None
-                        break
+                    if self.arrow not in item.input_arrows:
+                        item.input_arrows.append(self.arrow)  # 入力は何本でもOK
                 target = item
                 break
 
