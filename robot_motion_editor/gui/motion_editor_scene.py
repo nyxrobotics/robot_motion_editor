@@ -97,8 +97,8 @@ class WaypointItem(QGraphicsEllipseItem):
             return wp and (self.pos() - wp.pos()).manhattanLength() < 10
 
         if is_too_close(prev_wp) or is_too_close(next_wp):
-            self.arrow.scene().removeItem(self)
             self.arrow.waypoints.remove(self)
+            self.arrow.scene().removeItem(self)
             self.arrow.update_path()
 
 
@@ -327,8 +327,12 @@ class MotionFlowScene(QGraphicsScene):
         if event.key() == Qt.Key_Delete:
             for item in self.selectedItems():
                 if isinstance(item, WaypointItem):
-                    item.arrow.waypoints.remove(item)
-                self.removeItem(item)
+                    arrow = item.arrow
+                    arrow.waypoints.remove(item)
+                    self.removeItem(item)
+                    arrow.update_path()  # ← 線の再計算をここで実行！
+                else:
+                    self.removeItem(item)
         else:
             super().keyPressEvent(event)
 
