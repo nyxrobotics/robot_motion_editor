@@ -39,26 +39,28 @@ class FrameBlockItem(QGraphicsRectItem):
         self.selected_pen = QPen(QColor("#00ffff"), 4)
         self.setPen(self.default_pen)
         self.setFlags(self.ItemIsMovable | self.ItemIsSelectable | self.ItemSendsGeometryChanges)
+
         self.name = frame_name
         self.uid = uid or frame_name
         self.label = QGraphicsTextItem(frame_name, self)
         self.label.setDefaultTextColor(QColor("white"))
         self.label.setPos((width - self.label.boundingRect().width()) / 2,
                           (height - self.label.boundingRect().height()) / 2)
+
         self.connection = {"output": {}}
         self.is_highlighted = False
 
-        self.input_arrows = []       # 入力側：矢印を複数受け付けるため追加
-        self.output_arrow = None     # 出力側：1本まで（従来通り）
+        self.input_arrows = []       # 入力側：複数接続OK
+        self.output_arrow = None     # 出力側：1本まで
 
     def set_highlighted(self, state):
         self.is_highlighted = state
         self.update()
 
     def paint(self, painter, option, widget=None):
-        self.setPen(self.selected_pen if self.isSelected() else
-                    self.highlight_pen if self.is_highlighted else
-                    self.default_pen)
+        self.setPen(self.selected_pen if self.isSelected()
+                    else self.highlight_pen if self.is_highlighted
+                    else self.default_pen)
         super().paint(painter, option, widget)
 
     def itemChange(self, change, value):
@@ -345,7 +347,7 @@ class MotionFlowScene(QGraphicsScene):
             item.setSelected(True)
             item.contextMenuEvent(event)
         else:
-            menu.addAction(QAction("Add New Frame", menu))
+            menu.addAction(QAction("New Frame", menu))
             arrow_action = QAction("New Arrow", menu)
             menu.addAction(arrow_action)
             selected_action = menu.exec_(event.screenPos())
@@ -371,7 +373,7 @@ class MotionFlowScene(QGraphicsScene):
         else:
             super().keyPressEvent(event)
 
-    def to_layout_dict(self):
+    def save_layout_yaml(self):
         layout = {"block": {}, "arrow": {}}
         used_uids = set()
         items = [item for item in self.items() if isinstance(item, FrameBlockItem)]
@@ -420,7 +422,7 @@ class MotionFlowScene(QGraphicsScene):
                     arrow_outputs[sid] = idx + 1
         return layout
 
-    def load_layout_dict(self, layout):
+    def load_layout_yaml(self, layout):
         self.clear()
         self.arrows = []
         uid_to_item = {}

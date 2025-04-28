@@ -184,7 +184,7 @@ class MotionEditorWidget(QWidget):
         self.current_animation_name = animation_name
         result = load_animation_file(self.animation_root, animation_name)
         layout = result.get("layout", {})
-        self.scene.load_layout_dict(layout)
+        self.scene.load_layout_yaml(layout)
 
     def save_current_animation(self):
         if not self.current_animation_name:
