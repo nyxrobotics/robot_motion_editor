@@ -467,6 +467,11 @@ class ArrowItem(QGraphicsPathItem):
         self._force_snap_end = False
         self.start_handle.setPos(0, 0)
         self.end_handle.setPos(100, 0)
+        self.default_pen = QPen(QColor("#ffffff"), 3)
+        self.highlight_pen = QPen(QColor("#00ff00"), 3)
+        self.selected_pen = QPen(QColor("#00ffff"), 4)
+        self.setPen(self.default_pen)
+        self.setFlags(self.ItemIsSelectable)
 
     def notify_waypoint_moved(self, waypoint):
         self._recently_moved_waypoint = waypoint
@@ -502,7 +507,8 @@ class ArrowItem(QGraphicsPathItem):
             self.hover_points.append(hp)
 
     def update_path(self):
-        pen = QPen(QColor("white"), 4)
+        # Set different pen depending on selection
+        pen = self.selected_pen if self.isSelected() else self.default_pen
         is_connected = self.start_item is not None and self.end_item is not None
         pen.setStyle(Qt.SolidLine if is_connected else Qt.DashLine)
         self.setPen(pen)
@@ -555,6 +561,38 @@ class ArrowItem(QGraphicsPathItem):
         self.setPath(path)
         self.refresh_hover_points()
         self._recently_moved_waypoint = None
+
+    def remove_from_scene(self):
+        scene = self.scene()
+        if scene:
+            scene.removeItem(self)
+            if self.start_handle.scene():
+                scene.removeItem(self.start_handle)
+            if self.end_handle.scene():
+                scene.removeItem(self.end_handle)
+            for wp in self.waypoints:
+                if wp.scene():
+                    scene.removeItem(wp)
+            self.waypoints.clear()
+            for hp in self.hover_points:
+                if hp.scene():
+                    scene.removeItem(hp)
+            self.hover_points.clear()
+
+        # start_item, end_itemの矢印リストからも外す
+        if self.start_item and self in self.start_item.output_arrows:
+            self.start_item.output_arrows.remove(self)
+        if self.end_item and self in self.end_item.input_arrows:
+            self.end_item.input_arrows.remove(self)
+        self.start_item = None
+        self.end_item = None
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Delete and self.isSelected():
+            self.remove_from_scene()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
 
 class MotionFlowScene(QGraphicsScene):
