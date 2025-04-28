@@ -27,8 +27,13 @@ def compute_edge_point(center, target, width, height):
 
 class FrameBlockItem(QGraphicsRectItem):
     def __init__(self, frame_name, uid=None):
-        temp_label = QGraphicsTextItem(frame_name)
-        font_metrics = QFontMetricsF(temp_label.font())
+        self.max_inputs = -1
+        self.max_outputs = 1
+        self.input_arrows = []       # 入力側：複数接続OK
+        self.output_arrows = []     # 出力側：1本まで
+
+        label_text = QGraphicsTextItem(frame_name)
+        font_metrics = QFontMetricsF(label_text.font())
         text_width = font_metrics.width(frame_name)
         width = max(120, text_width + 20)
         height = 60
@@ -49,9 +54,6 @@ class FrameBlockItem(QGraphicsRectItem):
 
         self.connection = {"output": {}}
         self.is_highlighted = False
-
-        self.input_arrows = []       # 入力側：複数接続OK
-        self.output_arrow = None     # 出力側：1本まで
 
     def set_highlighted(self, state):
         self.is_highlighted = state
@@ -78,9 +80,15 @@ class FrameBlockItem(QGraphicsRectItem):
 
 class OutputSubBlockItem(QGraphicsRectItem):
     def __init__(self, label, parent_block):
-        self.label_text = label
-        temp_label = QGraphicsTextItem(label)
-        font_metrics = QFontMetricsF(temp_label.font())
+        self.max_inputs = 0
+        self.max_outputs = 1
+        self.input_arrows = []
+        self.output_arrows = []
+
+        self.parent_block = parent_block  # 親ブロック (IfBlockItemやSwitchBlockItem)
+        self.label = label      # "True", "False", "case_0"など
+        label_text = QGraphicsTextItem(label)
+        font_metrics = QFontMetricsF(label_text.font())
         text_width = font_metrics.width(label)
         text_height = font_metrics.height()
 
@@ -99,26 +107,33 @@ class OutputSubBlockItem(QGraphicsRectItem):
         self.label.setPos((width - self.label.boundingRect().width()) / 2,
                           (height - self.label.boundingRect().height()) / 2)
 
-        self.parent_block = parent_block  # 親ブロック (IfBlockItemやSwitchBlockItem)
-        self.label = label      # "True", "False", "case_0"など
-        self.output_arrow = None          # 必ず1本の出力Arrowを持つ
-
     def paint(self, painter, option, widget=None):
         self.setPen(self.selected_pen if self.isSelected() else self.default_pen)
         super().paint(painter, option, widget)
 
     def itemChange(self, change, value):
         if change == self.ItemPositionChange and self.scene():
-            if self.output_arrow:
-                self.output_arrow._force_snap_start = True
-                self.output_arrow.update_path()
+            for item in self.scene().items():
+                if isinstance(item, ArrowItem):
+                    if item.start_item == self:
+                        item._force_snap_start = True
+                    if item.end_item == self:
+                        item._force_snap_end = True
+                    if item.start_item == self or item.end_item == self:
+                        item.update_path()
         return super().itemChange(change, value)
 
 
 class IfBlockItem(QGraphicsRectItem):
     def __init__(self, block_name, uid=None):
-        temp_label = QGraphicsTextItem(block_name)
-        font_metrics = QFontMetricsF(temp_label.font())
+        self.max_inputs = -1
+        self.max_outputs = 0
+        self.input_arrows = []
+        self.output_arrows = []
+        self.output_sub_blocks = {}
+
+        label_text = QGraphicsTextItem(block_name)
+        font_metrics = QFontMetricsF(label_text.font())
         text_width = font_metrics.width(block_name)
         width = max(120, text_width + 20)
         super().__init__(0, 0, width, 60)
@@ -136,20 +151,19 @@ class IfBlockItem(QGraphicsRectItem):
         self.label.setDefaultTextColor(QColor("white"))
         self.label.setPos((width - self.label.boundingRect().width()) / 2, 5)
         self.is_highlighted = False
-        self.outputs = {}
         self.create_output_blocks()
 
     def create_output_blocks(self):
-        outputs = ["True", "False"]
+        output_sub_blocks = ["True", "False"]
         font_metrics = QFontMetricsF(self.label.font())
         text_height = font_metrics.height()
         gap = text_height / 2
         y = self.label.boundingRect().height() + 10
 
-        for out_label in outputs:
+        for out_label in output_sub_blocks:
             block = OutputSubBlockItem(out_label, self)
             block.setPos(10, y)
-            self.outputs[out_label] = block
+            self.output_sub_blocks[out_label] = block
             if self.scene():
                 self.scene().addItem(block)
             else:
@@ -171,17 +185,27 @@ class IfBlockItem(QGraphicsRectItem):
 
     def itemChange(self, change, value):
         if change == self.ItemPositionChange and self.scene():
-            for output in self.outputs.values():
-                if output.output_arrow:
-                    output.output_arrow._force_snap_start = True
-                    output.output_arrow.update_path()
+            for item in self.scene().items():
+                if isinstance(item, ArrowItem):
+                    if item.start_item == self:
+                        item._force_snap_start = True
+                    if item.end_item == self:
+                        item._force_snap_end = True
+                    if item.start_item == self or item.end_item == self:
+                        item.update_path()
         return super().itemChange(change, value)
 
 
 class SwitchBlockItem(QGraphicsRectItem):
     def __init__(self, block_name, num_cases=3, uid=None):
-        temp_label = QGraphicsTextItem(block_name)
-        font_metrics = QFontMetricsF(temp_label.font())
+        self.max_inputs = -1
+        self.max_outputs = 0
+        self.input_arrows = []
+        self.output_arrows = []
+        self.output_sub_blocks = {}
+
+        label_text = QGraphicsTextItem(block_name)
+        font_metrics = QFontMetricsF(label_text.font())
         text_width = font_metrics.width(block_name)
         width = max(120, text_width + 20)
         super().__init__(0, 0, width, 60)
@@ -195,13 +219,11 @@ class SwitchBlockItem(QGraphicsRectItem):
         self.name = block_name
         self.uid = uid or block_name
         self.num_cases = num_cases
-        self.outputs = {}
 
         self.label = QGraphicsTextItem(block_name, self)
         self.label.setDefaultTextColor(QColor("white"))
         self.label.setPos((width - self.label.boundingRect().width()) / 2, 5)
         self.is_highlighted = False
-        self.outputs = {}
         self.create_output_blocks()
 
     def create_output_blocks(self):
@@ -214,7 +236,7 @@ class SwitchBlockItem(QGraphicsRectItem):
         for label in labels:
             block = OutputSubBlockItem(label, self)
             block.setPos(10, y)
-            self.outputs[label] = block
+            self.output_sub_blocks[label] = block
             if self.scene():
                 self.scene().addItem(block)
             else:
@@ -236,10 +258,14 @@ class SwitchBlockItem(QGraphicsRectItem):
 
     def itemChange(self, change, value):
         if change == self.ItemPositionChange and self.scene():
-            for output in self.outputs.values():
-                if output.output_arrow:
-                    output.output_arrow._force_snap_start = True
-                    output.output_arrow.update_path()
+            for item in self.scene().items():
+                if isinstance(item, ArrowItem):
+                    if item.start_item == self:
+                        item._force_snap_start = True
+                    if item.end_item == self:
+                        item._force_snap_end = True
+                    if item.start_item == self or item.end_item == self:
+                        item.update_path()
         return super().itemChange(change, value)
 
 
@@ -332,6 +358,7 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
                 item.set_highlighted(item.sceneBoundingRect().contains(self.scenePos()))
         self.arrow.update_path()
 
+
     def mouseReleaseEvent(self, event):
         self.is_dragging = False
         if self.is_start:
@@ -342,15 +369,31 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         scene = self.scene()
         target = None
         for item in scene.items(self.scenePos()):
-            if isinstance(item, FrameBlockItem):
+            if isinstance(
+                    item,
+                    FrameBlockItem) or isinstance(
+                    item,
+                    IfBlockItem) or isinstance(
+                    item,
+                    SwitchBlockItem) or isinstance(
+                        item,
+                    OutputSubBlockItem):
                 if self.is_start:
-                    if item.output_arrow is not None and item.output_arrow != self.arrow:
+                    # 出力制限チェック
+                    if item.max_outputs != -1 and len(item.output_arrows) >= item.max_outputs:
                         target = None
                         break
-                    item.output_arrow = self.arrow  # 出力は1本のみ
+                    # すでに同じ矢印が入っていないかチェックして追加
+                    if self.arrow not in item.output_arrows:
+                        item.output_arrows.append(self.arrow)
                 else:
+                    # 入力制限チェック
+                    if item.max_inputs != -1 and len(item.input_arrows) >= item.max_inputs:
+                        target = None
+                        break
                     if self.arrow not in item.input_arrows:
-                        item.input_arrows.append(self.arrow)  # 入力は何本でもOK
+                        item.input_arrows.append(self.arrow)
+
                 target = item
                 break
 
@@ -364,6 +407,7 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
                 item.set_highlighted(False)
         self.arrow.update_path()
         super().mouseReleaseEvent(event)
+
 
 
 class ArrowItem(QGraphicsPathItem):
