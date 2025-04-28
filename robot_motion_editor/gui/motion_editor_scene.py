@@ -565,21 +565,49 @@ class ArrowItem(QGraphicsPathItem):
 
     def remove_from_scene(self):
         if self.scene():
-            self.scene().removeItem(self)
-        # start_item, end_itemの矢印リストからも外す
-        if self.start_item and self in self.start_item.output_arrows:
-            self.start_item.output_arrows.remove(self)
-        if self.end_item and self in self.end_item.input_arrows:
-            self.end_item.input_arrows.remove(self)
-        self.start_item = None
-        self.end_item = None
+            print(f"[DEBUG] Removing ArrowItem: {self.arrow_id}")
 
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Delete and self.isSelected():
-            self.remove_from_scene()
-            event.accept()
-        else:
-            super().keyPressEvent(event)
+            # start_item から自分を外す
+            if self.start_item:
+                if self in self.start_item.output_arrows:
+                    print(f"[DEBUG] Removing from start_item.output_arrows: {self.start_item.name}")
+                    self.start_item.output_arrows.remove(self)
+                else:
+                    print(f"[DEBUG] self not in start_item.output_arrows")
+
+            # end_item から自分を外す
+            if self.end_item:
+                if self in self.end_item.input_arrows:
+                    print(f"[DEBUG] Removing from end_item.input_arrows: {self.end_item.name}")
+                    self.end_item.input_arrows.remove(self)
+                else:
+                    print(f"[DEBUG] self not in end_item.input_arrows")
+
+            # Waypoints を消す
+            for wp in self.waypoints:
+                if self.scene().items().count(wp):
+                    print(f"[DEBUG] Removing waypoint at {wp.pos()}")
+                    self.scene().removeItem(wp)
+            self.waypoints.clear()
+
+            # HoverPoints を消す
+            for hp in self.hover_points:
+                if self.scene().items().count(hp):
+                    print(f"[DEBUG] Removing hover point at {hp.pos()}")
+                    self.scene().removeItem(hp)
+            self.hover_points.clear()
+
+            # ハンドルを消す
+            if self.start_handle:
+                print(f"[DEBUG] Removing start_handle")
+                self.scene().removeItem(self.start_handle)
+            if self.end_handle:
+                print(f"[DEBUG] Removing end_handle")
+                self.scene().removeItem(self.end_handle)
+
+            # 最後に自分自身
+            print(f"[DEBUG] Removing self ArrowItem")
+            self.scene().removeItem(self)
 
 
 class MotionFlowScene(QGraphicsScene):
@@ -699,7 +727,9 @@ class MotionFlowScene(QGraphicsScene):
                     arrow = item.arrow
                     arrow.waypoints.remove(item)
                     self.removeItem(item)
-                    arrow.update_path()  # ← 線の再計算をここで実行！
+                    arrow.update_path()
+                elif isinstance(item, ArrowItem):
+                    item.remove_from_scene()
                 else:
                     self.removeItem(item)
         else:
