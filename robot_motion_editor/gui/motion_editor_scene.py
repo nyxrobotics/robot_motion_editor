@@ -82,6 +82,30 @@ class FrameBlockItem(QGraphicsRectItem):
                         item.update_path()
         return super().itemChange(change, value)
 
+    def remove_from_scene(self):
+        scene = self.scene()
+        if scene:
+            # 入力矢印を全て除去
+            for arrow in list(self.input_arrows):
+                if arrow.start_item and arrow in arrow.start_item.output_arrows:
+                    arrow.start_item.output_arrows.remove(arrow)
+                if arrow.end_item and arrow in arrow.end_item.input_arrows:
+                    arrow.end_item.input_arrows.remove(arrow)
+                arrow.remove_from_scene()
+            self.input_arrows.clear()
+
+            # 出力矢印も全て除去
+            for arrow in list(self.output_arrows):
+                if arrow.start_item and arrow in arrow.start_item.output_arrows:
+                    arrow.start_item.output_arrows.remove(arrow)
+                if arrow.end_item and arrow in arrow.end_item.input_arrows:
+                    arrow.end_item.input_arrows.remove(arrow)
+                arrow.remove_from_scene()
+            self.output_arrows.clear()
+
+            # 自分をシーンから削除
+            scene.removeItem(self)
+
 
 class OutputSubBlockItem(QGraphicsRectItem):
     def __init__(self, label, parent_block):
@@ -113,6 +137,7 @@ class OutputSubBlockItem(QGraphicsRectItem):
         self.label.setPos((width - self.label.boundingRect().width()) / 2,
                           (height - self.label.boundingRect().height()) / 2)
         self.is_highlighted = False
+        self.name = label
 
     def can_accept_input(self):
         return self.max_inputs == -1 or len(self.input_arrows) < self.max_inputs
@@ -141,6 +166,30 @@ class OutputSubBlockItem(QGraphicsRectItem):
                     if item.start_item == self or item.end_item == self:
                         item.update_path()
         return super().itemChange(change, value)
+
+    def remove_from_scene(self):
+        scene = self.scene()
+        if scene:
+            # 入力矢印を全て除去
+            for arrow in list(self.input_arrows):
+                if arrow.start_item and arrow in arrow.start_item.output_arrows:
+                    arrow.start_item.output_arrows.remove(arrow)
+                if arrow.end_item and arrow in arrow.end_item.input_arrows:
+                    arrow.end_item.input_arrows.remove(arrow)
+                arrow.remove_from_scene()
+            self.input_arrows.clear()
+
+            # 出力矢印も全て除去
+            for arrow in list(self.output_arrows):
+                if arrow.start_item and arrow in arrow.start_item.output_arrows:
+                    arrow.start_item.output_arrows.remove(arrow)
+                if arrow.end_item and arrow in arrow.end_item.input_arrows:
+                    arrow.end_item.input_arrows.remove(arrow)
+                arrow.remove_from_scene()
+            self.output_arrows.clear()
+
+            # 自分をシーンから削除
+            scene.removeItem(self)
 
 
 class IfBlockItem(QGraphicsRectItem):
@@ -232,6 +281,30 @@ class IfBlockItem(QGraphicsRectItem):
                         item.update_path()
         return super().itemChange(change, value)
 
+    def remove_from_scene(self):
+        scene = self.scene()
+        if scene:
+            # 入力矢印を全て除去
+            for arrow in list(self.input_arrows):
+                if arrow.start_item and arrow in arrow.start_item.output_arrows:
+                    arrow.start_item.output_arrows.remove(arrow)
+                if arrow.end_item and arrow in arrow.end_item.input_arrows:
+                    arrow.end_item.input_arrows.remove(arrow)
+                arrow.remove_from_scene()
+            self.input_arrows.clear()
+
+            # 出力矢印も全て除去
+            for arrow in list(self.output_arrows):
+                if arrow.start_item and arrow in arrow.start_item.output_arrows:
+                    arrow.start_item.output_arrows.remove(arrow)
+                if arrow.end_item and arrow in arrow.end_item.input_arrows:
+                    arrow.end_item.input_arrows.remove(arrow)
+                arrow.remove_from_scene()
+            self.output_arrows.clear()
+
+            # 自分をシーンから削除
+            scene.removeItem(self)
+
 
 class SwitchBlockItem(QGraphicsRectItem):
     def __init__(self, block_name, num_cases=3, uid=None):
@@ -319,6 +392,30 @@ class SwitchBlockItem(QGraphicsRectItem):
                         item.update_path()
         return super().itemChange(change, value)
 
+    def remove_from_scene(self):
+        scene = self.scene()
+        if scene:
+            # 入力矢印を全て除去
+            for arrow in list(self.input_arrows):
+                if arrow.start_item and arrow in arrow.start_item.output_arrows:
+                    arrow.start_item.output_arrows.remove(arrow)
+                if arrow.end_item and arrow in arrow.end_item.input_arrows:
+                    arrow.end_item.input_arrows.remove(arrow)
+                arrow.remove_from_scene()
+            self.input_arrows.clear()
+
+            # 出力矢印も全て除去
+            for arrow in list(self.output_arrows):
+                if arrow.start_item and arrow in arrow.start_item.output_arrows:
+                    arrow.start_item.output_arrows.remove(arrow)
+                if arrow.end_item and arrow in arrow.end_item.input_arrows:
+                    arrow.end_item.input_arrows.remove(arrow)
+                arrow.remove_from_scene()
+            self.output_arrows.clear()
+
+            # 自分をシーンから削除
+            scene.removeItem(self)
+
 
 class WaypointItem(QGraphicsEllipseItem):
     def __init__(self, pos, arrow):
@@ -366,6 +463,13 @@ class WaypointItem(QGraphicsEllipseItem):
             self.arrow.waypoints.remove(self)
             self.arrow.update_path()
             return
+
+    def remove_from_scene(self):
+        if self.arrow and self in self.arrow.waypoints:
+            self.arrow.waypoints.remove(self)
+        if self.scene():
+            self.scene().removeItem(self)
+        self.arrow.update_path()
 
 
 class HoverPoint(QGraphicsEllipseItem):
@@ -723,12 +827,14 @@ class MotionFlowScene(QGraphicsScene):
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete:
             for item in self.selectedItems():
-                if isinstance(item, WaypointItem):
-                    arrow = item.arrow
-                    arrow.waypoints.remove(item)
-                    self.removeItem(item)
-                    arrow.update_path()
-                elif isinstance(item, ArrowItem):
+                if isinstance(
+                    item,
+                    (ArrowItem,
+                     WaypointItem,
+                     FrameBlockItem,
+                     IfBlockItem,
+                     SwitchBlockItem,
+                     OutputSubBlockItem)):
                     item.remove_from_scene()
                 else:
                     self.removeItem(item)
