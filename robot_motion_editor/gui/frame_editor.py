@@ -30,6 +30,7 @@ class FrameEditorDialog(QDialog):
 
         self.joint_widgets = {}
         self.joint_enabled = {}
+        self.enable_checkbox_widgets = {}
         self.pid_config = {}
         self.feedback_expressions = {}
         self.velocity_scale = {}
@@ -48,6 +49,18 @@ class FrameEditorDialog(QDialog):
         scroll.setWidgetResizable(True)
         content = QWidget()
         form = QFormLayout(content)
+
+        # All Enable 行
+        header_row = QHBoxLayout()
+        self.all_enable_checkbox = QCheckBox("All Enable")
+        self.all_enable_checkbox.stateChanged.connect(self.set_all_enable_checkboxes)
+        header_row.addWidget(self.all_enable_checkbox)
+
+        self.reset_all_button = QPushButton("Reset All")
+        self.reset_all_button.clicked.connect(self.reset_all_positions)
+        header_row.addWidget(self.reset_all_button)
+
+        form.addRow(header_row)
 
         # 時間設定
         self.duration_spin = QDoubleSpinBox()
@@ -79,6 +92,7 @@ class FrameEditorDialog(QDialog):
             enable_cb.setChecked(True)
             self.joint_enabled[joint] = True
             enable_cb.stateChanged.connect(lambda state, j=joint: self.update_enable(j, state))
+            self.enable_checkbox_widgets[joint] = enable_cb
 
             label = QLabel(joint)
             label.setFixedWidth(max_label_width)
@@ -138,6 +152,23 @@ class FrameEditorDialog(QDialog):
 
     def update_enable(self, joint, state):
         self.joint_enabled[joint] = (state == Qt.Checked)
+
+    def set_all_enable_checkboxes(self, state):
+        checked = (state == Qt.Checked)
+        for joint, checkbox in self.enable_checkbox_widgets.items():
+            checkbox.blockSignals(True)
+            checkbox.setChecked(checked)
+            self.joint_enabled[joint] = checked
+            checkbox.blockSignals(False)
+
+    def reset_all_positions(self):
+        for slider, spin, _ in self.joint_widgets.values():
+            slider.blockSignals(True)
+            spin.blockSignals(True)
+            slider.setValue(0)
+            spin.setValue(0.0)
+            slider.blockSignals(False)
+            spin.blockSignals(False)
 
     def load_frame_from_file(self, path):
         with open(path, "r") as f:
