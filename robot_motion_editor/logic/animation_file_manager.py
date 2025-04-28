@@ -23,16 +23,11 @@ def load_animation_file(project_root, animation_name):
     return {"layout": layout}
 
 
-def save_animation_file(project_root, animation_name, layout, frame_data_map=None):
+def save_animation_file(project_root, animation_name, layout):
     animation_dir = os.path.join(project_root, animation_name)
     os.makedirs(animation_dir, exist_ok=True)
     frames_dir = os.path.join(animation_dir, "frames")
     os.makedirs(frames_dir, exist_ok=True)
-
-    if frame_data_map:
-        for name, data in frame_data_map.items():
-            frame_path = os.path.join(frames_dir, f"{name}.yaml")
-            save_frame_file(frame_path, data)
 
     animation_path = os.path.join(animation_dir, "animation.yaml")
     print("[DEBUG] Writing to file:", animation_path)

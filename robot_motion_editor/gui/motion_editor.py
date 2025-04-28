@@ -43,21 +43,19 @@ class MotionEditorWidget(QWidget):
         left_widget = QWidget()
         left_panel = QVBoxLayout(left_widget)
         self.save_anim_btn = QPushButton("Save Animation")
-        self.save_frame_btn = QPushButton("Save Frame")
         self.new_anim_btn = QPushButton("New Animation")
         self.new_frame_btn = QPushButton("New Frame")
         self.delete_anim_btn = QPushButton("Delete Animation")
         self.delete_frame_btn = QPushButton("Delete Frame")
 
         self.save_anim_btn.clicked.connect(self.save_current_animation)
-        self.save_frame_btn.clicked.connect(lambda: print("Save Frame not implemented"))
         self.new_anim_btn.clicked.connect(self.create_new_animation)
         self.new_frame_btn.clicked.connect(self.create_new_frame)
         self.delete_anim_btn.clicked.connect(self.delete_animation)
         self.delete_frame_btn.clicked.connect(self.delete_frame)
 
         left_panel.addWidget(QLabel("Animation List"))
-        for btn in [self.save_anim_btn, self.save_frame_btn, self.new_anim_btn, self.new_frame_btn,
+        for btn in [self.save_anim_btn, self.new_anim_btn, self.new_frame_btn,
                     self.delete_anim_btn, self.delete_frame_btn]:
             left_panel.addWidget(btn)
         left_panel.addWidget(self.animation_tree)
