@@ -17,10 +17,7 @@ def save_frame_file(filepath, data):
 
 def create_default_frame():
     return {
-        "duration": 1.0,
-        "wait": 0.0,
         "joints": {
-            # Example:
             # "joint1": {
             #     "position": 0.0,
             #     "speed": 1.0,
@@ -28,6 +25,13 @@ def create_default_frame():
             #     "pid": [0.0, 0.0, 0.0],
             #     "feedback": ""
             # }
+        },
+        "time": {
+            # "duration": 1.0,
+            # "wait": 0.0
+        },
+        "velocity_scale": {
+            # "joint1": 1.0
         }
     }
 

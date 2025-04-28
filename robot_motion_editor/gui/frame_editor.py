@@ -17,6 +17,9 @@ from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
+from .feedback_expression_dialog import FeedbackExpressionDialog
+from .pid_config_dialog import PIDConfigDialog
+
 
 class FrameEditorDialog(QDialog):
     def __init__(self, joint_names, joint_limits, available_variables, frame_path=None, parent=None):
@@ -50,19 +53,7 @@ class FrameEditorDialog(QDialog):
         content = QWidget()
         form = QFormLayout(content)
 
-        # All Enable 行
-        header_row = QHBoxLayout()
-        self.all_enable_checkbox = QCheckBox("All Enable")
-        self.all_enable_checkbox.stateChanged.connect(self.set_all_enable_checkboxes)
-        header_row.addWidget(self.all_enable_checkbox)
-
-        self.reset_all_button = QPushButton("Reset All")
-        self.reset_all_button.clicked.connect(self.reset_all_positions)
-        header_row.addWidget(self.reset_all_button)
-
-        form.addRow(header_row)
-
-        # 時間設定
+        # Move/Wait時間
         self.duration_spin = QDoubleSpinBox()
         self.duration_spin.setDecimals(2)
         self.duration_spin.setRange(0.0, 10.0)
@@ -75,31 +66,38 @@ class FrameEditorDialog(QDialog):
         self.wait_spin.setSingleStep(0.1)
         self.wait_spin.setValue(self.wait_value)
 
-        form.addRow("Move Duration (sec)", self.duration_spin)
-        form.addRow("Wait Time (sec)", self.wait_spin)
+        form.addRow("Move (sec)", self.duration_spin)
+        form.addRow("Wait (sec)", self.wait_spin)
 
-        # 最大ラベル幅を計算
-        max_label_width = 0
-        for joint in self.joint_names:
-            label = QLabel(joint)
-            max_label_width = max(max_label_width, label.sizeHint().width())
+        # All EnableとReset All
+        all_enable_row = QHBoxLayout()
+        self.all_enable_checkbox = QCheckBox("All Enable")
+        self.all_enable_checkbox.stateChanged.connect(self.set_all_enable_checkboxes)
+        all_enable_row.addWidget(self.all_enable_checkbox)
 
-        # 各関節用
+        self.reset_all_button = QPushButton("Reset All")
+        self.reset_all_button.clicked.connect(self.reset_all_positions)
+        all_enable_row.addWidget(self.reset_all_button)
+
+        form.addRow(all_enable_row)
+
+        # ラベル幅調整
+        max_label_width = max(QLabel(j).sizeHint().width() for j in self.joint_names) if self.joint_names else 100
+
         for joint in self.joint_names:
             row = QHBoxLayout()
 
             enable_cb = QCheckBox()
             enable_cb.setChecked(True)
-            self.joint_enabled[joint] = True
             enable_cb.stateChanged.connect(lambda state, j=joint: self.update_enable(j, state))
+            self.joint_enabled[joint] = True
             self.enable_checkbox_widgets[joint] = enable_cb
 
             label = QLabel(joint)
             label.setFixedWidth(max_label_width)
 
             lower_rad, upper_rad = self.joint_limits.get(joint, (-math.pi, math.pi))
-            lower_deg = math.degrees(lower_rad)
-            upper_deg = math.degrees(upper_rad)
+            lower_deg, upper_deg = math.degrees(lower_rad), math.degrees(upper_rad)
 
             slider = QSlider(Qt.Horizontal)
             slider.setRange(int(lower_deg), int(upper_deg))
@@ -124,8 +122,11 @@ class FrameEditorDialog(QDialog):
 
             pid_btn = QPushButton("PID")
             pid_btn.setFixedWidth(50)
+            pid_btn.clicked.connect(lambda _, j=joint, btn=pid_btn: self.open_pid_dialog(j, btn))
+
             fb_btn = QPushButton("FB")
             fb_btn.setFixedWidth(50)
+            fb_btn.clicked.connect(lambda _, j=joint, btn=fb_btn: self.open_feedback_dialog(j, btn))
 
             row.addWidget(enable_cb)
             row.addWidget(label)
@@ -169,6 +170,27 @@ class FrameEditorDialog(QDialog):
             spin.setValue(0.0)
             slider.blockSignals(False)
             spin.blockSignals(False)
+
+    def open_pid_dialog(self, joint, button):
+        current = self.pid_config.get(joint, (0.0, 0.0, 0.0))
+        dialog = PIDConfigDialog(joint, current, parent=self)
+        if dialog.exec_() and dialog.result:
+            self.pid_config[joint] = dialog.result
+            p, i, d = dialog.result
+            if any(v != 0.0 for v in (p, i, d)):
+                button.setStyleSheet("background-color: lightblue;")
+            else:
+                button.setStyleSheet("")
+
+    def open_feedback_dialog(self, joint, button):
+        current = self.feedback_expressions.get(joint, "")
+        dialog = FeedbackExpressionDialog(joint, current, self.available_variables, parent=self)
+        if dialog.exec_() and dialog.result is not None:
+            self.feedback_expressions[joint] = dialog.result
+            if dialog.result.strip():
+                button.setStyleSheet("background-color: lightblue;")
+            else:
+                button.setStyleSheet("")
 
     def load_frame_from_file(self, path):
         with open(path, "r") as f:
