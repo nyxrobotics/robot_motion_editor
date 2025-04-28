@@ -465,8 +465,8 @@ class ArrowItem(QGraphicsPathItem):
         self._recently_moved_waypoint = None
         self._force_snap_start = False
         self._force_snap_end = False
-        self.start_handle.setPos(0, 0)
-        self.end_handle.setPos(100, 0)
+        self.start_handle.setParentItem(self)
+        self.end_handle.setParentItem(self)
         self.default_pen = QPen(QColor("#ffffff"), 3)
         self.highlight_pen = QPen(QColor("#00ff00"), 3)
         self.selected_pen = QPen(QColor("#00ffff"), 4)
@@ -478,12 +478,10 @@ class ArrowItem(QGraphicsPathItem):
 
     def add_to_scene(self, scene):
         scene.addItem(self)
-        scene.addItem(self.start_handle)
-        scene.addItem(self.end_handle)
 
     def insert_waypoint(self, index, pos):
         wp = WaypointItem(pos, self)
-        self.scene().addItem(wp)
+        wp.setParentItem(self)
         self.waypoints.insert(index, wp)
         self.notify_waypoint_moved(wp)
         self.update_path()
@@ -491,23 +489,26 @@ class ArrowItem(QGraphicsPathItem):
 
     def remove_all_waypoints(self):
         for wp in self.waypoints:
-            self.scene().removeItem(wp)
+            wp.setParentItem(None)  # 明示的に切り離す（念のため）
+            if wp.scene():
+                wp.scene().removeItem(wp)
         self.waypoints.clear()
 
     def refresh_hover_points(self):
         for hp in self.hover_points:
-            self.scene().removeItem(hp)
+            hp.setParentItem(None)
+            if hp.scene():
+                hp.scene().removeItem(hp)
         self.hover_points.clear()
 
         points = [self.start_handle.pos()] + [wp.pos() for wp in self.waypoints] + [self.end_handle.pos()]
         for i in range(len(points) - 1):
             mid = (points[i] + points[i + 1]) * 0.5
             hp = HoverPoint(mid, self, i)
-            self.scene().addItem(hp)
+            hp.setParentItem(self)
             self.hover_points.append(hp)
 
     def update_path(self):
-        # Set different pen depending on selection
         pen = self.selected_pen if self.isSelected() else self.default_pen
         is_connected = self.start_item is not None and self.end_item is not None
         pen.setStyle(Qt.SolidLine if is_connected else Qt.DashLine)
@@ -563,22 +564,8 @@ class ArrowItem(QGraphicsPathItem):
         self._recently_moved_waypoint = None
 
     def remove_from_scene(self):
-        scene = self.scene()
-        if scene:
-            scene.removeItem(self)
-            if self.start_handle.scene():
-                scene.removeItem(self.start_handle)
-            if self.end_handle.scene():
-                scene.removeItem(self.end_handle)
-            for wp in self.waypoints:
-                if wp.scene():
-                    scene.removeItem(wp)
-            self.waypoints.clear()
-            for hp in self.hover_points:
-                if hp.scene():
-                    scene.removeItem(hp)
-            self.hover_points.clear()
-
+        if self.scene():
+            self.scene().removeItem(self)
         # start_item, end_itemの矢印リストからも外す
         if self.start_item and self in self.start_item.output_arrows:
             self.start_item.output_arrows.remove(self)
