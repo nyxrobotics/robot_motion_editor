@@ -76,6 +76,173 @@ class FrameBlockItem(QGraphicsRectItem):
         return super().itemChange(change, value)
 
 
+class OutputSubBlockItem(QGraphicsRectItem):
+    def __init__(self, label, parent_block):
+        self.label_text = label
+        temp_label = QGraphicsTextItem(label)
+        font_metrics = QFontMetricsF(temp_label.font())
+        text_width = font_metrics.width(label)
+        text_height = font_metrics.height()
+
+        width = max(100, text_width + 20)
+        height = max(30, text_height + 10)
+
+        super().__init__(0, 0, width, height)
+        self.setBrush(QBrush(QColor("#2b2b2b")))
+        self.default_pen = QPen(QColor("#aaaaaa"), 2)
+        self.selected_pen = QPen(QColor("#00ffff"), 3)
+        self.setPen(self.default_pen)
+        self.setFlags(self.ItemIsSelectable | self.ItemSendsGeometryChanges)
+
+        self.label = QGraphicsTextItem(label, self)
+        self.label.setDefaultTextColor(QColor("white"))
+        self.label.setPos((width - self.label.boundingRect().width()) / 2,
+                          (height - self.label.boundingRect().height()) / 2)
+
+        self.parent_block = parent_block  # 親ブロック (IfBlockItemやSwitchBlockItem)
+        self.label = label      # "True", "False", "case_0"など
+        self.output_arrow = None          # 必ず1本の出力Arrowを持つ
+
+    def paint(self, painter, option, widget=None):
+        self.setPen(self.selected_pen if self.isSelected() else self.default_pen)
+        super().paint(painter, option, widget)
+
+    def itemChange(self, change, value):
+        if change == self.ItemPositionChange and self.scene():
+            if self.output_arrow:
+                self.output_arrow._force_snap_start = True
+                self.output_arrow.update_path()
+        return super().itemChange(change, value)
+
+
+class IfBlockItem(QGraphicsRectItem):
+    def __init__(self, block_name, uid=None):
+        temp_label = QGraphicsTextItem(block_name)
+        font_metrics = QFontMetricsF(temp_label.font())
+        text_width = font_metrics.width(block_name)
+        width = max(120, text_width + 20)
+        super().__init__(0, 0, width, 60)
+        self.setBrush(QBrush(QColor("#1a1a1a")))
+        self.default_pen = QPen(QColor("#ffffff"), 3)
+        self.highlight_pen = QPen(QColor("#00ff00"), 3)
+        self.selected_pen = QPen(QColor("#00ffff"), 4)
+        self.setPen(self.default_pen)
+        self.setFlags(self.ItemIsMovable | self.ItemIsSelectable | self.ItemSendsGeometryChanges)
+
+        self.name = block_name
+        self.uid = uid or block_name
+
+        self.label = QGraphicsTextItem(block_name, self)
+        self.label.setDefaultTextColor(QColor("white"))
+        self.label.setPos((width - self.label.boundingRect().width()) / 2, 5)
+        self.is_highlighted = False
+        self.outputs = {}
+        self.create_output_blocks()
+
+    def create_output_blocks(self):
+        outputs = ["True", "False"]
+        font_metrics = QFontMetricsF(self.label.font())
+        text_height = font_metrics.height()
+        gap = text_height / 2
+        y = self.label.boundingRect().height() + 10
+
+        for out_label in outputs:
+            block = OutputSubBlockItem(out_label, self)
+            block.setPos(10, y)
+            self.outputs[out_label] = block
+            if self.scene():
+                self.scene().addItem(block)
+            else:
+                block.setParentItem(self)
+            y += block.rect().height() + gap
+
+        total_height = y
+        self.setRect(0, 0, self.rect().width(), total_height)
+
+    def set_highlighted(self, state):
+        self.is_highlighted = state
+        self.update()
+
+    def paint(self, painter, option, widget=None):
+        self.setPen(self.selected_pen if self.isSelected() else
+                    self.highlight_pen if self.is_highlighted else
+                    self.default_pen)
+        super().paint(painter, option, widget)
+
+    def itemChange(self, change, value):
+        if change == self.ItemPositionChange and self.scene():
+            for output in self.outputs.values():
+                if output.output_arrow:
+                    output.output_arrow._force_snap_start = True
+                    output.output_arrow.update_path()
+        return super().itemChange(change, value)
+
+
+class SwitchBlockItem(QGraphicsRectItem):
+    def __init__(self, block_name, num_cases=3, uid=None):
+        temp_label = QGraphicsTextItem(block_name)
+        font_metrics = QFontMetricsF(temp_label.font())
+        text_width = font_metrics.width(block_name)
+        width = max(120, text_width + 20)
+        super().__init__(0, 0, width, 60)
+        self.setBrush(QBrush(QColor("#1a1a1a")))
+        self.default_pen = QPen(QColor("#ffffff"), 3)
+        self.highlight_pen = QPen(QColor("#00ff00"), 3)
+        self.selected_pen = QPen(QColor("#00ffff"), 4)
+        self.setPen(self.default_pen)
+        self.setFlags(self.ItemIsMovable | self.ItemIsSelectable | self.ItemSendsGeometryChanges)
+
+        self.name = block_name
+        self.uid = uid or block_name
+        self.num_cases = num_cases
+        self.outputs = {}
+
+        self.label = QGraphicsTextItem(block_name, self)
+        self.label.setDefaultTextColor(QColor("white"))
+        self.label.setPos((width - self.label.boundingRect().width()) / 2, 5)
+        self.is_highlighted = False
+        self.outputs = {}
+        self.create_output_blocks()
+
+    def create_output_blocks(self):
+        labels = [f"case_{i}" for i in range(self.num_cases)] + ["default"]
+        font_metrics = QFontMetricsF(self.label.font())
+        text_height = font_metrics.height()
+        gap = text_height / 2
+        y = self.label.boundingRect().height() + 10
+
+        for label in labels:
+            block = OutputSubBlockItem(label, self)
+            block.setPos(10, y)
+            self.outputs[label] = block
+            if self.scene():
+                self.scene().addItem(block)
+            else:
+                block.setParentItem(self)
+            y += block.rect().height() + gap
+
+        total_height = y
+        self.setRect(0, 0, self.rect().width(), total_height)
+
+    def set_highlighted(self, state):
+        self.is_highlighted = state
+        self.update()
+
+    def paint(self, painter, option, widget=None):
+        self.setPen(self.selected_pen if self.isSelected() else
+                    self.highlight_pen if self.is_highlighted else
+                    self.default_pen)
+        super().paint(painter, option, widget)
+
+    def itemChange(self, change, value):
+        if change == self.ItemPositionChange and self.scene():
+            for output in self.outputs.values():
+                if output.output_arrow:
+                    output.output_arrow._force_snap_start = True
+                    output.output_arrow.update_path()
+        return super().itemChange(change, value)
+
+
 class WaypointItem(QGraphicsEllipseItem):
     def __init__(self, pos, arrow):
         super().__init__(-8, -8, 16, 16)
@@ -309,14 +476,15 @@ class MotionFlowScene(QGraphicsScene):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setBackgroundBrush(QColor("#111111"))
-        self.id_counter = 0
+        self.block_counter = 0
+        self.blocks = []
         self.arrow_counter = 0
         self.arrows = []
 
-    def _generate_uid(self, name):
+    def _generate_block_id(self, name):
         safe = "".join(c if c.isalnum() else "_" for c in name)
-        uid = f"frame_{safe}_id{self.id_counter:03}"
-        self.id_counter += 1
+        uid = f"{safe}_id{self.block_counter:03}"
+        self.block_counter += 1
         return uid
 
     def _generate_arrow_id(self):
@@ -334,7 +502,7 @@ class MotionFlowScene(QGraphicsScene):
     def dropEvent(self, event):
         name = event.mimeData().text()
         pos = event.scenePos()
-        uid = self._generate_uid(name)
+        uid = self._generate_block_id(name)
         item = FrameBlockItem(name, uid=uid)
         item.setPos(pos)
         self.addItem(item)
@@ -343,17 +511,71 @@ class MotionFlowScene(QGraphicsScene):
     def contextMenuEvent(self, event):
         item = self.itemAt(event.scenePos(), self.views()[0].transform())
         menu = QMenu()
-        if isinstance(item, FrameBlockItem):
+        if isinstance(self, FrameBlockItem):
+            delete_action = menu.addAction("Delete Frame Block")
+            action = menu.exec_(event.screenPos())
+            if action == delete_action:
+                scene = self.scene()
+                if scene:
+                    scene.remove_block_and_arrows(self)
+        elif isinstance(self, IfBlockItem):
+            delete_action = menu.addAction("Delete If Block")
+            action = menu.exec_(event.screenPos())
+            if action == delete_action:
+                scene = self.scene()
+                if scene:
+                    scene.remove_block_and_arrows(self)
+        elif isinstance(self, SwitchBlockItem):
+            delete_action = menu.addAction("Delete Switch Block")
+            action = menu.exec_(event.screenPos())
+            if action == delete_action:
+                scene = self.scene()
+                if scene:
+                    scene.remove_block_and_arrows(self)
+        elif isinstance(self, ArrowItem):
+            delete_arrow_action = menu.addAction("Delete Arrow")
+            action = menu.exec_(event.screenPos())
+            if action == delete_arrow_action:
+                scene = self.scene()
+                if scene:
+                    scene.remove_arrow(self)
+        elif isinstance(self, OutputSubBlockItem):
             item.setSelected(True)
             item.contextMenuEvent(event)
         else:
-            menu.addAction(QAction("New Frame", menu))
-            arrow_action = QAction("New Arrow", menu)
-            menu.addAction(arrow_action)
+            new_frame_action = QAction("New Frame", menu)
+            new_if_action = QAction("New If", menu)
+            new_switch_action = QAction("New Switch", menu)
+            new_arrow_action = QAction("New Arrow", menu)
+
+            menu.addAction(new_frame_action)
+            menu.addAction(new_if_action)
+            menu.addAction(new_switch_action)
+            menu.addAction(new_arrow_action)
+
             selected_action = menu.exec_(event.screenPos())
-            if selected_action == arrow_action:
+            pos = event.scenePos()
+
+            if selected_action == new_frame_action:
+                block = FrameBlockItem(self._generate_block_id("frame"))
+                block.setPos(pos)
+                self.addItem(block)
+                self.blocks.append(block)
+
+            elif selected_action == new_if_action:
+                block = IfBlockItem(self._generate_block_id("if"))
+                block.setPos(pos)
+                self.addItem(block)
+                self.blocks.append(block)
+
+            elif selected_action == new_switch_action:
+                block = SwitchBlockItem(self._generate_block_id("switch"))
+                block.setPos(pos)
+                self.addItem(block)
+                self.blocks.append(block)
+
+            elif selected_action == new_arrow_action:
                 arrow = ArrowItem(self._generate_arrow_id())
-                pos = event.scenePos()
                 arrow.start_handle.setPos(pos)
                 arrow.end_handle.setPos(pos + QPointF(100, 0))
                 arrow.add_to_scene(self)
@@ -381,9 +603,9 @@ class MotionFlowScene(QGraphicsScene):
 
         for idx, item in enumerate(items):
             if not hasattr(item, 'uid') or not item.uid:
-                item.uid = self._generate_uid(item.name)
+                item.uid = self._generate_block_id(item.name)
             while item.uid in used_uids:
-                item.uid = self._generate_uid(item.name)
+                item.uid = self._generate_block_id(item.name)
             used_uids.add(item.uid)
             uid = item.uid
             layout["block"][uid] = {
