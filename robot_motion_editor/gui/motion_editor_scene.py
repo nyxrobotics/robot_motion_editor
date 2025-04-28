@@ -125,9 +125,9 @@ class OutputSubBlockItem(QGraphicsRectItem):
         self.update()
 
     def paint(self, painter, option, widget=None):
-        self.setPen(self.selected_pen if self.isSelected() else
-                    self.highlight_pen if self.is_highlighted else
-                    self.default_pen)
+        self.setPen(self.selected_pen if self.isSelected()
+                    else self.highlight_pen if self.is_highlighted
+                    else self.default_pen)
         super().paint(painter, option, widget)
 
     def itemChange(self, change, value):
@@ -203,9 +203,9 @@ class IfBlockItem(QGraphicsRectItem):
         self.update()
 
     def paint(self, painter, option, widget=None):
-        self.setPen(self.selected_pen if self.isSelected() else
-                    self.highlight_pen if self.is_highlighted else
-                    self.default_pen)
+        self.setPen(self.selected_pen if self.isSelected()
+                    else self.highlight_pen if self.is_highlighted
+                    else self.default_pen)
         super().paint(painter, option, widget)
 
     def itemChange(self, change, value):
@@ -282,9 +282,9 @@ class SwitchBlockItem(QGraphicsRectItem):
         self.update()
 
     def paint(self, painter, option, widget=None):
-        self.setPen(self.selected_pen if self.isSelected() else
-                    self.highlight_pen if self.is_highlighted else
-                    self.default_pen)
+        self.setPen(self.selected_pen if self.isSelected()
+                    else self.highlight_pen if self.is_highlighted
+                    else self.default_pen)
         super().paint(painter, option, widget)
 
     def itemChange(self, change, value):
@@ -385,7 +385,7 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
         for item in self.scene().items():
-            if isinstance(item, FrameBlockItem):
+            if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem, OutputSubBlockItem)):
                 item.set_highlighted(item.sceneBoundingRect().contains(self.scenePos()))
         self.arrow.update_path()
 
@@ -398,32 +398,23 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
 
         scene = self.scene()
         target = None
+
         for item in scene.items(self.scenePos()):
-            if isinstance(
-                    item,
-                    FrameBlockItem) or isinstance(
-                    item,
-                    IfBlockItem) or isinstance(
-                    item,
-                    SwitchBlockItem) or isinstance(
-                        item,
-                    OutputSubBlockItem):
+            if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem, OutputSubBlockItem)):
                 if self.is_start:
-                    # 出力制限チェック
-                    if item.max_outputs != -1 and len(item.output_arrows) >= item.max_outputs:
+                    # 出力側チェック
+                    if not item.can_accept_output():
                         target = None
                         break
-                    # すでに同じ矢印が入っていないかチェックして追加
                     if self.arrow not in item.output_arrows:
                         item.output_arrows.append(self.arrow)
                 else:
-                    # 入力制限チェック
-                    if item.max_inputs != -1 and len(item.input_arrows) >= item.max_inputs:
+                    # 入力側チェック
+                    if not item.can_accept_input():
                         target = None
                         break
                     if self.arrow not in item.input_arrows:
                         item.input_arrows.append(self.arrow)
-
                 target = item
                 break
 
@@ -432,9 +423,11 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         else:
             self.arrow.end_item = target
 
+        # ハイライト解除
         for item in scene.items():
             if hasattr(item, "set_highlighted"):
                 item.set_highlighted(False)
+
         self.arrow.update_path()
         super().mouseReleaseEvent(event)
 
