@@ -398,36 +398,35 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
 
         scene = self.scene()
         target = None
-
         for item in scene.items(self.scenePos()):
             if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem, OutputSubBlockItem)):
                 if self.is_start:
-                    # 出力側チェック
-                    if not item.can_accept_output():
+                    if item.max_outputs != -1 and len(item.output_arrows) >= item.max_outputs:
                         target = None
                         break
-                    if self.arrow not in item.output_arrows:
-                        item.output_arrows.append(self.arrow)
+                    item.output_arrows.append(self.arrow)
                 else:
-                    # 入力側チェック
-                    if not item.can_accept_input():
+                    if item.max_inputs != -1 and len(item.input_arrows) >= item.max_inputs:
                         target = None
                         break
-                    if self.arrow not in item.input_arrows:
-                        item.input_arrows.append(self.arrow)
+                    item.input_arrows.append(self.arrow)
                 target = item
                 break
 
         if self.is_start:
+            # もし前のstart_itemがあったら外す
+            if self.arrow.start_item and self.arrow in self.arrow.start_item.output_arrows:
+                self.arrow.start_item.output_arrows.remove(self.arrow)
             self.arrow.start_item = target
         else:
+            # もし前のend_itemがあったら外す
+            if self.arrow.end_item and self.arrow in self.arrow.end_item.input_arrows:
+                self.arrow.end_item.input_arrows.remove(self.arrow)
             self.arrow.end_item = target
 
-        # ハイライト解除
         for item in scene.items():
             if hasattr(item, "set_highlighted"):
                 item.set_highlighted(False)
-
         self.arrow.update_path()
         super().mouseReleaseEvent(event)
 
