@@ -52,8 +52,13 @@ class FrameBlockItem(QGraphicsRectItem):
         self.label.setPos((width - self.label.boundingRect().width()) / 2,
                           (height - self.label.boundingRect().height()) / 2)
 
-        self.connection = {"output": {}}
         self.is_highlighted = False
+
+    def can_accept_input(self):
+        return self.max_inputs == -1 or len(self.input_arrows) < self.max_inputs
+
+    def can_accept_output(self):
+        return self.max_outputs == -1 or len(self.output_arrows) < self.max_outputs
 
     def set_highlighted(self, state):
         self.is_highlighted = state
@@ -98,6 +103,7 @@ class OutputSubBlockItem(QGraphicsRectItem):
         super().__init__(0, 0, width, height)
         self.setBrush(QBrush(QColor("#2b2b2b")))
         self.default_pen = QPen(QColor("#aaaaaa"), 2)
+        self.highlight_pen = QPen(QColor("#00ff00"), 3)
         self.selected_pen = QPen(QColor("#00ffff"), 3)
         self.setPen(self.default_pen)
         self.setFlags(self.ItemIsSelectable | self.ItemSendsGeometryChanges)
@@ -106,9 +112,22 @@ class OutputSubBlockItem(QGraphicsRectItem):
         self.label.setDefaultTextColor(QColor("white"))
         self.label.setPos((width - self.label.boundingRect().width()) / 2,
                           (height - self.label.boundingRect().height()) / 2)
+        self.is_highlighted = False
+
+    def can_accept_input(self):
+        return self.max_inputs == -1 or len(self.input_arrows) < self.max_inputs
+
+    def can_accept_output(self):
+        return self.max_outputs == -1 or len(self.output_arrows) < self.max_outputs
+
+    def set_highlighted(self, state):
+        self.is_highlighted = state
+        self.update()
 
     def paint(self, painter, option, widget=None):
-        self.setPen(self.selected_pen if self.isSelected() else self.default_pen)
+        self.setPen(self.selected_pen if self.isSelected() else
+                    self.highlight_pen if self.is_highlighted else
+                    self.default_pen)
         super().paint(painter, option, widget)
 
     def itemChange(self, change, value):
@@ -172,6 +191,12 @@ class IfBlockItem(QGraphicsRectItem):
 
         total_height = y
         self.setRect(0, 0, self.rect().width(), total_height)
+
+    def can_accept_input(self):
+        return self.max_inputs == -1 or len(self.input_arrows) < self.max_inputs
+
+    def can_accept_output(self):
+        return self.max_outputs == -1 or len(self.output_arrows) < self.max_outputs
 
     def set_highlighted(self, state):
         self.is_highlighted = state
@@ -245,6 +270,12 @@ class SwitchBlockItem(QGraphicsRectItem):
 
         total_height = y
         self.setRect(0, 0, self.rect().width(), total_height)
+
+    def can_accept_input(self):
+        return self.max_inputs == -1 or len(self.input_arrows) < self.max_inputs
+
+    def can_accept_output(self):
+        return self.max_outputs == -1 or len(self.output_arrows) < self.max_outputs
 
     def set_highlighted(self, state):
         self.is_highlighted = state
@@ -358,7 +389,6 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
                 item.set_highlighted(item.sceneBoundingRect().contains(self.scenePos()))
         self.arrow.update_path()
 
-
     def mouseReleaseEvent(self, event):
         self.is_dragging = False
         if self.is_start:
@@ -407,7 +437,6 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
                 item.set_highlighted(False)
         self.arrow.update_path()
         super().mouseReleaseEvent(event)
-
 
 
 class ArrowItem(QGraphicsPathItem):
