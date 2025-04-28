@@ -173,22 +173,34 @@ class IfBlockItem(QGraphicsRectItem):
         self.create_output_blocks()
 
     def create_output_blocks(self):
-        output_sub_blocks = ["True", "False"]
+        output_sub_labels = ["True", "False"]
         font_metrics = QFontMetricsF(self.label.font())
         text_height = font_metrics.height()
         gap = text_height / 2
         y = self.label.boundingRect().height() + 10
 
-        for out_label in output_sub_blocks:
+        # Outputブロックをまず仮作成して幅を測定
+        output_blocks = []
+        max_width = 0
+        for out_label in output_sub_labels:
             block = OutputSubBlockItem(out_label, self)
-            block.setPos(10, y)
-            self.output_sub_blocks[out_label] = block
-            if self.scene():
-                self.scene().addItem(block)
-            else:
-                block.setParentItem(self)
+            output_blocks.append(block)
+            max_width = max(max_width, block.rect().width())
+
+        # If本体の幅を必要に応じて広げる
+        min_required_width = max_width + 2 * gap
+        if self.rect().width() < min_required_width:
+            self.setRect(0, 0, min_required_width, self.rect().height())
+
+        # Outputブロックを中央揃えで配置
+        for block in output_blocks:
+            block.setParentItem(self)
+            block_x = (self.rect().width() - block.rect().width()) / 2
+            block.setPos(block_x, y)
+            self.output_sub_blocks[block.label.toPlainText()] = block
             y += block.rect().height() + gap
 
+        # 全体の高さを更新
         total_height = y
         self.setRect(0, 0, self.rect().width(), total_height)
 
@@ -252,20 +264,28 @@ class SwitchBlockItem(QGraphicsRectItem):
         self.create_output_blocks()
 
     def create_output_blocks(self):
-        labels = [f"case_{i}" for i in range(self.num_cases)] + ["default"]
+        output_sub_labels = [f"case_{i}" for i in range(self.num_cases)] + ["default"]
         font_metrics = QFontMetricsF(self.label.font())
         text_height = font_metrics.height()
         gap = text_height / 2
         y = self.label.boundingRect().height() + 10
 
-        for label in labels:
-            block = OutputSubBlockItem(label, self)
-            block.setPos(10, y)
-            self.output_sub_blocks[label] = block
-            if self.scene():
-                self.scene().addItem(block)
-            else:
-                block.setParentItem(self)
+        output_blocks = []
+        max_width = 0
+        for out_label in output_sub_labels:
+            block = OutputSubBlockItem(out_label, self)
+            output_blocks.append(block)
+            max_width = max(max_width, block.rect().width())
+
+        min_required_width = max_width + 2 * gap
+        if self.rect().width() < min_required_width:
+            self.setRect(0, 0, min_required_width, self.rect().height())
+
+        for block in output_blocks:
+            block.setParentItem(self)
+            block_x = (self.rect().width() - block.rect().width()) / 2
+            block.setPos(block_x, y)
+            self.output_sub_blocks[block.label.toPlainText()] = block
             y += block.rect().height() + gap
 
         total_height = y
