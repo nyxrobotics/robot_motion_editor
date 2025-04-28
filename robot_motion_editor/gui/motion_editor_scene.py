@@ -436,7 +436,7 @@ class ArrowItem(QGraphicsPathItem):
     def __init__(self, arrow_id):
         super().__init__()
         self.arrow_id = arrow_id
-        self.setZValue(-1)
+        self.setZValue(10)
         self.start_item = None
         self.end_item = None
         self.start_handle = ArrowEndpointHandle(self, True)
