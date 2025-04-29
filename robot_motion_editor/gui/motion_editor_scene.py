@@ -1,6 +1,7 @@
 import math
 
 from PyQt5.QtCore import QPointF
+from PyQt5.QtCore import QRectF
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush
 from PyQt5.QtGui import QColor
@@ -895,6 +896,40 @@ class MotionFlowScene(QGraphicsScene):
         else:
             super().keyPressEvent(event)
 
+    def compute_scene_rect(self):
+        """Sceneに存在する全アイテムを囲う最小矩形を計算して返す"""
+        items = self.items()
+        if not items:
+            return QRectF(0, 0, 1000, 1000)  # 初期サイズ（広めにしておく）
+
+        bounding_rect = None
+        for item in items:
+            if not item.isVisible():
+                continue
+            rect = item.sceneBoundingRect()
+            if bounding_rect is None:
+                bounding_rect = rect
+            else:
+                bounding_rect = bounding_rect.united(rect)
+
+        # 50ピクセルのマージンを追加
+        if bounding_rect:
+            margin = 100
+            bounding_rect.adjust(-margin, -margin, margin, margin)
+            return bounding_rect
+        else:
+            return QRectF(0, 0, 1000, 1000)
+
+    def update_scene_rect(self):
+        """シーン全体を囲うためのsceneRectを自動設定する"""
+        rect = self.compute_scene_rect()
+        self.setSceneRect(rect)
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        # ドロップした直後にもsceneRectを更新
+        self.update_scene_rect()
+
     def save_layout_yaml(self):
         layout = {"block": {}, "arrow": {}}
         used_uids = set()
@@ -991,3 +1026,5 @@ class MotionFlowScene(QGraphicsScene):
         for arrow in arrow_map.values():
             arrow.update_path()
             self.arrows.append(arrow)
+
+        self.update_scene_rect()
