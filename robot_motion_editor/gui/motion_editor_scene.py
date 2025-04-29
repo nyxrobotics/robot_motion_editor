@@ -82,6 +82,15 @@ class FrameBlockItem(QGraphicsRectItem):
                         item.update_path()
         return super().itemChange(change, value)
 
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        if self.scene():
+            for item in self.scene().items():
+                if isinstance(item, ArrowItem):
+                    item._force_snap_start = True
+                    item._force_snap_end = True
+                    item.update_path()
+
     def remove_from_scene(self):
         scene = self.scene()
         if scene:
@@ -166,6 +175,15 @@ class OutputSubBlockItem(QGraphicsRectItem):
                     if item.start_item == self or item.end_item == self:
                         item.update_path()
         return super().itemChange(change, value)
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        if self.scene():
+            for item in self.scene().items():
+                if isinstance(item, ArrowItem):
+                    item._force_snap_start = True
+                    item._force_snap_end = True
+                    item.update_path()
 
     def on_parent_moved(self):
         # 親が動いたら自分に繋がってる矢印を更新
@@ -290,6 +308,18 @@ class IfBlockItem(QGraphicsRectItem):
                     subblock.on_parent_moved()
         return super().itemChange(change, value)
 
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        if self.scene():
+            for item in self.scene().items():
+                if isinstance(item, ArrowItem):
+                    item._force_snap_start = True
+                    item._force_snap_end = True
+                    item.update_path()
+            for subblock in getattr(self, 'output_sub_blocks', {}).values():
+                if hasattr(subblock, "on_parent_moved"):
+                    subblock.on_parent_moved()
+
     def remove_from_scene(self):
         scene = self.scene()
         if scene:
@@ -403,6 +433,18 @@ class SwitchBlockItem(QGraphicsRectItem):
                 if hasattr(subblock, "on_parent_moved"):
                     subblock.on_parent_moved()
         return super().itemChange(change, value)
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        if self.scene():
+            for item in self.scene().items():
+                if isinstance(item, ArrowItem):
+                    item._force_snap_start = True
+                    item._force_snap_end = True
+                    item.update_path()
+            for subblock in getattr(self, 'output_sub_blocks', {}).values():
+                if hasattr(subblock, "on_parent_moved"):
+                    subblock.on_parent_moved()
 
     def remove_from_scene(self):
         scene = self.scene()
