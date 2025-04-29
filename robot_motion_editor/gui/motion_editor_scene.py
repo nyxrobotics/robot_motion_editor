@@ -27,15 +27,20 @@ def compute_edge_point(center, target, width, height):
 
 
 class FrameBlockItem(QGraphicsRectItem):
-    def __init__(self, frame_name, uid=None):
+    def __init__(self, type, id):
+
+        self.type = type
+        self.id = id
+        self.name = f"{type}_{id}"
+
         self.max_inputs = -1
         self.max_outputs = 1
-        self.input_arrows = []       # 入力側：複数接続OK
+        self.input_arrows = []
         self.output_arrows = []     # 出力側：1本まで
 
-        label_text = QGraphicsTextItem(frame_name)
+        label_text = QGraphicsTextItem(self.name)
         font_metrics = QFontMetricsF(label_text.font())
-        text_width = font_metrics.width(frame_name)
+        text_width = font_metrics.width(self.name)
         width = max(120, text_width + 20)
         height = 60
         super().__init__(0, 0, width, height)
@@ -46,9 +51,7 @@ class FrameBlockItem(QGraphicsRectItem):
         self.setPen(self.default_pen)
         self.setFlags(self.ItemIsMovable | self.ItemIsSelectable | self.ItemSendsGeometryChanges)
 
-        self.name = frame_name
-        self.uid = uid or frame_name
-        self.label = QGraphicsTextItem(frame_name, self)
+        self.label = QGraphicsTextItem(self.name, self)
         self.label.setDefaultTextColor(QColor("white"))
         self.label.setPos((width - self.label.boundingRect().width()) / 2,
                           (height - self.label.boundingRect().height()) / 2)
@@ -218,16 +221,21 @@ class OutputSubBlockItem(QGraphicsRectItem):
 
 
 class IfBlockItem(QGraphicsRectItem):
-    def __init__(self, block_name, uid=None):
+    def __init__(self, type, id):
+
+        self.type = type
+        self.id = id
+        self.name = f"{type}_{id}"
+
         self.max_inputs = -1
         self.max_outputs = 0
         self.input_arrows = []
         self.output_arrows = []
         self.output_sub_blocks = {}
 
-        label_text = QGraphicsTextItem(block_name)
+        label_text = QGraphicsTextItem(self.name)
         font_metrics = QFontMetricsF(label_text.font())
-        text_width = font_metrics.width(block_name)
+        text_width = font_metrics.width(self.name)
         width = max(120, text_width + 20)
         super().__init__(0, 0, width, 60)
         self.setBrush(QBrush(QColor("#1a1a1a")))
@@ -237,10 +245,7 @@ class IfBlockItem(QGraphicsRectItem):
         self.setPen(self.default_pen)
         self.setFlags(self.ItemIsMovable | self.ItemIsSelectable | self.ItemSendsGeometryChanges)
 
-        self.name = block_name
-        self.uid = uid or block_name
-
-        self.label = QGraphicsTextItem(block_name, self)
+        self.label = QGraphicsTextItem(self.name, self)
         self.label.setDefaultTextColor(QColor("white"))
         self.label.setPos((width - self.label.boundingRect().width()) / 2, 5)
         self.is_highlighted = False
@@ -347,16 +352,22 @@ class IfBlockItem(QGraphicsRectItem):
 
 
 class SwitchBlockItem(QGraphicsRectItem):
-    def __init__(self, block_name, num_cases=3, uid=None):
+    def __init__(self, type, id, num_cases=3):
+
+        self.type = type
+        self.id = id
+        self.name = f"{type}_{id}"
+        self.num_cases = num_cases
+
         self.max_inputs = -1
         self.max_outputs = 0
         self.input_arrows = []
         self.output_arrows = []
         self.output_sub_blocks = {}
 
-        label_text = QGraphicsTextItem(block_name)
+        label_text = QGraphicsTextItem(self.name)
         font_metrics = QFontMetricsF(label_text.font())
-        text_width = font_metrics.width(block_name)
+        text_width = font_metrics.width(self.name)
         width = max(120, text_width + 20)
         super().__init__(0, 0, width, 60)
         self.setBrush(QBrush(QColor("#1a1a1a")))
@@ -366,11 +377,7 @@ class SwitchBlockItem(QGraphicsRectItem):
         self.setPen(self.default_pen)
         self.setFlags(self.ItemIsMovable | self.ItemIsSelectable | self.ItemSendsGeometryChanges)
 
-        self.name = block_name
-        self.uid = uid or block_name
-        self.num_cases = num_cases
-
-        self.label = QGraphicsTextItem(block_name, self)
+        self.label = QGraphicsTextItem(self.name, self)
         self.label.setDefaultTextColor(QColor("white"))
         self.label.setPos((width - self.label.boundingRect().width()) / 2, 5)
         self.is_highlighted = False
@@ -611,9 +618,13 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
 
 
 class ArrowItem(QGraphicsPathItem):
-    def __init__(self, arrow_id):
+    def __init__(self, id):
         super().__init__()
-        self.arrow_id = arrow_id
+
+        self.type = "arrow"
+        self.id = id
+        self.name = f"{self.type}_{id}"
+
         self.setZValue(10)
         self.start_item = None
         self.end_item = None
@@ -777,6 +788,7 @@ class MotionFlowScene(QGraphicsScene):
         self.blocks = []
         self.arrow_counter = 0
         self.arrows = []
+        self.setSceneRect(0, 0, 1000, 1000)
 
     def _generate_block_id(self, name):
         safe = "".join(c if c.isalnum() else "_" for c in name)

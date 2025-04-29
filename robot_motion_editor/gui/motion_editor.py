@@ -64,7 +64,6 @@ class MotionEditorWidget(QWidget):
         self.animation_tree.itemDoubleClicked.connect(self.on_tree_item_double_clicked)
 
         self.scene = MotionFlowScene()
-        self.scene.setSceneRect(0, 0, 2000, 2000)
         self.view = QGraphicsView(self.scene)
         self.view.setAcceptDrops(True)
         self.view.setRenderHints(self.view.renderHints() | QPainter.Antialiasing)
