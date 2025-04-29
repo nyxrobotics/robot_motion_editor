@@ -1020,63 +1020,75 @@ class MotionFlowScene(QGraphicsScene):
         return layout
 
     def load_layout_yaml(self, layout_data):
-        # まずブロックを作成
-        for block_name, block in layout_data.get("block", {}).items():
-            block_info = block.get("info", {})
-            block_type = block_info.get("type")
-            block_id = block_info.get("id")
-            block_filename = block_info.get("filename")
-            x = block.get("place", {}).get("x", 0)
-            y = block.get("place", {}).get("y", 0)
+        # --- 1. ブロックをすべて作成 ---
+        for block_key, block_value in layout_data.get("block", {}).items():
+            info = block_value.get("info", {})
+            block_type = info.get("type")
+            block_filename = info.get("filename", "")
+            block_id = info.get("id", 0)
+            x = block_value.get("place", {}).get("x", 0)
+            y = block_value.get("place", {}).get("y", 0)
 
             if block_type == "frame":
-                item = FrameBlockItem(block_id, block_filename)
+                item = FrameBlockItem(block_filename, block_id)
             elif block_type == "if":
-                item = IfBlockItem(block_id, block_filename)
+                item = IfBlockItem(block_filename, block_id)
             elif block_type == "switch":
-                case_num = len(block["connection"]["output"], {})
-                item = SwitchBlockItem(block_id, block_filename, case_num)
+                output_conn = block_value.get("connection", {}).get("output", {})
+                case_num = sum(1 for key in output_conn.keys() if key.startswith("case_"))
+                item = SwitchBlockItem(block_filename, block_id, case_num)
             else:
-                continue  # 未知のタイプはスキップ
+                continue  # 未知のブロックは無視
 
             item.setPos(x, y)
             self.addItem(item)
             self.blocks.append(item)
-            self.block_map[block_name] = item
+            self.block_map[block_key] = item
 
-            # output_sub_blocksがあれば、それもラベルで一致させる
-            if hasattr(item, 'output_sub_blocks') and 'output' in block:
-                for key, target in block['output'].items():
-                    if key in item.output_sub_blocks:
-                        pass  # 必要ならサブブロックへの何か追加処理を書く（今は不要）
-
-        # 次に矢印を作成
-        for arrow_name, arrow in layout_data.get("arrow", {}).items():
-            info = arrow.get("info", {})
+        # --- 2. 矢印をすべて作成 ---
+        for arrow_key, arrow_value in layout_data.get("arrow", {}).items():
+            info = arrow_value.get("info", {})
             arrow_id = info.get("id")
-            waypoints = arrow.get("waypoints", [])
+            waypoints = arrow_value.get("waypoints", [])
 
-            arrow_item = ArrowItem(arrow_id)
-            self.addItem(arrow_item)
-            self.arrows.append(arrow_item)
-            self.arrow_map[arrow_name] = arrow_item
+            arrow = ArrowItem(arrow_id)
+            self.addItem(arrow)
+            self.arrows.append(arrow)
+            self.arrow_map[arrow_key] = arrow
 
-            # startとendを解決
-            start_id = info.get("start_block")
-            end_id = info.get("end_block")
-
-            if start_id and start_id in self.block_map:
-                arrow_item.start_item = self.block_map[start_id]
-                if arrow_item not in arrow_item.start_item.output_arrows:
-                    arrow_item.start_item.output_arrows.append(arrow_item)
-
-            if end_id and end_id in self.block_map:
-                arrow_item.end_item = self.block_map[end_id]
-                if arrow_item not in arrow_item.end_item.input_arrows:
-                    arrow_item.end_item.input_arrows.append(arrow_item)
-
-            # waypointを復元
             for pos in waypoints:
-                arrow_item.insert_waypoint(len(arrow_item.waypoints), QPointF(pos[0], pos[1]))
+                arrow.insert_waypoint(len(arrow.waypoints), QPointF(pos[0], pos[1]))
 
-            arrow_item.update_path()
+        # --- 3. 接続を確定する ---
+        for block_key, block_value in layout_data.get("block", {}).items():
+            block = self.block_map.get(block_key)
+            if not block:
+                continue
+
+            output_conns = block_value.get("connection", {}).get("output", {})
+            for output_pin, conn in output_conns.items():
+                target_block_key = conn.get("target")
+                arrow_key = conn.get("arrow")
+
+                if not arrow_key or arrow_key not in self.arrow_map:
+                    continue
+
+                arrow = self.arrow_map[arrow_key]
+
+                # 出力ブロックの決定
+                if isinstance(block, (IfBlockItem, SwitchBlockItem)) and output_pin in block.output_sub_blocks:
+                    output_block = block.output_sub_blocks[output_pin]
+                else:
+                    output_block = block
+
+                arrow.start_item = output_block
+                output_block.output_arrows.append(arrow)
+
+                # 入力ブロックの決定
+                if target_block_key and target_block_key in self.block_map:
+                    target_block = self.block_map[target_block_key]
+                    arrow.end_item = target_block
+                    target_block.input_arrows.append(arrow)
+
+                # 最後にパスを更新
+                arrow.update_path()
