@@ -191,7 +191,7 @@ class MotionEditorWidget(QWidget):
             QMessageBox.information(self, "Save", "No animation selected to save.")
             return
 
-        layout = self.scene.to_layout_dict()
+        layout = self.scene.save_layout_yaml()
         print("[DEBUG] Final layout from scene:", layout)
         save_animation_file(self.animation_root, self.current_animation_name, layout)
         print("Saved:", self.current_animation_name)
