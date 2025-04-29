@@ -27,11 +27,12 @@ def compute_edge_point(center, target, width, height):
 
 
 class FrameBlockItem(QGraphicsRectItem):
-    def __init__(self, type, id):
+    def __init__(self, id, filename):
 
-        self.type = type
+        self.type = "frame"
         self.id = id
-        self.name = f"{type}_{id}"
+        self.filename = filename
+        self.name = f"{type}_{id}_{filename}"
 
         self.max_inputs = -1
         self.max_outputs = 1
@@ -221,11 +222,12 @@ class OutputSubBlockItem(QGraphicsRectItem):
 
 
 class IfBlockItem(QGraphicsRectItem):
-    def __init__(self, type, id):
+    def __init__(self, id, filename):
 
-        self.type = type
+        self.type = "if"
         self.id = id
-        self.name = f"{type}_{id}"
+        self.filename = filename
+        self.name = f"{self.type}_{id}_{self.filename}"
 
         self.max_inputs = -1
         self.max_outputs = 0
@@ -352,11 +354,12 @@ class IfBlockItem(QGraphicsRectItem):
 
 
 class SwitchBlockItem(QGraphicsRectItem):
-    def __init__(self, type, id, num_cases=3):
+    def __init__(self, id, filename, num_cases=3):
 
-        self.type = type
+        self.type = "switch"
         self.id = id
-        self.name = f"{type}_{id}"
+        self.filename = filename
+        self.name = f"{type}_{id}_{filename}"
         self.num_cases = num_cases
 
         self.max_inputs = -1
@@ -735,7 +738,7 @@ class ArrowItem(QGraphicsPathItem):
 
     def remove_from_scene(self):
         if self.scene():
-            print(f"[DEBUG] Removing ArrowItem: {self.arrow_id}")
+            print(f"[DEBUG] Removing ArrowItem: {self.name}")
 
             # start_item から自分を外す
             if self.start_item:
@@ -896,6 +899,20 @@ class MotionFlowScene(QGraphicsScene):
                 arrow.add_to_scene(self)
                 arrow.update_path()
                 self.arrows.append(arrow)
+
+    def remove_block_and_arrows(self, block):
+        for arrow in list(getattr(block, 'input_arrows', [])):
+            arrow.remove_from_scene()
+        for arrow in list(getattr(block, 'output_arrows', [])):
+            arrow.remove_from_scene()
+        block.remove_from_scene()
+        if block in self.blocks:
+            self.blocks.remove(block)
+
+    def remove_arrow(self, arrow):
+        arrow.remove_from_scene()
+        if arrow in self.arrows:
+            self.arrows.remove(arrow)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete:
