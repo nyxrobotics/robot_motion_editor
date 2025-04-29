@@ -136,10 +136,10 @@ joints:
 
 layout:
   block:
-    frame_pose0_000:
+    frame_000_pose1:
       info:
         type: frame
-        filename: pose0
+        filename: pose1
         id: 0
       place:
         x: 100
@@ -147,17 +147,29 @@ layout:
       connection:
         output:
           out_0:
-            target: frame_pose2_001
+            target: frame_001_pose2
             ch: 0
             arrow: arrow_000
+    frame_001_pose2:
+      info:
+        type: frame
+        filename: pose2
+        id: 1
+      place:
+        x: 300
+        y: 300
+      connection:
+        output:
+          out_0:
+            target: ""
+            ch: 0
+            arrow: ""
   arrow:
     arrow_000:
       info:
         id: 0
       waypoints:
-        - [100, 100]
-        - [200, 150]
-        - [300, 200]
+        - [200, 200]
 
 8.3 初期姿勢からのオフセット（initial_pose/offset.yaml）
 - ファイルは初期姿勢ファイルと同じ書式
@@ -180,41 +192,43 @@ joints:
     enable: true
     feedback: ''
     pid:
-    - 0.0
-    - 0.0
-    - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
     position: 0.0
   head_joint_2:
     enable: true
     feedback: ''
     pid:
-    - 0.0
-    - 0.0
-    - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
     position: 0.0
 
 8.5 if条件（conditions/if/*.yaml）
+- フローチャート上ではTrueとFalseの２箇所から矢印を出せる
 
 例：step_if.yaml
 
 expression: "def imu_norm = fabs(imu_gyro_x)"
 condition: "imu_norm > 0.5"
-cases:
-  0: frame_stop
-  1: frame_walk
+
+=======
 
 8.6 switch条件（conditions/switch/*.yaml）
+- caseの要素数はswitch_condition_editor.py上で追加できる
+- フローチャート上ではdefault＋caseの要素数の矢印を出せる
 
 例：mode_switch.yaml
 
 expression: "def button_id = 1"
 condition: "button_id"
-cases:
-  0: frame_idle
-  1: frame_run
-  2: frame_turn
-  3: frame_turn
-  4: frame_turn
+case:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
 
 9. RViz連携（trajectory_visualizer.py）
 -------------------------------

@@ -967,107 +967,116 @@ class MotionFlowScene(QGraphicsScene):
 
     def save_layout_yaml(self):
         layout = {"block": {}, "arrow": {}}
-        used_block_ids = set()
-        used_arrow_ids = set()
-        items = [item for item in self.items() if isinstance(item, FrameBlockItem)]
-        items.sort(key=lambda i: i.uid)
 
-        # save blocks
-        for idx, item in enumerate(items):
-            if not hasattr(item, 'id') or not item.id:
-                item.id = self._generate_block_id()
-            while item.id in used_block_ids:
-                item.id = self._generate_block_id()
-            used_block_ids.add(item.id)
-            item.name = f"{item.type}_{item.id}"
-            layout["block"][item.name] = {
-                "info": {"type": "frame", "filename": item.type, "id": item.id},
-                "place": {"x": int(item.pos().x()), "y": int(item.pos().y())},
-                "connection": {"output": {}}
-            }
-
-        # save arrows and waypoints
-        for arrow in self.arrows:
-            if not hasattr(arrow, 'id') or not arrow.id:
-                arrow.id = self._generate_arrow_id()
-            while item.id in used_arrow_ids:
-                arrow.id = self._generate_arrow_id()
-            used_arrow_ids.add(arrow.id)
-            arrow.name = f"{arrow.type}_{arrow.id}"
-            layout["arrow"][arrow.name] = {
-                "info": {"id": arrow.id},
-                "waypoints": (
-                    [[int(arrow.start_handle.pos().x()), int(arrow.start_handle.pos().y())]]
-                    + [[int(wp.pos().x()), int(wp.pos().y())] for wp in arrow.waypoints]
-                    + [[int(arrow.end_handle.pos().x()), int(arrow.end_handle.pos().y())]]
-                )
-            }
-
-        # build output connection (with out_0, out_1, ...)
-        arrow_outputs = {}
-        for arrow in self.arrows:
-            if arrow.start_item and arrow.end_item:
-                start_name = arrow.start_item.name
-                end_name = arrow.end_item.name
-                start_block = layout["block"].get(start_name)
-                if start_block is not None:
-                    output_conn = start_block["connection"]["output"]
-                    idx = arrow_outputs.get(start_name, 0)
-                    out_key = f"out_{idx}"
-                    output_conn[out_key] = {
-                        "target": end_name,
-                        "ch": 0,
-                        "arrow": arrow.arrow_id
+        for item in self.items():
+            if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem)):
+                block_data = {
+                    "info": {
+                        "type": self._detect_block_type(item),
+                        "filename": item.frame_name if hasattr(item, "frame_name") else "",
+                        "id": item.uid,
+                    },
+                    "place": {
+                        "x": item.pos().x(),
+                        "y": item.pos().y(),
+                    },
+                    "connection": {
+                        "output": {}
                     }
-                    arrow_outputs[start_name] = idx + 1
+                }
+
+                # 出力ピン（Frameならout_0、If/Switchなら各ラベル名）
+                if isinstance(item, FrameBlockItem):
+                    if item.output_arrows:
+                        arrow = item.output_arrows[0]
+                        if arrow.end_item:
+                            block_data["connection"]["output"]["out_0"] = {
+                                "target": arrow.end_item.uid,
+                                "ch": 0,
+                                "arrow": arrow.arrow_id
+                            }
+                else:  # If / Switch
+                    for label, subblock in item.output_sub_blocks.items():
+                        if subblock.output_arrows:
+                            arrow = subblock.output_arrows[0]
+                            if arrow.end_item:
+                                block_data["connection"]["output"][label] = {
+                                    "target": arrow.end_item.uid,
+                                    "ch": 0,
+                                    "arrow": arrow.arrow_id
+                                }
+
+                layout["block"][item.uid] = block_data
+
+            elif isinstance(item, ArrowItem):
+                arrow_data = {
+                    "info": {
+                        "id": item.arrow_id,
+                    },
+                    "waypoints": [[wp.pos().x(), wp.pos().y()] for wp in item.waypoints],
+                }
+                layout["arrow"][item.arrow_id] = arrow_data
+
         return layout
 
-    def load_layout_yaml(self, layout):
-        self.clear()
-        self.arrows = []
-        uid_to_item = {}
+    def load_layout_yaml(self, layout_data):
+        # まずブロックを作成
+        for block_name, block in layout_data.get("block", {}).items():
+            block_info = block.get("info", {})
+            block_type = block_info.get("type")
+            block_id = block_info.get("id")
+            block_filename = block_info.get("filename")
+            x = block.get("place", {}).get("x", 0)
+            y = block.get("place", {}).get("y", 0)
 
-        # 1. ブロックを先に復元
-        for uid, block in layout.get("block", {}).items():
-            name = block["info"]["filename"]
-            x = block["place"]["x"]
-            y = block["place"]["y"]
-            item = FrameBlockItem(name, uid=uid)
+            if block_type == "frame":
+                item = FrameBlockItem(block_id, block_filename)
+            elif block_type == "if":
+                item = IfBlockItem(block_id, block_filename)
+            elif block_type == "switch":
+                case_num = len(block["connection"]["output"], {})
+                item = SwitchBlockItem(block_id, block_filename, case_num)
+            else:
+                continue  # 未知のタイプはスキップ
+
             item.setPos(x, y)
-            if "connection" in block:
-                item.connection = block["connection"]
             self.addItem(item)
-            uid_to_item[uid] = item
+            self.blocks.append(item)
+            self.block_map[block_name] = item
 
-        # 2. 矢印を作成（まずシーンに追加してから waypoint を復元）
-        arrow_map = {}
-        for arrow_id, arrow_data in layout.get("arrow", {}).items():
-            arrow = ArrowItem(arrow_id)
-            arrow.add_to_scene(self)  # ← 先に追加
-            waypoints = arrow_data.get("waypoints", [])
-            for idx, [x, y] in enumerate(waypoints):
-                if idx == 0:
-                    arrow.start_handle.setPos(QPointF(x, y))
-                elif idx == len(waypoints) - 1:
-                    arrow.end_handle.setPos(QPointF(x, y))
-                else:
-                    arrow.insert_waypoint(idx - 1, QPointF(x, y))
-            arrow_map[arrow_id] = arrow
+            # output_sub_blocksがあれば、それもラベルで一致させる
+            if hasattr(item, 'output_sub_blocks') and 'output' in block:
+                for key, target in block['output'].items():
+                    if key in item.output_sub_blocks:
+                        pass  # 必要ならサブブロックへの何か追加処理を書く（今は不要）
 
-        # 3. block.connection.output から start/end を設定
-        for uid, block in layout.get("block", {}).items():
-            outputs = block.get("connection", {}).get("output", {})
-            for out in outputs.values():
-                arrow_id = out.get("arrow")
-                target_uid = out.get("target")
-                if arrow_id in arrow_map:
-                    arrow = arrow_map[arrow_id]
-                    arrow.start_item = uid_to_item.get(uid)
-                    arrow.end_item = uid_to_item.get(target_uid)
+        # 次に矢印を作成
+        for arrow_name, arrow in layout_data.get("arrow", {}).items():
+            info = arrow.get("info", {})
+            arrow_id = info.get("id")
+            waypoints = arrow.get("waypoints", [])
 
-        # 4. path 再描画 + リスト登録
-        for arrow in arrow_map.values():
-            arrow.update_path()
-            self.arrows.append(arrow)
+            arrow_item = ArrowItem(arrow_id)
+            self.addItem(arrow_item)
+            self.arrows.append(arrow_item)
+            self.arrow_map[arrow_name] = arrow_item
 
-        self.update_scene_rect()
+            # startとendを解決
+            start_id = info.get("start_block")
+            end_id = info.get("end_block")
+
+            if start_id and start_id in self.block_map:
+                arrow_item.start_item = self.block_map[start_id]
+                if arrow_item not in arrow_item.start_item.output_arrows:
+                    arrow_item.start_item.output_arrows.append(arrow_item)
+
+            if end_id and end_id in self.block_map:
+                arrow_item.end_item = self.block_map[end_id]
+                if arrow_item not in arrow_item.end_item.input_arrows:
+                    arrow_item.end_item.input_arrows.append(arrow_item)
+
+            # waypointを復元
+            for pos in waypoints:
+                arrow_item.insert_waypoint(len(arrow_item.waypoints), QPointF(pos[0], pos[1]))
+
+            arrow_item.update_path()
