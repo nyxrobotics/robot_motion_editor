@@ -227,7 +227,7 @@ class IfBlockItem(QGraphicsRectItem):
         self.type = "if"
         self.id = id
         self.filename = filename
-        self.name = f"{self.type}_{id}_{self.filename}"
+        self.name = f"{self.type}_{self.id}_{self.filename}"
 
         self.max_inputs = -1
         self.max_outputs = 0
@@ -359,7 +359,7 @@ class SwitchBlockItem(QGraphicsRectItem):
         self.type = "switch"
         self.id = id
         self.filename = filename
-        self.name = f"{type}_{id}_{filename}"
+        self.name = f"{self.type}_{self.id}_{self.filename}"
         self.num_cases = num_cases
 
         self.max_inputs = -1
@@ -1020,8 +1020,13 @@ class MotionFlowScene(QGraphicsScene):
         return layout
 
     def load_layout_yaml(self, layout_data):
-        self.block_map = {}
-        self.arrow_map = {}
+        self.clear()
+        self.block_counter = 0
+        self.blocks = []
+        self.arrow_counter = 0
+        self.arrows = []
+        block_map = {}
+        arrow_map = {}
         # --- 1. ブロックをすべて作成 ---
         for block_key, block_value in layout_data.get("block", {}).items():
             info = block_value.get("info", {})
@@ -1041,11 +1046,11 @@ class MotionFlowScene(QGraphicsScene):
                 item = SwitchBlockItem(block_id, block_filename, case_num)
             else:
                 continue  # 未知のブロックは無視
-
             item.setPos(x, y)
             self.addItem(item)
             self.blocks.append(item)
-            self.block_map[block_key] = item
+            block_map[block_key] = item
+            self.block_counter = self.block_counter + 1
 
         # --- 2. 矢印をすべて作成 ---
         for arrow_key, arrow_value in layout_data.get("arrow", {}).items():
@@ -1056,14 +1061,15 @@ class MotionFlowScene(QGraphicsScene):
             arrow = ArrowItem(arrow_id)
             self.addItem(arrow)
             self.arrows.append(arrow)
-            self.arrow_map[arrow_key] = arrow
+            arrow_map[arrow_key] = arrow
+            self.arrow_counter = self.arrow_counter + 1
 
             for pos in waypoints:
                 arrow.insert_waypoint(len(arrow.waypoints), QPointF(pos[0], pos[1]))
 
         # --- 3. 接続を確定する ---
         for block_key, block_value in layout_data.get("block", {}).items():
-            block = self.block_map.get(block_key)
+            block = block_map.get(block_key)
             if not block:
                 continue
 
@@ -1072,10 +1078,10 @@ class MotionFlowScene(QGraphicsScene):
                 target_block_key = conn.get("target")
                 arrow_key = conn.get("arrow")
 
-                if not arrow_key or arrow_key not in self.arrow_map:
+                if not arrow_key or arrow_key not in arrow_map:
                     continue
 
-                arrow = self.arrow_map[arrow_key]
+                arrow = arrow_map[arrow_key]
 
                 # 出力ブロックの決定
                 if isinstance(block, (IfBlockItem, SwitchBlockItem)) and output_pin in block.output_sub_blocks:
@@ -1087,8 +1093,8 @@ class MotionFlowScene(QGraphicsScene):
                 output_block.output_arrows.append(arrow)
 
                 # 入力ブロックの決定
-                if target_block_key and target_block_key in self.block_map:
-                    target_block = self.block_map[target_block_key]
+                if target_block_key and target_block_key in block_map:
+                    target_block = block_map[target_block_key]
                     arrow.end_item = target_block
                     target_block.input_arrows.append(arrow)
 
