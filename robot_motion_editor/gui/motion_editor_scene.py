@@ -790,9 +790,8 @@ class MotionFlowScene(QGraphicsScene):
         self.arrows = []
         self.setSceneRect(0, 0, 1000, 1000)
 
-    def _generate_block_id(self, name):
-        safe = "".join(c if c.isalnum() else "_" for c in name)
-        uid = f"{safe}_id{self.block_counter:03}"
+    def _generate_block_id(self):
+        uid = self.block_counter
         self.block_counter += 1
         return uid
 
@@ -810,9 +809,9 @@ class MotionFlowScene(QGraphicsScene):
 
     def dropEvent(self, event):
         name = event.mimeData().text()
+        id = self._generate_block_id()
+        item = FrameBlockItem(name, id)
         pos = event.scenePos()
-        uid = self._generate_block_id(name)
-        item = FrameBlockItem(name, uid=uid)
         item.setPos(pos)
         self.addItem(item)
         event.acceptProposedAction()
@@ -866,25 +865,32 @@ class MotionFlowScene(QGraphicsScene):
             pos = event.scenePos()
 
             if selected_action == new_frame_action:
-                block = FrameBlockItem(self._generate_block_id("frame"))
+                id = self._generate_block_id()
+                type = "frame"
+                block = FrameBlockItem(type, id)
                 block.setPos(pos)
                 self.addItem(block)
                 self.blocks.append(block)
 
             elif selected_action == new_if_action:
-                block = IfBlockItem(self._generate_block_id("if"))
+                id = self._generate_block_id()
+                type = "frame"
+                block = IfBlockItem(type, id)
                 block.setPos(pos)
                 self.addItem(block)
                 self.blocks.append(block)
 
             elif selected_action == new_switch_action:
-                block = SwitchBlockItem(self._generate_block_id("switch"))
+                id = self._generate_block_id()
+                type = "switch"
+                block = SwitchBlockItem(type, id)
                 block.setPos(pos)
                 self.addItem(block)
                 self.blocks.append(block)
 
             elif selected_action == new_arrow_action:
-                arrow = ArrowItem(self._generate_arrow_id())
+                id = self._generate_arrow_id()
+                arrow = ArrowItem(id)
                 arrow.start_handle.setPos(pos)
                 arrow.end_handle.setPos(pos + QPointF(100, 0))
                 arrow.add_to_scene(self)
@@ -944,27 +950,35 @@ class MotionFlowScene(QGraphicsScene):
 
     def save_layout_yaml(self):
         layout = {"block": {}, "arrow": {}}
-        used_uids = set()
+        used_block_ids = set()
+        used_arrow_ids = set()
         items = [item for item in self.items() if isinstance(item, FrameBlockItem)]
         items.sort(key=lambda i: i.uid)
 
+        # save blocks
         for idx, item in enumerate(items):
-            if not hasattr(item, 'uid') or not item.uid:
-                item.uid = self._generate_block_id(item.name)
-            while item.uid in used_uids:
-                item.uid = self._generate_block_id(item.name)
-            used_uids.add(item.uid)
-            uid = item.uid
-            layout["block"][uid] = {
-                "info": {"type": "frame", "filename": item.name, "id": idx},
+            if not hasattr(item, 'id') or not item.id:
+                item.id = self._generate_block_id()
+            while item.id in used_block_ids:
+                item.id = self._generate_block_id()
+            used_block_ids.add(item.id)
+            item.name = f"{item.type}_{item.id}"
+            layout["block"][item.name] = {
+                "info": {"type": "frame", "filename": item.type, "id": item.id},
                 "place": {"x": int(item.pos().x()), "y": int(item.pos().y())},
                 "connection": {"output": {}}
             }
 
         # save arrows and waypoints
         for arrow in self.arrows:
-            layout["arrow"][arrow.arrow_id] = {
-                "info": {"id": int(arrow.arrow_id.split("_")[-1])},
+            if not hasattr(arrow, 'id') or not arrow.id:
+                arrow.id = self._generate_arrow_id()
+            while item.id in used_arrow_ids:
+                arrow.id = self._generate_arrow_id()
+            used_arrow_ids.add(arrow.id)
+            arrow.name = f"{arrow.type}_{arrow.id}"
+            layout["arrow"][arrow.name] = {
+                "info": {"id": arrow.id},
                 "waypoints": (
                     [[int(arrow.start_handle.pos().x()), int(arrow.start_handle.pos().y())]]
                     + [[int(wp.pos().x()), int(wp.pos().y())] for wp in arrow.waypoints]
@@ -976,19 +990,19 @@ class MotionFlowScene(QGraphicsScene):
         arrow_outputs = {}
         for arrow in self.arrows:
             if arrow.start_item and arrow.end_item:
-                sid = arrow.start_item.uid
-                tid = arrow.end_item.uid
-                block = layout["block"].get(sid)
-                if block is not None:
-                    output_conn = block["connection"]["output"]
-                    idx = arrow_outputs.get(sid, 0)
+                start_name = arrow.start_item.name
+                end_name = arrow.end_item.name
+                start_block = layout["block"].get(start_name)
+                if start_block is not None:
+                    output_conn = start_block["connection"]["output"]
+                    idx = arrow_outputs.get(start_name, 0)
                     out_key = f"out_{idx}"
                     output_conn[out_key] = {
-                        "target": tid,
+                        "target": end_name,
                         "ch": 0,
                         "arrow": arrow.arrow_id
                     }
-                    arrow_outputs[sid] = idx + 1
+                    arrow_outputs[start_name] = idx + 1
         return layout
 
     def load_layout_yaml(self, layout):
