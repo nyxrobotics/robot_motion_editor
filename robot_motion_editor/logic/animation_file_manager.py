@@ -10,7 +10,11 @@ def load_animation_file(animation_root, animation_name):
     with open(path, 'r') as f:
         data = yaml.safe_load(f)
         if isinstance(data, dict):
-            return data.get("layout", {"block": {}, "arrow": {}})
+            layout = data.get("layout")
+            if isinstance(layout, dict):
+                return layout
+            else:
+                return {"block": {}, "arrow": {}}
         else:
             return {"block": {}, "arrow": {}}
 

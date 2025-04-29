@@ -32,7 +32,7 @@ class FrameBlockItem(QGraphicsRectItem):
         self.type = "frame"
         self.id = id
         self.filename = filename
-        self.name = f"{type}_{id}_{filename}"
+        self.name = f"{self.type}_{id}_{filename}"
 
         self.max_inputs = -1
         self.max_outputs = 1
@@ -794,9 +794,9 @@ class MotionFlowScene(QGraphicsScene):
         self.setSceneRect(0, 0, 1000, 1000)
 
     def _generate_block_id(self):
-        uid = self.block_counter
+        id = self.block_counter
         self.block_counter += 1
-        return uid
+        return id
 
     def _generate_arrow_id(self):
         aid = f"arrow_{self.arrow_counter:03}"
@@ -813,7 +813,7 @@ class MotionFlowScene(QGraphicsScene):
     def dropEvent(self, event):
         name = event.mimeData().text()
         id = self._generate_block_id()
-        item = FrameBlockItem(name, id)
+        item = FrameBlockItem(id, name)
         pos = event.scenePos()
         item.setPos(pos)
         self.addItem(item)
@@ -869,24 +869,24 @@ class MotionFlowScene(QGraphicsScene):
 
             if selected_action == new_frame_action:
                 id = self._generate_block_id()
-                type = "frame"
-                block = FrameBlockItem(type, id)
+                filename = "frame"
+                block = FrameBlockItem(id, filename)
                 block.setPos(pos)
                 self.addItem(block)
                 self.blocks.append(block)
 
             elif selected_action == new_if_action:
                 id = self._generate_block_id()
-                type = "frame"
-                block = IfBlockItem(type, id)
+                filename = "if"
+                block = IfBlockItem(id, filename)
                 block.setPos(pos)
                 self.addItem(block)
                 self.blocks.append(block)
 
             elif selected_action == new_switch_action:
                 id = self._generate_block_id()
-                type = "switch"
-                block = SwitchBlockItem(type, id)
+                filename = "switch"
+                block = SwitchBlockItem(id, filename, 3)
                 block.setPos(pos)
                 self.addItem(block)
                 self.blocks.append(block)
@@ -972,9 +972,9 @@ class MotionFlowScene(QGraphicsScene):
             if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem)):
                 block_data = {
                     "info": {
-                        "type": self._detect_block_type(item),
-                        "filename": item.frame_name if hasattr(item, "frame_name") else "",
-                        "id": item.uid,
+                        "type": item.type,
+                        "filename": item.filename,
+                        "id": item.id,
                     },
                     "place": {
                         "x": item.pos().x(),
@@ -991,9 +991,9 @@ class MotionFlowScene(QGraphicsScene):
                         arrow = item.output_arrows[0]
                         if arrow.end_item:
                             block_data["connection"]["output"]["out_0"] = {
-                                "target": arrow.end_item.uid,
+                                "target": arrow.end_item.name,
                                 "ch": 0,
-                                "arrow": arrow.arrow_id
+                                "arrow": arrow.name
                             }
                 else:  # If / Switch
                     for label, subblock in item.output_sub_blocks.items():
@@ -1001,25 +1001,27 @@ class MotionFlowScene(QGraphicsScene):
                             arrow = subblock.output_arrows[0]
                             if arrow.end_item:
                                 block_data["connection"]["output"][label] = {
-                                    "target": arrow.end_item.uid,
+                                    "target": arrow.end_item.name,
                                     "ch": 0,
-                                    "arrow": arrow.arrow_id
+                                    "arrow": arrow.id
                                 }
 
-                layout["block"][item.uid] = block_data
+                layout["block"][item.name] = block_data
 
             elif isinstance(item, ArrowItem):
                 arrow_data = {
                     "info": {
-                        "id": item.arrow_id,
+                        "id": item.id,
                     },
                     "waypoints": [[wp.pos().x(), wp.pos().y()] for wp in item.waypoints],
                 }
-                layout["arrow"][item.arrow_id] = arrow_data
+                layout["arrow"][item.name] = arrow_data
 
         return layout
 
     def load_layout_yaml(self, layout_data):
+        self.block_map = {}
+        self.arrow_map = {}
         # --- 1. ブロックをすべて作成 ---
         for block_key, block_value in layout_data.get("block", {}).items():
             info = block_value.get("info", {})
@@ -1030,13 +1032,13 @@ class MotionFlowScene(QGraphicsScene):
             y = block_value.get("place", {}).get("y", 0)
 
             if block_type == "frame":
-                item = FrameBlockItem(block_filename, block_id)
+                item = FrameBlockItem(block_id, block_filename)
             elif block_type == "if":
-                item = IfBlockItem(block_filename, block_id)
+                item = IfBlockItem(block_id, block_filename)
             elif block_type == "switch":
                 output_conn = block_value.get("connection", {}).get("output", {})
                 case_num = sum(1 for key in output_conn.keys() if key.startswith("case_"))
-                item = SwitchBlockItem(block_filename, block_id, case_num)
+                item = SwitchBlockItem(block_id, block_filename, case_num)
             else:
                 continue  # 未知のブロックは無視
 
