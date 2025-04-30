@@ -1,41 +1,45 @@
-import rospy
+import os
+
 from PyQt5.QtWidgets import QDialog
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
-from PyQt5.QtWidgets import QLineEdit
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtWidgets import QVBoxLayout
 
+from robot_motion_editor.logic.if_condition_file_manager import load_if_condition
+from robot_motion_editor.logic.if_condition_file_manager import save_if_condition
+
 
 class IfConditionEditorDialog(QDialog):
-    def __init__(self, available_variables=None, parent=None):
+    def __init__(self, condition_path, available_variables=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Edit If Condition")
+        self.setWindowTitle(f"If Condition Editor: {os.path.basename(condition_path)}")
         self.available_variables = available_variables or []
-        self.result = None  # 保存する結果（dict）
-
+        self.condition_path = condition_path
+        self.animation_root, self.animation_name, self.condition_name = self.parse_path(condition_path)
         self.init_ui()
+        self.load_condition()
+
+    def parse_path(self, path):
+        condition_name = os.path.splitext(os.path.basename(path))[0]
+        conditions_dir = os.path.dirname(os.path.dirname(path))
+        animation_name = os.path.basename(os.path.dirname(conditions_dir))
+        animation_root = os.path.dirname(os.path.dirname(conditions_dir))
+        return animation_root, animation_name, condition_name
 
     def init_ui(self):
         layout = QVBoxLayout()
 
-        # Expression input
-        expr_row = QHBoxLayout()
-        expr_row.addWidget(QLabel("Expression:"))
-        self.expression_edit = QLineEdit()
-        expr_row.addWidget(self.expression_edit)
-        layout.addLayout(expr_row)
+        layout.addWidget(QLabel("Expression:"))
+        self.expression_edit = QTextEdit()
+        layout.addWidget(self.expression_edit, stretch=3)
 
-        # Condition input
-        cond_row = QHBoxLayout()
-        cond_row.addWidget(QLabel("Condition:"))
+        layout.addWidget(QLabel("Condition:"))
         self.condition_edit = QTextEdit()
-        cond_row.addWidget(self.condition_edit)
-        layout.addLayout(cond_row)
+        layout.addWidget(self.condition_edit, stretch=1)  # expressionの1/3の高さ
 
-        # Buttons
         btn_row = QHBoxLayout()
         self.show_vars_btn = QPushButton("Show Variables")
         self.show_vars_btn.clicked.connect(self.show_variables)
@@ -53,48 +57,35 @@ class IfConditionEditorDialog(QDialog):
         self.setLayout(layout)
 
     def show_variables(self):
-        """使用できる変数一覧をダイアログ表示"""
-        text = "\n".join(self.available_variables)
-        QMessageBox.information(self, "Available Variables", text)
+        QMessageBox.information(self, "Available Variables", "\n".join(self.available_variables))
 
-    def validate_expression_and_condition(self, expression, condition):
-        """expression を定義してから、condition を if文として実行できるか確認する"""
-        local_vars = {}
-
-        try:
-            # expressionを実行
-            exec(expression, {}, local_vars)
-        except Exception as e:
-            rospy.logwarn(f"Expression error: {e}")
-            return False
-
-        try:
-            # conditionをif文として実行
-            exec(f"if {condition}: pass", {}, local_vars)
-        except Exception as e:
-            rospy.logwarn(f"Condition error: {e}")
-            return False
-
-        return True
+    def load_condition(self):
+        data = load_if_condition(self.animation_root, self.animation_name, self.condition_name)
+        if data:
+            self.expression_edit.setPlainText(data.get('expression', ''))
+            self.condition_edit.setPlainText(data.get('condition', ''))
 
     def accept_and_store(self):
-        """OKボタン押下時のバリデーション＆保存"""
-        expression = self.expression_edit.text().strip()
+        expression = self.expression_edit.toPlainText().strip()
         condition = self.condition_edit.toPlainText().strip()
 
-        if not expression:
-            QMessageBox.warning(self, "Missing Expression", "Please provide an expression.")
+        if not expression or not condition:
+            QMessageBox.warning(self, "Error", "Expression and condition cannot be empty.")
             return
 
-        if not self.validate_expression_and_condition(expression, condition):
-            QMessageBox.critical(
-                self, "Invalid Expression or Condition",
-                "The expression or condition contains syntax errors or undefined variables."
-            )
+        try:
+            local_vars = {}
+            exec(expression, {}, local_vars)
+            exec(f"if {condition}: pass", {}, local_vars)
+        except Exception as e:
+            QMessageBox.critical(self, "Syntax Error", str(e))
             return
 
-        self.result = {
-            "expression": expression,
-            "condition": condition
-        }
+        save_if_condition(
+            self.animation_root,
+            self.animation_name,
+            self.condition_name,
+            {"expression": expression, "condition": condition}
+        )
+
         self.accept()

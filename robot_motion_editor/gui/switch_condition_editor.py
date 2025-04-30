@@ -1,59 +1,60 @@
-import rospy
+import os
+
 from PyQt5.QtWidgets import QDialog
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
-from PyQt5.QtWidgets import QLineEdit
 from PyQt5.QtWidgets import QListWidget
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtWidgets import QVBoxLayout
 
+from robot_motion_editor.logic.switch_condition_file_manager import load_switch_condition
+from robot_motion_editor.logic.switch_condition_file_manager import save_switch_condition
+
 
 class SwitchConditionEditorDialog(QDialog):
-    def __init__(self, available_variables=None, parent=None):
+    def __init__(self, condition_path, available_variables=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Edit Switch Condition")
+        self.setWindowTitle(f"Switch Condition Editor: {os.path.basename(condition_path)}")
         self.available_variables = available_variables or []
-        self.result = None  # 保存する結果（dict）
-
+        self.condition_path = condition_path
+        self.animation_root, self.animation_name, self.condition_name = self.parse_path(condition_path)
         self.init_ui()
+        self.load_condition()
+
+    def parse_path(self, path):
+        condition_name = os.path.splitext(os.path.basename(path))[0]
+        conditions_dir = os.path.dirname(os.path.dirname(path))
+        animation_name = os.path.basename(os.path.dirname(conditions_dir))
+        animation_root = os.path.dirname(os.path.dirname(conditions_dir))
+        return animation_root, animation_name, condition_name
 
     def init_ui(self):
         layout = QVBoxLayout()
 
-        # Expression input
-        expr_row = QHBoxLayout()
-        expr_row.addWidget(QLabel("Expression:"))
-        self.expression_edit = QLineEdit()
-        expr_row.addWidget(self.expression_edit)
-        layout.addLayout(expr_row)
+        layout.addWidget(QLabel("Expression:"))
+        self.expression_edit = QTextEdit()
+        layout.addWidget(self.expression_edit, stretch=3)
 
-        # Condition input
-        cond_row = QHBoxLayout()
-        cond_row.addWidget(QLabel("Condition:"))
+        layout.addWidget(QLabel("Condition (evaluates to int):"))
         self.condition_edit = QTextEdit()
-        cond_row.addWidget(self.condition_edit)
-        layout.addLayout(cond_row)
+        layout.addWidget(self.condition_edit, stretch=1)  # expressionの1/3の高さ
 
-        # Case list
-        case_label = QLabel("Cases (integers):")
-        layout.addWidget(case_label)
-
+        layout.addWidget(QLabel("Cases:"))
         self.case_list = QListWidget()
-        layout.addWidget(self.case_list)
+        layout.addWidget(self.case_list, stretch=2)
 
-        # Case management buttons
-        case_btn_row = QHBoxLayout()
-        self.add_case_btn = QPushButton("Add Case")
+        case_btn_layout = QHBoxLayout()
+        self.add_case_btn = QPushButton("＋")
         self.add_case_btn.clicked.connect(self.add_case)
-        self.remove_case_btn = QPushButton("Remove Case")
-        self.remove_case_btn.clicked.connect(self.remove_case)
-        case_btn_row.addWidget(self.add_case_btn)
-        case_btn_row.addWidget(self.remove_case_btn)
-        layout.addLayout(case_btn_row)
+        case_btn_layout.addWidget(self.add_case_btn)
 
-        # Action buttons
+        self.remove_case_btn = QPushButton("－")
+        self.remove_case_btn.clicked.connect(self.remove_case)
+        case_btn_layout.addWidget(self.remove_case_btn)
+        layout.addLayout(case_btn_layout)
+
         btn_row = QHBoxLayout()
         self.show_vars_btn = QPushButton("Show Variables")
         self.show_vars_btn.clicked.connect(self.show_variables)
@@ -71,69 +72,52 @@ class SwitchConditionEditorDialog(QDialog):
         self.setLayout(layout)
 
     def show_variables(self):
-        """使用できる変数一覧をダイアログ表示"""
-        text = "\n".join(self.available_variables)
-        QMessageBox.information(self, "Available Variables", text)
+        QMessageBox.information(self, "Available Variables", "\n".join(self.available_variables))
 
-    def validate_expression_and_condition(self, expression, condition):
-        """expression を実行し、condition を整数に評価できるか確認"""
-        local_vars = {}
-
-        try:
-            # expressionをexec実行（例: def button_id = 1）
-            exec(expression, {}, local_vars)
-        except Exception as e:
-            rospy.logwarn(f"Expression error: {e}")
-            return False
-
-        try:
-            # conditionを整数として評価
-            value = eval(condition, {}, local_vars)
-            if not isinstance(value, int):
-                rospy.logwarn(f"Condition did not evaluate to int: {value}")
-                return False
-        except Exception as e:
-            rospy.logwarn(f"Condition eval error: {e}")
-            return False
-
-        return True
+    def load_condition(self):
+        data = load_switch_condition(self.animation_root, self.animation_name, self.condition_name)
+        if data:
+            self.expression_edit.setPlainText(data.get('expression', ''))
+            self.condition_edit.setPlainText(data.get('condition', ''))
+            self.case_list.clear()
+            for case in data.get('case', []):
+                self.case_list.addItem(str(case))
 
     def add_case(self):
-        """case番号を追加"""
-        items = [int(self.case_list.item(i).text()) for i in range(self.case_list.count())]
-        new_case = max(items) + 1 if items else 0
+        new_case = 0
+        if self.case_list.count() > 0:
+            new_case = int(self.case_list.item(self.case_list.count() - 1).text()) + 1
         self.case_list.addItem(str(new_case))
 
     def remove_case(self):
-        """選択されたcaseを削除"""
-        selected = self.case_list.currentRow()
-        if selected >= 0:
-            self.case_list.takeItem(selected)
+        current_row = self.case_list.currentRow()
+        if current_row >= 0:
+            self.case_list.takeItem(current_row)
 
     def accept_and_store(self):
-        """OKボタン押下時のバリデーション＆保存"""
-        expression = self.expression_edit.text().strip()
+        expression = self.expression_edit.toPlainText().strip()
         condition = self.condition_edit.toPlainText().strip()
         cases = [int(self.case_list.item(i).text()) for i in range(self.case_list.count())]
 
-        if not expression:
-            QMessageBox.warning(self, "Missing Expression", "Please provide an expression.")
+        if not expression or not condition:
+            QMessageBox.warning(self, "Error", "Expression and condition cannot be empty.")
             return
 
-        if not self.validate_expression_and_condition(expression, condition):
-            QMessageBox.critical(
-                self, "Invalid Expression or Condition",
-                "The expression or condition could not be validated as a switch-case."
-            )
+        try:
+            local_vars = {}
+            exec(expression, {}, local_vars)
+            condition_value = eval(condition, {}, local_vars)
+            if not isinstance(condition_value, int):
+                raise ValueError("Condition must evaluate to an integer.")
+        except Exception as e:
+            QMessageBox.critical(self, "Syntax Error", str(e))
             return
 
-        self.result = {
-            "expression": expression,
-            "condition": condition,
-            "case": cases
-        }
+        save_switch_condition(
+            self.animation_root,
+            self.animation_name,
+            self.condition_name,
+            {"expression": expression, "condition": condition, "case": cases}
+        )
+
         self.accept()
-
-    def get_case_indices(self):
-        """現在登録されているcase番号をリストで返す"""
-        return [int(self.case_list.item(i).text()) for i in range(self.case_list.count())]
