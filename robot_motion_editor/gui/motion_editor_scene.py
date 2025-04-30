@@ -1,4 +1,5 @@
 import math
+import os
 
 from PyQt5.QtCore import QPointF
 from PyQt5.QtCore import QRectF
@@ -14,7 +15,14 @@ from PyQt5.QtWidgets import QGraphicsPathItem
 from PyQt5.QtWidgets import QGraphicsRectItem
 from PyQt5.QtWidgets import QGraphicsScene
 from PyQt5.QtWidgets import QGraphicsTextItem
+from PyQt5.QtWidgets import QInputDialog
 from PyQt5.QtWidgets import QMenu
+from PyQt5.QtWidgets import QMessageBox
+
+from ..logic.frame_file_manager import create_default_frame
+from ..logic.frame_file_manager import save_frame_file
+from ..logic.if_condition_file_manager import save_if_condition
+from ..logic.switch_condition_file_manager import save_switch_condition
 
 
 def compute_edge_point(center, target, width, height):
@@ -806,8 +814,9 @@ class ArrowItem(QGraphicsPathItem):
 
 
 class MotionFlowScene(QGraphicsScene):
-    def __init__(self, parent=None):
+    def __init__(self, editor_widget, parent=None):
         super().__init__(parent)
+        self.editor_widget = editor_widget
         self.setBackgroundBrush(QColor("#111111"))
         self.block_objects = {}
         self.arrow_objects = {}
@@ -892,29 +901,92 @@ class MotionFlowScene(QGraphicsScene):
             pos = event.scenePos()
 
             if selected_action == new_frame_action:
-                id = self._generate_block_id()
-                filename = "frame"
-                block = FrameBlockItem(id, filename)
-                block.setPos(pos)
-                self.addItem(block)
-                self.block_objects[block.name] = block
+                name, ok = QInputDialog.getText(None, "New Frame", "Enter frame name:")
+                if ok and name.strip():
+                    name = name.strip()
+                    frames_dir = os.path.join(
+                        self.editor_widget.animation_root,
+                        self.editor_widget.current_animation_name,
+                        "frames")
+                    frame_path = os.path.join(frames_dir, f"{name}.yaml")
+
+                    if os.path.exists(frame_path):
+                        QMessageBox.warning(None, "Name Conflict", f"Frame '{name}' already exists.")
+                        return
+
+                    os.makedirs(frames_dir, exist_ok=True)
+                    default_frame_data = create_default_frame()
+                    save_frame_file(frame_path, default_frame_data)
+
+                    id = self._generate_block_id()
+                    block = FrameBlockItem(id, name)
+                    block.setPos(pos)
+                    self.addItem(block)
+                    self.block_objects[block.name] = block
+
+                    self.editor_widget.load_animation_list()
 
             elif selected_action == new_if_action:
-                id = self._generate_block_id()
-                filename = "if"
-                block = IfBlockItem(id, filename)
-                block.setPos(pos)
-                self.addItem(block)
-                self.block_objects[block.name] = block
+                name, ok = QInputDialog.getText(None, "New If Condition", "Enter condition name:")
+                if ok and name.strip():
+                    name = name.strip()
+                    conditions_dir = os.path.join(
+                        self.editor_widget.animation_root,
+                        self.editor_widget.current_animation_name,
+                        "conditions",
+                        "if")
+                    condition_path = os.path.join(conditions_dir, f"{name}.yaml")
+
+                    if os.path.exists(condition_path):
+                        QMessageBox.warning(None, "Name Conflict", f"If condition '{name}' already exists.")
+                        return
+
+                    os.makedirs(conditions_dir, exist_ok=True)
+                    default_if_data = {"expression": "", "condition": ""}
+                    save_if_condition(
+                        self.editor_widget.animation_root,
+                        self.editor_widget.current_animation_name,
+                        name,
+                        default_if_data)
+
+                    id = self._generate_block_id()
+                    block = IfBlockItem(id, name)
+                    block.setPos(pos)
+                    self.addItem(block)
+                    self.block_objects[block.name] = block
+
+                    self.editor_widget.load_animation_list()
 
             elif selected_action == new_switch_action:
-                id = self._generate_block_id()
-                filename = "switch"
-                block = SwitchBlockItem(id, filename, 3)
-                block.setPos(pos)
-                self.addItem(block)
-                self.block_objects[block.name] = block
+                name, ok = QInputDialog.getText(None, "New Switch Condition", "Enter condition name:")
+                if ok and name.strip():
+                    name = name.strip()
+                    conditions_dir = os.path.join(
+                        self.editor_widget.animation_root,
+                        self.editor_widget.current_animation_name,
+                        "conditions",
+                        "switch")
+                    condition_path = os.path.join(conditions_dir, f"{name}.yaml")
 
+                    if os.path.exists(condition_path):
+                        QMessageBox.warning(None, "Name Conflict", f"Switch condition '{name}' already exists.")
+                        return
+
+                    os.makedirs(conditions_dir, exist_ok=True)
+                    default_switch_data = {"expression": "", "condition": "", "case": [0]}
+                    save_switch_condition(
+                        self.editor_widget.animation_root,
+                        self.editor_widget.current_animation_name,
+                        name,
+                        default_switch_data)
+
+                    id = self._generate_block_id()
+                    block = SwitchBlockItem(id, name, num_cases=2)
+                    block.setPos(pos)
+                    self.addItem(block)
+                    self.block_objects[block.name] = block
+
+                    self.editor_widget.load_animation_list()
             elif selected_action == new_arrow_action:
                 id = self._generate_arrow_id()
                 arrow = ArrowItem(id)
