@@ -1138,7 +1138,7 @@ class MotionFlowScene(QGraphicsScene):
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete:
             for item in self.selectedItems():
-                if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem)):
+                if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem, StartBlockItem)):
                     self.remove_block(item)
                 elif isinstance(item, (ArrowItem)):
                     self.remove_arrow(item)
