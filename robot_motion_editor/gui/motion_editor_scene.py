@@ -32,7 +32,7 @@ class FrameBlockItem(QGraphicsRectItem):
         self.type = "frame"
         self.id = id
         self.filename = filename
-        self.name = f"{self.type}_{id}_{filename}"
+        self.name = f"{self.type}_{self.id}_{self.filename}"
 
         self.max_inputs = -1
         self.max_outputs = 1
