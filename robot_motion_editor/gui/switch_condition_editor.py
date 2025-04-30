@@ -84,10 +84,17 @@ class SwitchConditionEditorDialog(QDialog):
         self.case_list.clear()
         self.expression_edit.setPlainText(data.get("expression", ""))
         self.condition_edit.setPlainText(data.get("condition", ""))
-        case_values = data.get("case", [])
-        case_values.sort()
-        for i in range(len(case_values)):
-            self.case_list.addItem(f"case_{i}")
+
+        case_section = data.get("case", {})
+
+        if isinstance(case_section, dict):
+            sorted_keys = sorted(case_section.keys(), key=lambda k: int(k.split("_")[1]))
+            for key in sorted_keys:
+                self.case_list.addItem(key)
+        else:
+            # 旧形式の int list などにも一応対応
+            for i, val in enumerate(case_section):
+                self.case_list.addItem(f"case_{i}")
 
     def add_case(self):
         current_count = self.case_list.count()
@@ -102,7 +109,6 @@ class SwitchConditionEditorDialog(QDialog):
         expression = self.expression_edit.toPlainText().strip()
         condition = self.condition_edit.toPlainText().strip()
         case_count = self.case_list.count()
-        cases = list(range(case_count))  # 常に連番で保存
 
         if not condition:
             QMessageBox.warning(self, "Error", "Condition cannot be empty.")
@@ -134,11 +140,20 @@ class SwitchConditionEditorDialog(QDialog):
                 "This may not match any case."
             )
 
+        # 保存形式の構造を作成
+        case_dict = {}
+        for i in range(case_count):
+            case_dict[f"case_{i}"] = {"value": i}
+
         save_switch_condition(
             self.animation_root,
             self.animation_name,
             self.condition_name,
-            {"expression": expression, "condition": condition, "case": cases}
+            {
+                "expression": expression,
+                "condition": condition,
+                "case": case_dict
+            }
         )
 
         self.result = {"num_cases": case_count + 1}  # default含む

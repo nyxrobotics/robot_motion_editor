@@ -221,14 +221,18 @@ condition: "imu_norm > 0.5"
 
 例：mode_switch.yaml
 
-expression: "def button_id = 1"
-condition: "button_id"
+expression: "mode = 2"
+condition: "mode"
 case:
-  - 0
-  - 1
-  - 2
-  - 3
-  - 4
+  case_0:
+    value: 0
+  case_1:
+    value: 1
+  case_2:
+    value: 2
+  case_3:
+    value: 3
+
 
 9. RViz連携（trajectory_visualizer.py）
 -------------------------------
