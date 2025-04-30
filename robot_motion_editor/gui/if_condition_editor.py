@@ -69,18 +69,44 @@ class IfConditionEditorDialog(QDialog):
         expression = self.expression_edit.toPlainText().strip()
         condition = self.condition_edit.toPlainText().strip()
 
-        if not expression or not condition:
-            QMessageBox.warning(self, "Error", "Expression and condition cannot be empty.")
+        if not condition:
+            QMessageBox.warning(self, "Error", "Condition cannot be empty.")
             return
+
+        local_vars = {}
+
+        # Expression があれば先に実行（変数を定義）
+        if expression:
+            try:
+                exec(expression, {}, local_vars)
+            except Exception as e:
+                QMessageBox.critical(self, "Syntax Error in Expression", str(e))
+                return
 
         try:
-            local_vars = {}
-            exec(expression, {}, local_vars)
-            exec(f"if {condition}: pass", {}, local_vars)
+            result = eval(condition, {}, local_vars)
         except Exception as e:
-            QMessageBox.critical(self, "Syntax Error", str(e))
-            return
+            if not expression:
+                QMessageBox.critical(
+                    self,
+                    "Invalid Condition",
+                    "Condition cannot be evaluated without Expression.\n"
+                    f"Error: {str(e)}"
+                )
+                return
+            else:
+                QMessageBox.critical(self, "Syntax Error in Condition", str(e))
+                return
 
+        # 評価結果が falsy（0, "", [], None など）の場合に警告だけ出す（保存は許可）
+        if not bool(result):
+            QMessageBox.warning(
+                self,
+                "Condition Evaluates to False",
+                f"The condition evaluates to a falsy value: {result}"
+            )
+
+        # 保存処理
         save_if_condition(
             self.animation_root,
             self.animation_name,
