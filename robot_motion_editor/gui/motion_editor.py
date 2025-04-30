@@ -23,6 +23,7 @@ from .if_condition_editor import IfConditionEditorDialog
 from .motion_editor_animation_tree_widget import AnimationTreeWidget
 from .motion_editor_scene import FrameBlockItem
 from .motion_editor_scene import MotionFlowScene
+from .motion_graphics_view import MotionGraphicsView
 from .offset_editor import OffsetEditorDialog
 from .switch_condition_editor import SwitchConditionEditorDialog
 
@@ -66,7 +67,7 @@ class MotionEditorWidget(QWidget):
         self.animation_tree.itemDoubleClicked.connect(self.on_tree_item_double_clicked)
 
         self.scene = MotionFlowScene(editor_widget=self)
-        self.view = QGraphicsView(self.scene)
+        self.view = MotionGraphicsView(self.scene)
         self.view.setAcceptDrops(True)
         self.view.setRenderHints(self.view.renderHints() | QPainter.Antialiasing)
 
