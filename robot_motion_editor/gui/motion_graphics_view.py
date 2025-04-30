@@ -1,3 +1,4 @@
+from PyQt5.QtCore import QEvent
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeyEvent
 from PyQt5.QtGui import QMouseEvent
@@ -19,11 +20,37 @@ class MotionGraphicsView(QGraphicsView):
         else:
             super().wheelEvent(event)
 
-    def mousePressEvent(self, event: QMouseEvent):
+    def mousePressEvent(self, event):
         if event.button() == Qt.MiddleButton and event.modifiers() == Qt.ControlModifier:
             self.reset_zoom_at(event.pos())
+        elif event.button() == Qt.MiddleButton:
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
+            # QtはScrollHandDragで左クリックを要求するので偽装
+            fake_event = QMouseEvent(
+                QEvent.MouseButtonPress,
+                event.localPos(),
+                Qt.LeftButton,
+                Qt.LeftButton,
+                Qt.NoModifier
+            )
+            super().mousePressEvent(fake_event)
         else:
             super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MiddleButton:
+            # QtはScrollHandDragで左クリックを要求するので偽装
+            fake_event = QMouseEvent(
+                QEvent.MouseButtonRelease,
+                event.localPos(),
+                Qt.LeftButton,
+                Qt.LeftButton,
+                Qt.NoModifier
+            )
+            super().mouseReleaseEvent(fake_event)
+            self.setDragMode(QGraphicsView.NoDrag)  # 通常モードに戻す
+        else:
+            super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.modifiers() == Qt.ControlModifier:
