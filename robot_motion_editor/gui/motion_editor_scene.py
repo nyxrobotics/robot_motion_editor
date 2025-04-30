@@ -426,7 +426,7 @@ class SwitchBlockItem(QGraphicsRectItem):
         self.create_output_blocks()
 
     def create_output_blocks(self):
-        output_sub_labels = [f"case_{i}" for i in range(self.num_cases - 1)] + ["default"]
+        output_sub_labels = ["default"] + [f"case_{i}" for i in range(self.num_cases - 1)]
         font_metrics = QFontMetricsF(self.label.font())
         text_height = font_metrics.height()
         gap = text_height / 2
@@ -1262,19 +1262,75 @@ class MotionFlowScene(QGraphicsScene):
         return True
 
     def update_switch_block(self, condition_name, new_num_cases):
-        # ブロックを検索
+        target_block = None
         for block in self.block_objects.values():
             if isinstance(block, SwitchBlockItem) and block.filename == condition_name:
-                current_cases = block.num_cases
-                if current_cases != new_num_cases:
-                    # ブロックを再作成（現在位置を保持）
-                    pos = block.pos()
-                    id = block.id
-                    self.remove_block(block)
-
-                    # 新しいケース数で再作成
-                    new_block = SwitchBlockItem(id, condition_name, num_cases=new_num_cases)
-                    new_block.setPos(pos)
-                    self.addItem(new_block)
-                    self.block_objects[new_block.name] = new_block
+                target_block = block
                 break
+
+        if not target_block:
+            return
+
+        if target_block.num_cases == new_num_cases:
+            return
+
+        pos = target_block.pos()
+        id = target_block.id
+
+        # 現在の接続情報を保存
+        input_arrows = list(target_block.input_arrows)
+        old_output_labels = list(target_block.output_sub_blocks.keys())
+        output_arrows = []
+        for label in old_output_labels:
+            subblock = target_block.output_sub_blocks[label]
+            arrow = subblock.output_arrows[0] if subblock.output_arrows else None
+            output_arrows.append(arrow)
+
+        # ブロックだけ削除（矢印は削除しない）
+        for arrow in input_arrows:
+            arrow.end_item = None
+        for arrow in output_arrows:
+            if arrow:
+                arrow.start_item = None
+
+        self.removeItem(target_block)
+        del self.block_objects[target_block.name]
+
+        # 新しいブロックを作成
+        new_block = SwitchBlockItem(id, condition_name, num_cases=new_num_cases)
+        new_block.setPos(pos)
+        self.addItem(new_block)
+        self.block_objects[new_block.name] = new_block
+
+        # 入力矢印を再接続
+        for arrow in input_arrows:
+            arrow.end_item = new_block
+            new_block.input_arrows.append(arrow)
+            arrow._force_snap_end = True
+            arrow.update_path()
+
+        # 出力矢印を再利用して再接続
+        new_output_labels = list(new_block.output_sub_blocks.keys())
+        min_output_count = min(len(output_arrows), len(new_output_labels))
+
+        # 既存の矢印を再接続
+        for i in range(min_output_count):
+            arrow = output_arrows[i]
+            if arrow:
+                new_subblock = new_block.output_sub_blocks[new_output_labels[i]]
+                arrow.start_item = new_subblock
+                new_subblock.output_arrows.append(arrow)
+                arrow._force_snap_start = True
+                arrow.update_path()
+
+        # 不要な矢印を削除（caseが減った場合）
+        for i in range(min_output_count, len(output_arrows)):
+            arrow = output_arrows[i]
+            if arrow:
+                if arrow.end_item:
+                    arrow.end_item.input_arrows.remove(arrow)
+                self.removeItem(arrow)
+                if arrow.name in self.arrow_objects:
+                    del self.arrow_objects[arrow.name]
+
+        # 新しく増えたケースについては矢印なしの状態（何もしない）
