@@ -787,21 +787,23 @@ class MotionFlowScene(QGraphicsScene):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setBackgroundBrush(QColor("#111111"))
-        self.block_counter = 0
-        self.blocks = []
-        self.arrow_counter = 0
-        self.arrows = []
+        self.block_objects = {}
+        self.arrow_objects = {}
         self.setSceneRect(0, 0, 1000, 1000)
 
     def _generate_block_id(self):
-        id = self.block_counter
-        self.block_counter += 1
-        return id
+        used_ids = {block.id for block in self.block_objects.values()}
+        i = 0
+        while i in used_ids:
+            i += 1
+        return i
 
     def _generate_arrow_id(self):
-        aid = f"arrow_{self.arrow_counter:03}"
-        self.arrow_counter += 1
-        return aid
+        used_ids = {arrow.id for arrow in self.arrow_objects.values()}
+        i = 0
+        while i in used_ids:
+            i += 1
+        return i
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasText():
@@ -873,7 +875,7 @@ class MotionFlowScene(QGraphicsScene):
                 block = FrameBlockItem(id, filename)
                 block.setPos(pos)
                 self.addItem(block)
-                self.blocks.append(block)
+                self.block_objects[block.name] = block
 
             elif selected_action == new_if_action:
                 id = self._generate_block_id()
@@ -881,7 +883,7 @@ class MotionFlowScene(QGraphicsScene):
                 block = IfBlockItem(id, filename)
                 block.setPos(pos)
                 self.addItem(block)
-                self.blocks.append(block)
+                self.block_objects[block.name] = block
 
             elif selected_action == new_switch_action:
                 id = self._generate_block_id()
@@ -889,7 +891,7 @@ class MotionFlowScene(QGraphicsScene):
                 block = SwitchBlockItem(id, filename, 3)
                 block.setPos(pos)
                 self.addItem(block)
-                self.blocks.append(block)
+                self.block_objects[block.name] = block
 
             elif selected_action == new_arrow_action:
                 id = self._generate_arrow_id()
@@ -898,36 +900,40 @@ class MotionFlowScene(QGraphicsScene):
                 arrow.end_handle.setPos(pos + QPointF(100, 0))
                 arrow.add_to_scene(self)
                 arrow.update_path()
-                self.arrows.append(arrow)
+                self.arrow_objects[arrow.name] = arrow
 
     def remove_block_and_arrows(self, block):
         for arrow in list(getattr(block, 'input_arrows', [])):
             arrow.remove_from_scene()
+            if arrow.name in self.arrow_objects:
+                self.arrow_objects.pop(arrow.name)
         for arrow in list(getattr(block, 'output_arrows', [])):
             arrow.remove_from_scene()
+            if arrow.name in self.arrow_objects:
+                self.arrow_objects.pop(arrow.name)
         block.remove_from_scene()
-        if block in self.blocks:
-            self.blocks.remove(block)
+        if block.name in self.block_objects:
+            self.block_objects.pop(block.name)
+
+    def remove_block(self, block):
+        block.remove_from_scene()
+        if block.name in self.block_objects:
+            self.block_objects.pop(block.name)
 
     def remove_arrow(self, arrow):
         arrow.remove_from_scene()
-        if arrow in self.arrows:
-            self.arrows.remove(arrow)
+        if arrow in self.arrow_objects:
+            self.arrow_objects.pop(arrow.name)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete:
             for item in self.selectedItems():
-                if isinstance(
-                    item,
-                    (ArrowItem,
-                     WaypointItem,
-                     FrameBlockItem,
-                     IfBlockItem,
-                     SwitchBlockItem,
-                     OutputSubBlockItem)):
-                    item.remove_from_scene()
+                if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem)):
+                    self.remove_block(item)
+                elif isinstance(item, (ArrowItem)):
+                    self.remove_arrow(item)
                 else:
-                    self.removeItem(item)
+                    return
         else:
             super().keyPressEvent(event)
 
@@ -1021,12 +1027,8 @@ class MotionFlowScene(QGraphicsScene):
 
     def load_layout_yaml(self, layout_data):
         self.clear()
-        self.block_counter = 0
-        self.blocks = []
-        self.arrow_counter = 0
-        self.arrows = []
-        block_map = {}
-        arrow_map = {}
+        self.block_objects.clear()
+        self.arrow_objects.clear()
         # --- 1. ブロックをすべて作成 ---
         for block_key, block_value in layout_data.get("block", {}).items():
             info = block_value.get("info", {})
@@ -1048,9 +1050,7 @@ class MotionFlowScene(QGraphicsScene):
                 continue  # 未知のブロックは無視
             item.setPos(x, y)
             self.addItem(item)
-            self.blocks.append(item)
-            block_map[block_key] = item
-            self.block_counter = self.block_counter + 1
+            self.block_objects[item.name] = item
 
         # --- 2. 矢印をすべて作成 ---
         for arrow_key, arrow_value in layout_data.get("arrow", {}).items():
@@ -1060,16 +1060,14 @@ class MotionFlowScene(QGraphicsScene):
 
             arrow = ArrowItem(arrow_id)
             self.addItem(arrow)
-            self.arrows.append(arrow)
-            arrow_map[arrow_key] = arrow
-            self.arrow_counter = self.arrow_counter + 1
+            self.arrow_objects[arrow.name] = arrow
 
             for pos in waypoints:
                 arrow.insert_waypoint(len(arrow.waypoints), QPointF(pos[0], pos[1]))
 
         # --- 3. 接続を確定する ---
         for block_key, block_value in layout_data.get("block", {}).items():
-            block = block_map.get(block_key)
+            block = self.block_objects.get(block_key)
             if not block:
                 continue
 
@@ -1078,10 +1076,10 @@ class MotionFlowScene(QGraphicsScene):
                 target_block_key = conn.get("target")
                 arrow_key = conn.get("arrow")
 
-                if not arrow_key or arrow_key not in arrow_map:
+                if not arrow_key or arrow_key not in self.arrow_objects:
                     continue
 
-                arrow = arrow_map[arrow_key]
+                arrow = self.arrow_objects[arrow_key]
 
                 # 出力ブロックの決定
                 if isinstance(block, (IfBlockItem, SwitchBlockItem)) and output_pin in block.output_sub_blocks:
@@ -1093,8 +1091,8 @@ class MotionFlowScene(QGraphicsScene):
                 output_block.output_arrows.append(arrow)
 
                 # 入力ブロックの決定
-                if target_block_key and target_block_key in block_map:
-                    target_block = block_map[target_block_key]
+                if target_block_key and target_block_key in self.block_objects:
+                    target_block = self.block_objects[target_block_key]
                     arrow.end_item = target_block
                     target_block.input_arrows.append(arrow)
 
