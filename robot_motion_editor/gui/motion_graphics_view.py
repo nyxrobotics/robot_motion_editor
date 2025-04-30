@@ -39,6 +39,7 @@ class MotionGraphicsView(QGraphicsView):
             super().keyPressEvent(event)
 
     def zoom_at(self, pos, factor):
+        self.setTransformationAnchor(QGraphicsView.NoAnchor)
         old_pos = self.mapToScene(pos)
         self.scale(factor, factor)
         new_pos = self.mapToScene(pos)
