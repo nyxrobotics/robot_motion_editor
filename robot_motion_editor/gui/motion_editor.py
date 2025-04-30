@@ -19,10 +19,12 @@ from ..logic.animation_file_manager import save_animation_file
 from ..logic.initial_pose_file_manager import load_initial_pose
 from ..logic.initial_pose_file_manager import save_initial_pose
 from .frame_editor import FrameEditorDialog
+from .if_condition_editor import IfConditionEditorDialog
 from .motion_editor_animation_tree_widget import AnimationTreeWidget
 from .motion_editor_scene import FrameBlockItem
 from .motion_editor_scene import MotionFlowScene
 from .offset_editor import OffsetEditorDialog
+from .switch_condition_editor import SwitchConditionEditorDialog
 
 
 class MotionEditorWidget(QWidget):
@@ -274,3 +276,39 @@ class MotionEditorWidget(QWidget):
                 os.remove(path)
             self.load_animation_list()
             self.load_animation_by_name(anim_name)
+
+    def open_frame_editor(self, frame_name):
+        frame_path = os.path.join(self.animation_root, self.current_animation_name, "frames", f"{frame_name}.yaml")
+        dlg = FrameEditorDialog(
+            joint_names=self.joint_names,
+            joint_limits=self.joint_limits,
+            available_variables=self.available_variables,
+            frame_path=frame_path
+        )
+        dlg.exec_()
+
+    def open_if_condition_editor(self, condition_name):
+        condition_path = os.path.join(
+            self.animation_root,
+            self.current_animation_name,
+            "conditions",
+            "if",
+            f"{condition_name}.yaml")
+        dlg = IfConditionEditorDialog(
+            available_variables=self.available_variables,
+            condition_path=condition_path
+        )
+        dlg.exec_()
+
+    def open_switch_condition_editor(self, condition_name):
+        condition_path = os.path.join(
+            self.animation_root,
+            self.current_animation_name,
+            "conditions",
+            "switch",
+            f"{condition_name}.yaml")
+        dlg = SwitchConditionEditorDialog(
+            available_variables=self.available_variables,
+            condition_path=condition_path
+        )
+        dlg.exec_()

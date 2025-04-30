@@ -108,6 +108,10 @@ class FrameBlockItem(QGraphicsRectItem):
                     item._force_snap_end = True
                     item.update_path()
 
+    def mouseDoubleClickEvent(self, event):
+        super().mouseDoubleClickEvent(event)
+        self.scene().editor_widget.open_frame_editor(self.filename)
+
     def remove_from_scene(self):
         scene = self.scene()
         if scene:
@@ -359,6 +363,10 @@ class IfBlockItem(QGraphicsRectItem):
                 if hasattr(subblock, "on_parent_moved"):
                     subblock.on_parent_moved()
 
+    def mouseDoubleClickEvent(self, event):
+        super().mouseDoubleClickEvent(event)
+        self.scene().editor_widget.open_if_condition_editor(self.filename)
+
     def remove_from_scene(self):
         scene = self.scene()
         if scene:
@@ -487,6 +495,10 @@ class SwitchBlockItem(QGraphicsRectItem):
             for subblock in getattr(self, 'output_sub_blocks', {}).values():
                 if hasattr(subblock, "on_parent_moved"):
                     subblock.on_parent_moved()
+
+    def mouseDoubleClickEvent(self, event):
+        super().mouseDoubleClickEvent(event)
+        self.scene().editor_widget.open_switch_condition_editor(self.filename)
 
     def remove_from_scene(self):
         scene = self.scene()
