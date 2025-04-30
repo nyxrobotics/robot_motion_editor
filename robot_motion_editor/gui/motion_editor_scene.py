@@ -1347,7 +1347,7 @@ class MotionFlowScene(QGraphicsScene):
                 arrow._force_snap_start = True
                 arrow._force_snap_end = True
                 arrow.update_path()
-
+        self.update_scene_rect()
         return True
 
     def update_switch_block(self, condition_name, new_num_cases):
