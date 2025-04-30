@@ -1,6 +1,7 @@
 import math
 import os
 
+import yaml
 from PyQt5.QtCore import QPointF
 from PyQt5.QtCore import QRectF
 from PyQt5.QtCore import Qt
@@ -844,12 +845,40 @@ class MotionFlowScene(QGraphicsScene):
         event.acceptProposedAction()
 
     def dropEvent(self, event):
-        name = event.mimeData().text()
+        data = event.mimeData().text()
+        if ":" not in data:
+            event.ignore()
+            return
+
+        item_type, name = data.split(":", 1)
         id = self._generate_block_id()
-        item = FrameBlockItem(id, name)
         pos = event.scenePos()
+
+        if item_type == "frame":
+            item = FrameBlockItem(id, name)
+        elif item_type == "if":
+            item = IfBlockItem(id, name)
+        elif item_type == "switch":
+            # switchのcase数をyamlから取得して反映（オプション）
+            switch_path = os.path.join(
+                self.editor_widget.animation_root,
+                self.editor_widget.current_animation_name,
+                "conditions", "switch", f"{name}.yaml"
+            )
+            if os.path.exists(switch_path):
+                with open(switch_path, "r") as f:
+                    switch_data = yaml.safe_load(f)
+                    num_cases = len(switch_data.get("case", [])) + 1  # default含む
+            else:
+                num_cases = 2
+            item = SwitchBlockItem(id, name, num_cases=num_cases)
+        else:
+            event.ignore()
+            return
+
         item.setPos(pos)
         self.addItem(item)
+        self.block_objects[item.name] = item
         event.acceptProposedAction()
 
     def contextMenuEvent(self, event):
