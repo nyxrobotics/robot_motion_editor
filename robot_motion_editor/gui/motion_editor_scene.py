@@ -1143,6 +1143,12 @@ class MotionFlowScene(QGraphicsScene):
                     self.remove_block(item)
                 elif isinstance(item, (ArrowItem)):
                     self.remove_arrow(item)
+                elif isinstance(item, WaypointItem):
+                    arrow = item.arrow
+                    if item in arrow.waypoints:
+                        arrow.waypoints.remove(item)
+                    self.removeItem(item)
+                    arrow.update_path()
                 else:
                     return
         else:
