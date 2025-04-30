@@ -39,10 +39,11 @@ class SwitchConditionEditorDialog(QDialog):
 
         layout.addWidget(QLabel("Condition (evaluates to int):"))
         self.condition_edit = QTextEdit()
-        layout.addWidget(self.condition_edit, stretch=1)  # expressionの1/3の高さ
+        layout.addWidget(self.condition_edit, stretch=1)
 
         layout.addWidget(QLabel("Cases:"))
         self.case_list = QListWidget()
+        self.case_list.setSelectionMode(QListWidget.NoSelection)
         layout.addWidget(self.case_list, stretch=2)
 
         case_btn_layout = QHBoxLayout()
@@ -53,6 +54,7 @@ class SwitchConditionEditorDialog(QDialog):
         self.remove_case_btn = QPushButton("－")
         self.remove_case_btn.clicked.connect(self.remove_case)
         case_btn_layout.addWidget(self.remove_case_btn)
+
         layout.addLayout(case_btn_layout)
 
         btn_row = QHBoxLayout()
@@ -72,47 +74,65 @@ class SwitchConditionEditorDialog(QDialog):
         self.setLayout(layout)
 
     def show_variables(self):
-        QMessageBox.information(self, "Available Variables", "\n".join(self.available_variables))
+        if not self.available_variables:
+            QMessageBox.information(self, "Variables", "No available variables.")
+        else:
+            QMessageBox.information(self, "Available Variables", "\n".join(self.available_variables))
 
     def load_condition(self):
         data = load_switch_condition(self.animation_root, self.animation_name, self.condition_name)
-        if data:
-            self.expression_edit.setPlainText(data.get('expression', ''))
-            self.condition_edit.setPlainText(data.get('condition', ''))
-            self.case_list.clear()
-            for case in data.get('case', []):
-                self.case_list.addItem(str(case))
+        self.case_list.clear()
+        self.expression_edit.setPlainText(data.get("expression", ""))
+        self.condition_edit.setPlainText(data.get("condition", ""))
+        case_values = data.get("case", [])
+        case_values.sort()
+        for i in range(len(case_values)):
+            self.case_list.addItem(f"case_{i}")
 
     def add_case(self):
-        new_case = 0
-        if self.case_list.count() > 0:
-            new_case = int(self.case_list.item(self.case_list.count() - 1).text()) + 1
-        self.case_list.addItem(str(new_case))
+        current_count = self.case_list.count()
+        self.case_list.addItem(f"case_{current_count}")
 
     def remove_case(self):
-        current_row = self.case_list.currentRow()
-        if current_row >= 0:
-            self.case_list.takeItem(current_row)
-
+        count = self.case_list.count()
+        if count > 0:
+            self.case_list.takeItem(count - 1)
 
     def accept_and_store(self):
         expression = self.expression_edit.toPlainText().strip()
         condition = self.condition_edit.toPlainText().strip()
-        cases = [int(self.case_list.item(i).text()) for i in range(self.case_list.count())]
+        case_count = self.case_list.count()
+        cases = list(range(case_count))  # 常に連番で保存
 
-        if not expression or not condition:
-            QMessageBox.warning(self, "Error", "Expression and condition cannot be empty.")
+        if not condition:
+            QMessageBox.warning(self, "Error", "Condition cannot be empty.")
             return
+
+        local_vars = {}
+        if expression:
+            try:
+                exec(expression, {}, local_vars)
+            except Exception as e:
+                QMessageBox.critical(self, "Syntax Error in Expression", str(e))
+                return
 
         try:
-            local_vars = {}
-            exec(expression, {}, local_vars)
-            condition_value = eval(condition, {}, local_vars)
-            if not isinstance(condition_value, int):
-                raise ValueError("Condition must evaluate to an integer.")
+            result = eval(condition, {}, local_vars)
         except Exception as e:
-            QMessageBox.critical(self, "Syntax Error", str(e))
-            return
+            if not expression:
+                QMessageBox.critical(self, "Invalid Condition", f"Cannot evaluate condition.\n{str(e)}")
+                return
+            else:
+                QMessageBox.critical(self, "Syntax Error in Condition", str(e))
+                return
+
+        if not isinstance(result, int):
+            QMessageBox.warning(
+                self,
+                "Non-Integer Condition",
+                f"The condition evaluates to a non-integer value: {result}\n"
+                "This may not match any case."
+            )
 
         save_switch_condition(
             self.animation_root,
@@ -121,6 +141,5 @@ class SwitchConditionEditorDialog(QDialog):
             {"expression": expression, "condition": condition, "case": cases}
         )
 
-        # case数をresultとして返す
-        self.result = {"num_cases": len(cases) + 1}  # defaultを含める
+        self.result = {"num_cases": case_count + 1}  # default含む
         self.accept()
