@@ -1135,6 +1135,15 @@ class MotionFlowScene(QGraphicsScene):
                     arrow.end_item = target_block
                     target_block.input_arrows.append(arrow)
 
+                # Update arrow direction
+                if arrow.start_item:
+                    start_center = arrow.start_item.sceneBoundingRect().center()
+                    arrow.start_handle.setPos(start_center)
+                if arrow.end_item:
+                    end_center = arrow.end_item.sceneBoundingRect().center()
+                    arrow.end_handle.setPos(end_center)
+                arrow._force_snap_start = True
+                arrow._force_snap_end = True
                 arrow.update_path()
 
         return True
