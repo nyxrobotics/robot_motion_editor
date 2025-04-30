@@ -633,6 +633,15 @@ class WaypointItem(QGraphicsEllipseItem):
             self.scene().removeItem(self)
         self.arrow.update_path()
 
+    def mousePressEvent(self, event):
+        # Deselect other items
+        if self.scene():
+            for item in self.scene().selectedItems():
+                if item is not self:
+                    item.setSelected(False)
+        self.setSelected(True)
+        super().mousePressEvent(event)
+
 
 class HoverPoint(QGraphicsEllipseItem):
     def __init__(self, pos, arrow, segment_index):
