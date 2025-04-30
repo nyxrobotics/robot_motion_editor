@@ -98,24 +98,7 @@ class MotionEditorWidget(QWidget):
             while animation_item.parent() is not None:
                 animation_item = animation_item.parent()
             animation_name = animation_item.text(0)
-
-            offset_path = os.path.join(self.animation_root, animation_name, "offset.yaml")
-
-            dlg = OffsetEditorDialog(joint_names=self.joint_names,
-                                     joint_limits=self.joint_limits,
-                                     available_variables=self.available_variables,
-                                     offset_path=offset_path)
-            if dlg.exec_():
-                updated_data = dlg.get_joint_data()
-                save_initial_pose(
-                    os.path.join(self.animation_root, animation_name),
-                    joint_names=list(updated_data.keys()),
-                    positions=[v["position"] for v in updated_data.values()],
-                    enabled={k: v["enable"] for k, v in updated_data.items()},
-                    pid_config={k: v["pid"] for k, v in updated_data.items()},
-                    feedback_exprs={k: v["feedback"] for k, v in updated_data.items()},
-                    filename="offset.yaml"
-                )
+            self.open_offset_editor()
 
         elif item.parent() and item.parent().text(0) == "frames":
             animation_item = item
@@ -323,6 +306,28 @@ class MotionEditorWidget(QWidget):
                 os.remove(path)
             self.load_animation_list()
             self.load_animation_by_name(anim_name)
+
+    def open_offset_editor(self):
+        offset_path = os.path.join(self.animation_root, self.current_animation_name, "offset.yaml")
+
+        dlg = OffsetEditorDialog(
+            joint_names=self.joint_names,
+            joint_limits=self.joint_limits,
+            available_variables=self.available_variables,
+            offset_path=offset_path
+        )
+
+        if dlg.exec_():
+            updated_data = dlg.get_joint_data()
+            save_initial_pose(
+                os.path.join(self.animation_root, self.current_animation_name),
+                joint_names=list(updated_data.keys()),
+                positions=[v["position"] for v in updated_data.values()],
+                enabled={k: v["enable"] for k, v in updated_data.items()},
+                pid_config={k: v["pid"] for k, v in updated_data.items()},
+                feedback_exprs={k: v["feedback"] for k, v in updated_data.items()},
+                filename="offset.yaml"
+            )
 
     def open_frame_editor(self, frame_name):
         frame_path = os.path.join(self.animation_root, self.current_animation_name, "frames", f"{frame_name}.yaml")

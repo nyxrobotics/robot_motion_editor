@@ -84,6 +84,10 @@ class StartBlockItem(QGraphicsRectItem):
         if scene:
             scene.removeItem(self)
 
+    def mouseDoubleClickEvent(self, event):
+        super().mouseDoubleClickEvent(event)
+        self.scene().editor_widget.open_offset_editor()
+
 
 class FrameBlockItem(QGraphicsRectItem):
     def __init__(self, id, filename):
