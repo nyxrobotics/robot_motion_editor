@@ -35,6 +35,56 @@ def compute_edge_point(center, target, width, height):
     return QPointF(center.x() + dx * scale, center.y() + dy * scale)
 
 
+class StartBlockItem(QGraphicsRectItem):
+    def __init__(self, id):
+        self.type = "start"
+        self.id = id
+        self.name = f"{self.type}_{self.id}"
+        self.max_inputs = 0
+        self.max_outputs = 1
+        self.input_arrows = []
+        self.output_arrows = []
+
+        super().__init__(0, 0, 100, 60)
+        self.setBrush(QBrush(QColor("#0066cc")))  # 青系
+        self.default_pen = QPen(QColor("white"), 3)
+        self.setPen(self.default_pen)
+        self.setFlags(self.ItemIsMovable | self.ItemIsSelectable | self.ItemSendsGeometryChanges)
+
+        self.label = QGraphicsTextItem("Start", self)
+        self.label.setDefaultTextColor(QColor("white"))
+        self.label.setPos(
+            (self.rect().width() - self.label.boundingRect().width()) / 2,
+            (self.rect().height() - self.label.boundingRect().height()) / 2
+        )
+
+    def can_accept_input(self):
+        return False
+
+    def can_accept_output(self):
+        return self.max_outputs == -1 or len(self.output_arrows) < self.max_outputs
+
+    def paint(self, painter, option, widget=None):
+        self.setPen(self.default_pen)
+        super().paint(painter, option, widget)
+
+    def itemChange(self, change, value):
+        if change == self.ItemPositionChange and self.scene():
+            for item in self.scene().items():
+                if isinstance(item, ArrowItem):
+                    if item.start_item == self or item.end_item == self:
+                        item.update_path()
+        return super().itemChange(change, value)
+
+    def remove_from_scene(self):
+        scene = self.scene()
+        for arrow in list(self.output_arrows):
+            arrow.remove_from_scene()
+        self.output_arrows.clear()
+        if scene:
+            scene.removeItem(self)
+
+
 class FrameBlockItem(QGraphicsRectItem):
     def __init__(self, id, filename):
         self.type = "frame"
@@ -631,7 +681,7 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         scene = self.scene()
         target = None
         for item in scene.items(self.scenePos()):
-            if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem, OutputSubBlockItem)):
+            if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem, OutputSubBlockItem, StartBlockItem)):
                 if self.is_start:
                     if item.max_outputs != -1 and len(item.output_arrows) >= item.max_outputs:
                         target = None
@@ -928,11 +978,13 @@ class MotionFlowScene(QGraphicsScene):
             item.setSelected(True)
             item.contextMenuEvent(event)
         else:
+            new_start_action = QAction("New Start", menu)
             new_frame_action = QAction("New Frame", menu)
             new_if_action = QAction("New If", menu)
             new_switch_action = QAction("New Switch", menu)
             new_arrow_action = QAction("New Arrow", menu)
 
+            menu.addAction(new_start_action)
             menu.addAction(new_frame_action)
             menu.addAction(new_if_action)
             menu.addAction(new_switch_action)
@@ -941,7 +993,20 @@ class MotionFlowScene(QGraphicsScene):
             selected_action = menu.exec_(event.screenPos())
             pos = event.scenePos()
 
-            if selected_action == new_frame_action:
+            if selected_action == new_start_action:
+                # 既に存在していれば拒否
+                if any(isinstance(b, StartBlockItem) for b in self.block_objects.values()):
+                    QMessageBox.warning(
+                        None,
+                        "Start Block Exists",
+                        "There is already a Start block in this animation.")
+                    return
+                id = self._generate_block_id()
+                block = StartBlockItem(id)
+                block.setPos(pos)
+                self.addItem(block)
+                self.block_objects[block.name] = block
+            elif selected_action == new_frame_action:
                 name, ok = QInputDialog.getText(None, "New Frame", "Enter frame name:")
                 if ok and name.strip():
                     name = name.strip()
@@ -1110,11 +1175,11 @@ class MotionFlowScene(QGraphicsScene):
         layout = {"block": {}, "arrow": {}}
 
         for item in self.items():
-            if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem)):
+            if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem, StartBlockItem)):
                 block_data = {
                     "info": {
                         "type": item.type,
-                        "filename": item.filename,
+                        "filename": getattr(item, "filename", ""),  # StartBlockItem は filename 持たないがOK
                         "id": item.id,
                     },
                     "place": {
@@ -1126,18 +1191,18 @@ class MotionFlowScene(QGraphicsScene):
                     }
                 }
 
-                # 出力ピンの全リストを取得
+                # 出力接続の構成（Start, Frame, If, Switch）
                 output_labels = []
                 if isinstance(item, FrameBlockItem):
                     output_labels = ["out_0"]
                 elif isinstance(item, (IfBlockItem, SwitchBlockItem)):
                     output_labels = list(item.output_sub_blocks.keys())
+                elif isinstance(item, StartBlockItem):
+                    output_labels = ["out_0"]
 
-                # 全出力ピンを保存（接続有無に関わらず）
                 for label in output_labels:
                     subblock = item.output_sub_blocks.get(label) if hasattr(item, 'output_sub_blocks') else item
                     connection_data = {"ch": output_labels.index(label)}
-
                     if subblock.output_arrows:
                         arrow = subblock.output_arrows[0]
                         if arrow.end_item:
@@ -1145,18 +1210,15 @@ class MotionFlowScene(QGraphicsScene):
                                 "target": arrow.end_item.name,
                                 "arrow": arrow.name
                             })
-
                     block_data["connection"]["output"][label] = connection_data
 
                 layout["block"][item.name] = block_data
 
             elif isinstance(item, ArrowItem):
-                # 既存の矢印保存処理
-                arrow_data = {
+                layout["arrow"][item.name] = {
                     "info": {"id": item.id},
                     "waypoints": [[wp.pos().x(), wp.pos().y()] for wp in item.waypoints],
                 }
-                layout["arrow"][item.name] = arrow_data
 
         return layout
 
@@ -1189,7 +1251,8 @@ class MotionFlowScene(QGraphicsScene):
             elif block_type == "switch":
                 case_num = len(labels)
                 item = SwitchBlockItem(block_id, block_filename, case_num)
-                # ラベル順序を強制的に合わせる場合、ここでitem.output_sub_blocksを再構成してもよい
+            elif block_type == "start":
+                item = StartBlockItem(block_id)
             else:
                 continue
 
