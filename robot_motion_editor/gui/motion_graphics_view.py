@@ -12,11 +12,16 @@ class MotionGraphicsView(QGraphicsView):
         self._zoom = 0
         self._default_transform = self.transform()
 
-    def wheelEvent(self, event: QWheelEvent):
+    def wheelEvent(self, event):
         if event.modifiers() == Qt.ControlModifier:
+            # Ctrl + ホイール → 拡大縮小
             angle = event.angleDelta().y()
             factor = 1.25 if angle > 0 else 0.8
             self.zoom_at(event.pos(), factor)
+        elif event.modifiers() == Qt.ShiftModifier:
+            # Shift + ホイール → 横スクロール
+            delta = event.angleDelta().y()
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta)
         else:
             super().wheelEvent(event)
 
