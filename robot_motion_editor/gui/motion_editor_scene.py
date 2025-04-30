@@ -28,22 +28,21 @@ def compute_edge_point(center, target, width, height):
 
 class FrameBlockItem(QGraphicsRectItem):
     def __init__(self, id, filename):
-
         self.type = "frame"
         self.id = id
         self.filename = filename
         self.name = f"{self.type}_{self.id}_{self.filename}"
-
         self.max_inputs = -1
         self.max_outputs = 1
         self.input_arrows = []
-        self.output_arrows = []     # 出力側：1本まで
+        self.output_arrows = []
 
         label_text = QGraphicsTextItem(self.name)
         font_metrics = QFontMetricsF(label_text.font())
         text_width = font_metrics.width(self.name)
         width = max(120, text_width + 20)
         height = 60
+
         super().__init__(0, 0, width, height)
         self.setBrush(QBrush(QColor("#1a1a1a")))
         self.default_pen = QPen(QColor("#ffffff"), 3)
@@ -54,9 +53,10 @@ class FrameBlockItem(QGraphicsRectItem):
 
         self.label = QGraphicsTextItem(self.name, self)
         self.label.setDefaultTextColor(QColor("white"))
-        self.label.setPos((width - self.label.boundingRect().width()) / 2,
-                          (height - self.label.boundingRect().height()) / 2)
-
+        self.label.setPos(
+            (width - self.label.boundingRect().width()) / 2,
+            (height - self.label.boundingRect().height()) / 2
+        )
         self.is_highlighted = False
 
     def can_accept_input(self):
@@ -70,9 +70,12 @@ class FrameBlockItem(QGraphicsRectItem):
         self.update()
 
     def paint(self, painter, option, widget=None):
-        self.setPen(self.selected_pen if self.isSelected()
-                    else self.highlight_pen if self.is_highlighted
-                    else self.default_pen)
+        if self.isSelected():
+            self.setPen(self.selected_pen)
+        elif self.is_highlighted:
+            self.setPen(self.highlight_pen)
+        else:
+            self.setPen(self.default_pen)
         super().paint(painter, option, widget)
 
     def itemChange(self, change, value):
@@ -99,7 +102,7 @@ class FrameBlockItem(QGraphicsRectItem):
     def remove_from_scene(self):
         scene = self.scene()
         if scene:
-            # 入力矢印を全て除去
+            # Remove all input arrows
             for arrow in list(self.input_arrows):
                 if arrow.start_item and arrow in arrow.start_item.output_arrows:
                     arrow.start_item.output_arrows.remove(arrow)
@@ -107,8 +110,7 @@ class FrameBlockItem(QGraphicsRectItem):
                     arrow.end_item.input_arrows.remove(arrow)
                 arrow.remove_from_scene()
             self.input_arrows.clear()
-
-            # 出力矢印も全て除去
+            # Remove all output arrows
             for arrow in list(self.output_arrows):
                 if arrow.start_item and arrow in arrow.start_item.output_arrows:
                     arrow.start_item.output_arrows.remove(arrow)
@@ -116,60 +118,79 @@ class FrameBlockItem(QGraphicsRectItem):
                     arrow.end_item.input_arrows.remove(arrow)
                 arrow.remove_from_scene()
             self.output_arrows.clear()
-
-            # 自分をシーンから削除
+            # Remove self from scene
             scene.removeItem(self)
 
 
 class OutputSubBlockItem(QGraphicsRectItem):
     def __init__(self, label, parent_block):
+        # Label text (e.g. "True", "False", "case_0")
+        self.name = label
+        # Maximum number of input/output arrows
         self.max_inputs = 0
         self.max_outputs = 1
+
+        # Lists to store connected arrows
         self.input_arrows = []
         self.output_arrows = []
 
-        self.parent_block = parent_block  # 親ブロック (IfBlockItemやSwitchBlockItem)
-        self.label = label      # "True", "False", "case_0"など
-        label_text = QGraphicsTextItem(label)
-        font_metrics = QFontMetricsF(label_text.font())
+        # Reference to parent block (IfBlockItem or SwitchBlockItem)
+        self.parent_block = parent_block
+
+        self.label = label
+
+        # Calculate size based on label text
+        font_metrics = QFontMetricsF(QGraphicsTextItem(label).font())
         text_width = font_metrics.width(label)
         text_height = font_metrics.height()
-
         width = max(100, text_width + 20)
         height = max(30, text_height + 10)
 
         super().__init__(0, 0, width, height)
+
+        # Appearance settings
         self.setBrush(QBrush(QColor("#2b2b2b")))
         self.default_pen = QPen(QColor("#aaaaaa"), 2)
         self.highlight_pen = QPen(QColor("#00ff00"), 3)
         self.selected_pen = QPen(QColor("#00ffff"), 3)
         self.setPen(self.default_pen)
+
         self.setFlags(self.ItemIsSelectable | self.ItemSendsGeometryChanges)
 
-        self.label = QGraphicsTextItem(label, self)
-        self.label.setDefaultTextColor(QColor("white"))
-        self.label.setPos((width - self.label.boundingRect().width()) / 2,
-                          (height - self.label.boundingRect().height()) / 2)
+        # Display label centered in block
+        self.label_item = QGraphicsTextItem(label, self)
+        self.label_item.setDefaultTextColor(QColor("white"))
+        self.label_item.setPos(
+            (width - self.label_item.boundingRect().width()) / 2,
+            (height - self.label_item.boundingRect().height()) / 2
+        )
         self.is_highlighted = False
-        self.name = label
 
     def can_accept_input(self):
+        # Returns True if more input arrows can be accepted
         return self.max_inputs == -1 or len(self.input_arrows) < self.max_inputs
 
     def can_accept_output(self):
+        # Returns True if more output arrows can be accepted
         return self.max_outputs == -1 or len(self.output_arrows) < self.max_outputs
 
     def set_highlighted(self, state):
+        # Set highlight state and update appearance
         self.is_highlighted = state
         self.update()
 
     def paint(self, painter, option, widget=None):
-        self.setPen(self.selected_pen if self.isSelected()
-                    else self.highlight_pen if self.is_highlighted
-                    else self.default_pen)
+        # Set pen based on selection/highlight state
+        if self.isSelected():
+            self.setPen(self.selected_pen)
+        elif self.is_highlighted:
+            self.setPen(self.highlight_pen)
+        else:
+            self.setPen(self.default_pen)
         super().paint(painter, option, widget)
 
     def itemChange(self, change, value):
+        # Update connected arrows when position changes
         if change == self.ItemPositionChange and self.scene():
             for item in self.scene().items():
                 if isinstance(item, ArrowItem):
@@ -182,6 +203,7 @@ class OutputSubBlockItem(QGraphicsRectItem):
         return super().itemChange(change, value)
 
     def mouseReleaseEvent(self, event):
+        # Update connected arrows after moving
         super().mouseReleaseEvent(event)
         if self.scene():
             for item in self.scene().items():
@@ -191,7 +213,7 @@ class OutputSubBlockItem(QGraphicsRectItem):
                     item.update_path()
 
     def on_parent_moved(self):
-        # 親が動いたら自分に繋がってる矢印を更新
+        # Called when parent block moves; update connected arrows
         for arrow in self.output_arrows:
             arrow._force_snap_start = True
             arrow.update_path()
@@ -199,7 +221,7 @@ class OutputSubBlockItem(QGraphicsRectItem):
     def remove_from_scene(self):
         scene = self.scene()
         if scene:
-            # 入力矢印を全て除去
+            # Remove all input arrows
             for arrow in list(self.input_arrows):
                 if arrow.start_item and arrow in arrow.start_item.output_arrows:
                     arrow.start_item.output_arrows.remove(arrow)
@@ -208,7 +230,7 @@ class OutputSubBlockItem(QGraphicsRectItem):
                 arrow.remove_from_scene()
             self.input_arrows.clear()
 
-            # 出力矢印も全て除去
+            # Remove all output arrows
             for arrow in list(self.output_arrows):
                 if arrow.start_item and arrow in arrow.start_item.output_arrows:
                     arrow.start_item.output_arrows.remove(arrow)
@@ -217,7 +239,7 @@ class OutputSubBlockItem(QGraphicsRectItem):
                 arrow.remove_from_scene()
             self.output_arrows.clear()
 
-            # 自分をシーンから削除
+            # Remove self from scene
             scene.removeItem(self)
 
 
@@ -278,7 +300,7 @@ class IfBlockItem(QGraphicsRectItem):
             block.setParentItem(self)
             block_x = (self.rect().width() - block.rect().width()) / 2
             block.setPos(block_x, y)
-            self.output_sub_blocks[block.label.toPlainText()] = block
+            self.output_sub_blocks[block.name] = block
             y += block.rect().height() + gap
 
         # 全体の高さを更新
@@ -387,7 +409,7 @@ class SwitchBlockItem(QGraphicsRectItem):
         self.create_output_blocks()
 
     def create_output_blocks(self):
-        output_sub_labels = [f"case_{i}" for i in range(self.num_cases)] + ["default"]
+        output_sub_labels = [f"case_{i}" for i in range(self.num_cases - 1)] + ["default"]
         font_metrics = QFontMetricsF(self.label.font())
         text_height = font_metrics.height()
         gap = text_height / 2
@@ -408,7 +430,7 @@ class SwitchBlockItem(QGraphicsRectItem):
             block.setParentItem(self)
             block_x = (self.rect().width() - block.rect().width()) / 2
             block.setPos(block_x, y)
-            self.output_sub_blocks[block.label.toPlainText()] = block
+            self.output_sub_blocks[block.name] = block
             y += block.rect().height() + gap
 
         total_height = y
@@ -991,34 +1013,34 @@ class MotionFlowScene(QGraphicsScene):
                     }
                 }
 
-                # 出力ピン（Frameならout_0、If/Switchなら各ラベル名）
+                # 出力ピンの全リストを取得
+                output_labels = []
                 if isinstance(item, FrameBlockItem):
-                    if item.output_arrows:
-                        arrow = item.output_arrows[0]
+                    output_labels = ["out_0"]
+                elif isinstance(item, (IfBlockItem, SwitchBlockItem)):
+                    output_labels = list(item.output_sub_blocks.keys())
+
+                # 全出力ピンを保存（接続有無に関わらず）
+                for label in output_labels:
+                    subblock = item.output_sub_blocks.get(label) if hasattr(item, 'output_sub_blocks') else item
+                    connection_data = {"ch": output_labels.index(label)}
+
+                    if subblock.output_arrows:
+                        arrow = subblock.output_arrows[0]
                         if arrow.end_item:
-                            block_data["connection"]["output"]["out_0"] = {
+                            connection_data.update({
                                 "target": arrow.end_item.name,
-                                "ch": 0,
                                 "arrow": arrow.name
-                            }
-                else:  # If / Switch
-                    for label, subblock in item.output_sub_blocks.items():
-                        if subblock.output_arrows:
-                            arrow = subblock.output_arrows[0]
-                            if arrow.end_item:
-                                block_data["connection"]["output"][label] = {
-                                    "target": arrow.end_item.name,
-                                    "ch": 0,
-                                    "arrow": arrow.id
-                                }
+                            })
+
+                    block_data["connection"]["output"][label] = connection_data
 
                 layout["block"][item.name] = block_data
 
             elif isinstance(item, ArrowItem):
+                # 既存の矢印保存処理
                 arrow_data = {
-                    "info": {
-                        "id": item.id,
-                    },
+                    "info": {"id": item.id},
                     "waypoints": [[wp.pos().x(), wp.pos().y()] for wp in item.waypoints],
                 }
                 layout["arrow"][item.name] = arrow_data
@@ -1029,7 +1051,8 @@ class MotionFlowScene(QGraphicsScene):
         self.clear()
         self.block_objects.clear()
         self.arrow_objects.clear()
-        # --- 1. ブロックをすべて作成 ---
+
+        # --- 1. ブロック作成 ---
         for block_key, block_value in layout_data.get("block", {}).items():
             info = block_value.get("info", {})
             block_type = info.get("type")
@@ -1038,24 +1061,32 @@ class MotionFlowScene(QGraphicsScene):
             x = block_value.get("place", {}).get("x", 0)
             y = block_value.get("place", {}).get("y", 0)
 
+            output_conn = block_value.get("connection", {}).get("output", {})
+            # ch順でラベルを並べる
+            ch_label_pairs = sorted(
+                ((v.get("ch", 0), k) for k, v in output_conn.items()),
+                key=lambda x: x[0]
+            )
+            labels = [label for ch, label in ch_label_pairs]
+
             if block_type == "frame":
                 item = FrameBlockItem(block_id, block_filename)
             elif block_type == "if":
                 item = IfBlockItem(block_id, block_filename)
             elif block_type == "switch":
-                output_conn = block_value.get("connection", {}).get("output", {})
-                case_num = sum(1 for key in output_conn.keys() if key.startswith("case_"))
+                case_num = len(labels)
                 item = SwitchBlockItem(block_id, block_filename, case_num)
+                # ラベル順序を強制的に合わせる場合、ここでitem.output_sub_blocksを再構成してもよい
             else:
-                continue  # 未知のブロックは無視
+                continue
+
             item.setPos(x, y)
             self.addItem(item)
             self.block_objects[item.name] = item
 
-        # --- 2. 矢印をすべて作成 ---
+        # --- 2. 矢印作成 ---
         for arrow_key, arrow_value in layout_data.get("arrow", {}).items():
-            info = arrow_value.get("info", {})
-            arrow_id = info.get("id")
+            arrow_id = arrow_value.get("info", {}).get("id")
             waypoints = arrow_value.get("waypoints", [])
 
             arrow = ArrowItem(arrow_id)
@@ -1065,14 +1096,20 @@ class MotionFlowScene(QGraphicsScene):
             for pos in waypoints:
                 arrow.insert_waypoint(len(arrow.waypoints), QPointF(pos[0], pos[1]))
 
-        # --- 3. 接続を確定する ---
+        # --- 3. 接続処理 ---
         for block_key, block_value in layout_data.get("block", {}).items():
             block = self.block_objects.get(block_key)
             if not block:
                 continue
 
             output_conns = block_value.get("connection", {}).get("output", {})
-            for output_pin, conn in output_conns.items():
+            # ch順にソートして処理
+            sorted_conns = sorted(
+                output_conns.items(),
+                key=lambda x: x[1].get("ch", 0)
+            )
+
+            for conn_idx, (output_pin, conn) in enumerate(sorted_conns):
                 target_block_key = conn.get("target")
                 arrow_key = conn.get("arrow")
 
@@ -1081,20 +1118,23 @@ class MotionFlowScene(QGraphicsScene):
 
                 arrow = self.arrow_objects[arrow_key]
 
-                # 出力ブロックの決定
-                if isinstance(block, (IfBlockItem, SwitchBlockItem)) and output_pin in block.output_sub_blocks:
-                    output_block = block.output_sub_blocks[output_pin]
+                # 出力ブロック決定
+                if isinstance(block, (IfBlockItem, SwitchBlockItem)):
+                    labels = list(block.output_sub_blocks.keys())
+                    output_pin = labels[conn_idx] if conn_idx < len(labels) else output_pin
+                    output_block = block.output_sub_blocks.get(output_pin)
                 else:
                     output_block = block
 
+                # 接続設定
                 arrow.start_item = output_block
                 output_block.output_arrows.append(arrow)
 
-                # 入力ブロックの決定
-                if target_block_key and target_block_key in self.block_objects:
+                if target_block_key in self.block_objects:
                     target_block = self.block_objects[target_block_key]
                     arrow.end_item = target_block
                     target_block.input_arrows.append(arrow)
 
-                # 最後にパスを更新
                 arrow.update_path()
+
+        return True
