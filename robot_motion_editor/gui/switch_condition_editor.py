@@ -94,6 +94,7 @@ class SwitchConditionEditorDialog(QDialog):
         if current_row >= 0:
             self.case_list.takeItem(current_row)
 
+
     def accept_and_store(self):
         expression = self.expression_edit.toPlainText().strip()
         condition = self.condition_edit.toPlainText().strip()
@@ -120,4 +121,6 @@ class SwitchConditionEditorDialog(QDialog):
             {"expression": expression, "condition": condition, "case": cases}
         )
 
+        # case数をresultとして返す
+        self.result = {"num_cases": len(cases) + 1}  # defaultを含める
         self.accept()

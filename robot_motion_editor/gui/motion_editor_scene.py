@@ -1260,3 +1260,21 @@ class MotionFlowScene(QGraphicsScene):
                 arrow.update_path()
 
         return True
+
+    def update_switch_block(self, condition_name, new_num_cases):
+        # ブロックを検索
+        for block in self.block_objects.values():
+            if isinstance(block, SwitchBlockItem) and block.filename == condition_name:
+                current_cases = block.num_cases
+                if current_cases != new_num_cases:
+                    # ブロックを再作成（現在位置を保持）
+                    pos = block.pos()
+                    id = block.id
+                    self.remove_block(block)
+
+                    # 新しいケース数で再作成
+                    new_block = SwitchBlockItem(id, condition_name, num_cases=new_num_cases)
+                    new_block.setPos(pos)
+                    self.addItem(new_block)
+                    self.block_objects[new_block.name] = new_block
+                break

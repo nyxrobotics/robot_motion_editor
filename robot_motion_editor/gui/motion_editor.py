@@ -304,11 +304,15 @@ class MotionEditorWidget(QWidget):
         condition_path = os.path.join(
             self.animation_root,
             self.current_animation_name,
-            "conditions",
-            "switch",
-            f"{condition_name}.yaml")
-        dlg = SwitchConditionEditorDialog(
-            available_variables=self.available_variables,
-            condition_path=condition_path
+            "conditions", "switch", f"{condition_name}.yaml"
         )
-        dlg.exec_()
+        dlg = SwitchConditionEditorDialog(
+            condition_path=condition_path,
+            available_variables=self.available_variables
+        )
+
+        if dlg.exec_():
+            if dlg.result:
+                new_num_cases = dlg.result.get("num_cases", 2)
+                # フローチャート上のブロックを更新
+                self.scene.update_switch_block(condition_name, new_num_cases)
