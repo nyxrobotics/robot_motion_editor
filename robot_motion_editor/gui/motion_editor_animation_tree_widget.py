@@ -13,11 +13,13 @@ class AnimationTreeWidget(QTreeWidget):
 
     def mouseMoveEvent(self, event):
         item = self.currentItem()
-        if item and item.parent():
+        if item is None:
+            event.ignore()
+            return
+        elif item.text(0) == "offset" and item.parent():
+            item_type = "start"
+        elif item and item.parent():
             parent_text = item.parent().text(0)
-            grand_parent_text = item.parent().parent().text(0) if item.parent().parent() else ""
-
-            # ドラッグ対象の種別判定
             if parent_text == "frames":
                 item_type = "frame"
             elif parent_text == "if":
@@ -27,12 +29,13 @@ class AnimationTreeWidget(QTreeWidget):
             else:
                 event.ignore()
                 return
-
-            mime_text = f"{item_type}:{item.text(0)}"
-            drag = QDrag(self)
-            mime = QMimeData()
-            mime.setText(mime_text)
-            drag.setMimeData(mime)
-            drag.exec_(Qt.CopyAction)
         else:
             event.ignore()
+            return
+
+        mime_text = f"{item_type}:{item.text(0)}"
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setText(mime_text)
+        drag.setMimeData(mime)
+        drag.exec_(Qt.CopyAction)

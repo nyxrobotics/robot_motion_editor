@@ -938,6 +938,12 @@ class MotionFlowScene(QGraphicsScene):
             else:
                 num_cases = 2
             item = SwitchBlockItem(id, name, num_cases=num_cases)
+        elif item_type == "start":
+            # 既にStartBlockが存在するかチェック
+            if any(isinstance(b, StartBlockItem) for b in self.block_objects.values()):
+                QMessageBox.warning(None, "Start Block Exists", "This animation already has a Start block.")
+                return
+            item = StartBlockItem(id)
         else:
             event.ignore()
             return
