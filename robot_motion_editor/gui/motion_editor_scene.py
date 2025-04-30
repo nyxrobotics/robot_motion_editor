@@ -663,6 +663,7 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         self.arrow = arrow
         self.is_start = is_start
         self.is_dragging = False
+        self.original_end_item = None
 
     def mousePressEvent(self, event):
         self.is_dragging = True
@@ -687,12 +688,14 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         for item in scene.items(self.scenePos()):
             if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem, OutputSubBlockItem, StartBlockItem)):
                 if self.is_start:
-                    if item.max_outputs != -1 and len(item.output_arrows) >= item.max_outputs:
+                    is_same = item == self.arrow.start_item
+                    if item.max_outputs != -1 and len(item.output_arrows) >= item.max_outputs and not is_same:
                         target = None
                         break
                     item.output_arrows.append(self.arrow)
                 else:
-                    if item.max_inputs != -1 and len(item.input_arrows) >= item.max_inputs:
+                    is_same = item == self.arrow.end_item
+                    if item.max_inputs != -1 and len(item.input_arrows) >= item.max_inputs and not is_same:
                         target = None
                         break
                     item.input_arrows.append(self.arrow)
@@ -700,12 +703,10 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
                 break
 
         if self.is_start:
-            # もし前のstart_itemがあったら外す
             if self.arrow.start_item and self.arrow in self.arrow.start_item.output_arrows:
                 self.arrow.start_item.output_arrows.remove(self.arrow)
             self.arrow.start_item = target
         else:
-            # もし前のend_itemがあったら外す
             if self.arrow.end_item and self.arrow in self.arrow.end_item.input_arrows:
                 self.arrow.end_item.input_arrows.remove(self.arrow)
             self.arrow.end_item = target
