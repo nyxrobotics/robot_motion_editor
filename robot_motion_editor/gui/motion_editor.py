@@ -137,6 +137,49 @@ class MotionEditorWidget(QWidget):
             )
             dlg.exec_()
 
+        elif item.parent() and item.parent().text(0) == "if":
+            animation_item = item
+            while animation_item.parent() is not None:
+                animation_item = animation_item.parent()
+            animation_name = animation_item.text(0)
+            condition_name = item.text(0)
+
+            condition_path = os.path.join(
+                self.animation_root, animation_name, "conditions", "if", f"{condition_name}.yaml"
+            )
+            if not os.path.exists(condition_path):
+                QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
+                return
+
+            dlg = IfConditionEditorDialog(
+                available_variables=self.available_variables,
+                condition_path=condition_path
+            )
+            dlg.exec_()
+
+        elif item.parent() and item.parent().text(0) == "switch":
+            animation_item = item
+            while animation_item.parent() is not None:
+                animation_item = animation_item.parent()
+            animation_name = animation_item.text(0)
+            condition_name = item.text(0)
+
+            condition_path = os.path.join(
+                self.animation_root, animation_name, "conditions", "switch", f"{condition_name}.yaml"
+            )
+            if not os.path.exists(condition_path):
+                QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
+                return
+
+            dlg = SwitchConditionEditorDialog(
+                condition_path=condition_path,
+                available_variables=self.available_variables
+            )
+            if dlg.exec_():
+                if dlg.result:
+                    new_num_cases = dlg.result.get("num_cases", 2)
+                    self.scene.update_switch_block(condition_name, new_num_cases)
+
     def load_animation_list(self):
         self.animation_tree.clear()
         if not os.path.isdir(self.animation_root):
@@ -182,6 +225,10 @@ class MotionEditorWidget(QWidget):
                         QTreeWidgetItem(switch_item, [fname[:-5]])
 
     def load_animation_by_name(self, animation_name):
+        if animation_name == self.current_animation_name:
+            return
+        if not self.confirm_save_if_unsaved_changes():
+            return
         self.current_animation_name = animation_name
         layout = load_animation_file(self.animation_root, animation_name)
         self.scene.load_layout_yaml(layout)
@@ -316,3 +363,28 @@ class MotionEditorWidget(QWidget):
                 new_num_cases = dlg.result.get("num_cases", 2)
                 # フローチャート上のブロックを更新
                 self.scene.update_switch_block(condition_name, new_num_cases)
+
+    def confirm_save_if_unsaved_changes(self):
+        if not self.current_animation_name:
+            return True
+
+        current_layout = self.scene.save_layout_yaml()
+        saved_layout = load_animation_file(self.animation_root, self.current_animation_name)
+
+        if current_layout == saved_layout:
+            return True
+
+        reply = QMessageBox.question(
+            self,
+            "Unsaved Changes",
+            f"Animation '{self.current_animation_name}' has unsaved changes.\nDo you want to save them?",
+            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
+        )
+
+        if reply == QMessageBox.Save:
+            self.save_current_animation()
+            return True
+        elif reply == QMessageBox.Discard:
+            return True
+        else:
+            return False
