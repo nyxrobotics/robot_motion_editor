@@ -1,7 +1,9 @@
 import os
 
+from PyQt5.QtCore import QMimeData
 from PyQt5.QtCore import QPoint
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QDrag
 from PyQt5.QtWidgets import QAbstractItemView
 from PyQt5.QtWidgets import QInputDialog
 from PyQt5.QtWidgets import QMenu
@@ -41,6 +43,7 @@ class AnimationTreeWidget(QTreeWidget):
                     item.setText(0, new_name)
 
     def rename_yaml_file(self, category, old_name, new_name, item_widget):
+        # アニメーション名（ルートノード）
         animation_item = item_widget
         while animation_item.parent():
             animation_item = animation_item.parent()
@@ -48,6 +51,7 @@ class AnimationTreeWidget(QTreeWidget):
 
         base_dir = self.animation_root
 
+        # 対象ディレクトリ決定
         if category == "frames":
             dir_path = os.path.join(base_dir, animation_name, "frames")
         elif category == "if":
@@ -66,10 +70,66 @@ class AnimationTreeWidget(QTreeWidget):
 
         try:
             os.rename(old_path, new_path)
-            return True
         except Exception as e:
             QMessageBox.critical(self, "Rename Failed", str(e))
             return False
+
+        # MotionEditorWidget を取得
+        editor = self
+        while editor and not hasattr(editor, "scene"):
+            editor = editor.parent()
+        if not editor:
+            QMessageBox.critical(self, "Error", "MotionEditorWidget not found.")
+            return False
+
+        # layout 修正処理
+        layout = editor.scene.save_layout_yaml()
+        singular_type = category.rstrip("s")
+        updated = False
+
+        # 新しい block を格納する dict
+        new_block = {}
+        rename_map = {}
+
+        for block_key, block_data in layout.get("block", {}).items():
+            info = block_data.get("info", {})
+            block_type = info.get("type")
+            block_filename = info.get("filename")
+            block_id = info.get("id")
+
+            if block_type == singular_type and block_filename == old_name:
+                # info.filename 修正
+                info["filename"] = new_name
+
+                # block名を修正（例: frame_1_oldname → frame_1_newname）
+                parts = block_key.split("_")
+                if len(parts) >= 3 and parts[0] == singular_type and parts[2] == old_name:
+                    new_key = f"{parts[0]}_{parts[1]}_{new_name}"
+                    rename_map[block_key] = new_key
+                    new_block[new_key] = block_data
+                    updated = True
+                else:
+                    new_block[block_key] = block_data
+            else:
+                new_block[block_key] = block_data
+
+        layout["block"] = new_block
+
+        # target 修正（target: frame_1_oldname → frame_1_newname）
+        for block_data in layout["block"].values():
+            output = block_data.get("connection", {}).get("output", {})
+            for conn in output.values():
+                if isinstance(conn, dict) and "target" in conn:
+                    old_target = conn["target"]
+                    if old_target in rename_map:
+                        conn["target"] = rename_map[old_target]
+                        updated = True
+
+        if updated:
+            editor.scene.load_layout_yaml(layout)
+            editor.save_current_animation()
+
+        return True
 
     def mouseMoveEvent(self, event):
         item = self.currentItem()
