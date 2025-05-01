@@ -11,6 +11,7 @@ def load_frame_file(filepath):
 
 
 def save_frame_file(filepath, data):
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, 'w') as f:
         yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
