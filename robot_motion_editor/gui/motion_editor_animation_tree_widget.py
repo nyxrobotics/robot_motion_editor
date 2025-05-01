@@ -23,24 +23,60 @@ class AnimationTreeWidget(QTreeWidget):
 
     def show_context_menu(self, pos: QPoint):
         item = self.itemAt(pos)
-        if item is None or item.parent() is None:
+        if item is None:
+            return
+
+        menu = QMenu(self)
+
+        if item.parent() is None:
+            # アニメーション名ノード（ルート）
+            rename_action = menu.addAction("Rename Animation")
+            action = menu.exec_(self.viewport().mapToGlobal(pos))
+            if action == rename_action:
+                self.rename_animation_folder(item)
             return
 
         parent_text = item.parent().text(0)
         if parent_text not in {"frames", "if", "switch"}:
             return
 
-        menu = QMenu(self)
         rename_action = menu.addAction("Rename")
         action = menu.exec_(self.viewport().mapToGlobal(pos))
 
         if action == rename_action:
             old_name = item.text(0)
-            new_name, ok = QInputDialog.getText(self, "Rename", f"Rename {parent_text} '{old_name}' to:")
+            new_name, ok = QInputDialog.getText(
+                self, "Rename", f"Rename {parent_text} '{old_name}' to:", text=old_name)
             if ok and new_name and new_name != old_name:
                 success = self.rename_yaml_file(parent_text, old_name, new_name, item)
                 if success:
                     item.setText(0, new_name)
+
+    def rename_animation_folder(self, item: QTreeWidgetItem):
+        old_name = item.text(0)
+        new_name, ok = QInputDialog.getText(self, "Rename", f"Rename Animation '{old_name}' to:", text=old_name)
+        if not ok or not new_name or old_name == new_name:
+            return
+
+        old_path = os.path.join(self.animation_root, old_name)
+        new_path = os.path.join(self.animation_root, new_name)
+
+        if os.path.exists(new_path):
+            QMessageBox.warning(self, "Error", f"'{new_name}' already exists.")
+            return
+
+        try:
+            os.rename(old_path, new_path)
+        except Exception as e:
+            QMessageBox.critical(self, "Rename Failed", str(e))
+            return
+
+        # ツリー表示を更新
+        item.setText(0, new_name)
+
+        # 現在編集中のアニメーション名も更新（MotionEditorWidget から取得）
+        if hasattr(self.parent(), "current_animation_name") and self.parent().current_animation_name == old_name:
+            self.parent().current_animation_name = new_name
 
     def rename_yaml_file(self, category, old_name, new_name, item_widget):
         # アニメーション名（ルートノード）
