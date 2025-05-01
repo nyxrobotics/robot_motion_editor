@@ -35,7 +35,7 @@ class MotionEditorWidget(QWidget):
         self.joint_names = joint_names or []
         self.joint_limits = joint_limits or {}
         self.available_variables = available_variables or []
-        self.animation_tree = AnimationTreeWidget()
+        self.animation_tree = AnimationTreeWidget(animation_root=self.animation_root, parent=self)
         self.current_animation_name = None
         self.init_ui()
         self.load_animation_list()
