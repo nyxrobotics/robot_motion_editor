@@ -16,6 +16,7 @@ from robot_motion_editor.gui.initial_pose_editor import InitialPoseEditor
 from robot_motion_editor.gui.motion_editor import MotionEditorWidget
 from robot_motion_editor.robot_interface.urdf_joint_extractor import get_joint_limit
 from robot_motion_editor.robot_interface.urdf_joint_extractor import get_transmission_joints
+from robot_motion_editor.visualizer.trajectory_visualizer import TrajectoryVisualizer
 
 
 class MainWindow(QWidget):
@@ -30,6 +31,9 @@ class MainWindow(QWidget):
             for name in self.joint_names
         }
         self.variable_names = self.generate_variable_names()
+
+        # Initialize the trajectory visualizer
+        self.trajectory_visualizer = TrajectoryVisualizer(visualize_as_state=True, rate=30.0)
         self.init_ui()
 
     def generate_variable_names(self):
@@ -107,7 +111,10 @@ class MainWindow(QWidget):
 
         self.tabs = QTabWidget()
         self.initial_pose_editor = InitialPoseEditor(
-            self.joint_names, self.joint_limits, available_variables=self.variable_names)
+            self.joint_names,
+            self.joint_limits,
+            available_variables=self.variable_names,
+            trajectory_visualizer=self.trajectory_visualizer)
         self.tabs.addTab(self.initial_pose_editor, "Initial Pose")
 
         self.motion_editor = MotionEditorWidget(

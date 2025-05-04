@@ -17,15 +17,15 @@ from sensor_msgs.msg import JointState
 
 from ..logic.initial_pose_file_manager import load_initial_pose
 from ..logic.initial_pose_file_manager import save_initial_pose
+from ..visualizer.initial_pose_visualizer import InitialPoseVisualizer
 from .feedback_expression_dialog import FeedbackExpressionDialog
-from .initial_pose_visualizer import InitialPoseVisualizer
 from .pid_config_dialog import PIDConfigDialog
 
 
 class InitialPoseEditor(QWidget):
     pose_updated = pyqtSignal()
 
-    def __init__(self, joint_names, joint_limits, available_variables):
+    def __init__(self, joint_names, joint_limits, available_variables, trajectory_visualizer):
         super().__init__()
         self.motion_directory = None
         self.joint_names = joint_names
@@ -38,7 +38,8 @@ class InitialPoseEditor(QWidget):
         self.pid_config = {}
         self.feedback_expressions = {}
         self.prev_pose = []
-        self.visualizer = InitialPoseVisualizer(joint_names)
+        self.trajectory_visualizer = trajectory_visualizer
+        self.initial_pose_visualizer = InitialPoseVisualizer(joint_names, trajectory_visualizer)
         self.init_ui()
 
     def init_ui(self):
@@ -136,8 +137,7 @@ class InitialPoseEditor(QWidget):
                 msg = JointState()
                 msg.name = self.joint_names
                 msg.position = current
-                self.visualizer.update_target_pose(msg)
-                self.visualizer.publish_query_goal_state()
+                self.initial_pose_visualizer.update_target_pose(msg)
 
     def set_motion_directory(self, directory):
         self.motion_directory = directory
