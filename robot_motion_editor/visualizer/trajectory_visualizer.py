@@ -21,7 +21,7 @@ class TrajectoryVisualizer:
         if self.visualize_as_state:
             self.pub = rospy.Publisher("/display_planned_state", DisplayRobotState, queue_size=1)
             self.cancel_event = threading.Event()
-            self.loop_enabled = False
+            self.loop_enabled = True
             self._playback_thread = threading.Thread(target=self._playback_loop)
             self._playback_thread.daemon = True
             self._playback_thread.start()
@@ -35,18 +35,36 @@ class TrajectoryVisualizer:
             name=target.name,
             position=self._get_aligned_joint_positions(current, target)
         )
-        trajectory = self._interpolate_trajectory(start_state, target, duration, self.rate)
-        self.visualize_joint_trajectory(trajectory)
+
+        traj = JointTrajectory()
+        traj.joint_names = target.name
+
+        point_start = JointTrajectoryPoint()
+        point_start.time_from_start = rospy.Duration(0.0)
+        point_start.positions = start_state.position
+        point_start.velocities = [
+            (b - a) / duration for a, b in zip(start_state.position, target.position)
+        ]
+
+        point_end = JointTrajectoryPoint()
+        point_end.time_from_start = rospy.Duration(duration)
+        point_end.positions = target.position
+        point_end.velocities = [0.0] * len(target.position)
+
+        traj.points = [point_start, point_end]
+        self.visualize_joint_trajectory(traj)
 
     def visualize_joint_trajectory(self, trajectory: JointTrajectory):
+        interpolated = self._interpolate_joint_trajectory(trajectory, self.rate)
+
         with self._lock:
-            self._trajectory = trajectory
+            self._trajectory = interpolated
 
         if self.visualize_as_state:
             self.cancel_event.set()
         else:
             traj_msg = DisplayTrajectory()
-            traj_msg.trajectory.append(RobotTrajectory(joint_trajectory=trajectory))
+            traj_msg.trajectory.append(RobotTrajectory(joint_trajectory=interpolated))
             self.pub.publish(traj_msg)
 
     def publish_goal_state(self, joint_state: JointState):
@@ -70,11 +88,27 @@ class TrajectoryVisualizer:
             name=target.name,
             position=self._get_aligned_joint_positions(current, target)
         )
-        trajectory = self._interpolate_trajectory(start_state, target, duration, self.rate)
+
+        traj = JointTrajectory()
+        traj.joint_names = target.name
+
+        point_start = JointTrajectoryPoint()
+        point_start.time_from_start = rospy.Duration(0.0)
+        point_start.positions = start_state.position
+        point_start.velocities = [
+            (b - a) / duration for a, b in zip(start_state.position, target.position)
+        ]
+
+        point_end = JointTrajectoryPoint()
+        point_end.time_from_start = rospy.Duration(duration)
+        point_end.positions = target.position
+        point_end.velocities = [0.0] * len(target.position)
+
+        traj.points = [point_start, point_end]
 
         traj_msg = DisplayTrajectory()
         traj_msg.trajectory_start.joint_state = start_state
-        traj_msg.trajectory.append(RobotTrajectory(joint_trajectory=trajectory))
+        traj_msg.trajectory.append(RobotTrajectory(joint_trajectory=traj))
         self.pub.publish(traj_msg)
 
     def _playback_loop(self):
@@ -86,7 +120,7 @@ class TrajectoryVisualizer:
                 with self._lock:
                     trajectory = self._trajectory
 
-                if trajectory:
+                if trajectory and trajectory.points:
                     for point in trajectory.points:
                         if self.cancel_event.is_set():
                             break
@@ -95,28 +129,42 @@ class TrajectoryVisualizer:
                         robot_state.joint_state.position = point.positions
                         robot_state.joint_state.velocity = point.velocities
                         self.pub.publish(DisplayRobotState(state=robot_state))
-                        rospy.sleep(point.time_from_start.to_sec())
-                    break
+                        rospy.sleep(1.0 / self.rate)
+                    if not self.loop_enabled:
+                        break
                 else:
                     break
 
                 if not self.loop_enabled or self.cancel_event.is_set():
                     break
 
-    def _interpolate_trajectory(self, current, target, duration, rate):
-        traj = JointTrajectory()
-        traj.joint_names = target.name
-        steps = int(duration * rate)
-        for step in range(steps + 1):
-            t = step / steps
-            point = JointTrajectoryPoint()
-            point.time_from_start = rospy.Duration.from_sec(t * duration)
-            point.positions = [
-                (1 - t) * c + t * tgt for c, tgt in zip(current.position, target.position)
-            ]
-            point.velocities = [0.0] * len(point.positions)
-            traj.points.append(point)
-        return traj
+    def _interpolate_joint_trajectory(self, trajectory: JointTrajectory, rate: float) -> JointTrajectory:
+        if len(trajectory.points) < 2:
+            return trajectory
+
+        result = JointTrajectory()
+        result.joint_names = trajectory.joint_names
+
+        for i in range(len(trajectory.points) - 1):
+            p0 = trajectory.points[i]
+            p1 = trajectory.points[i + 1]
+            dt = (p1.time_from_start - p0.time_from_start).to_sec()
+            steps = max(int(dt * rate), 1)
+            for step in range(steps):
+                t = step / steps
+                point = JointTrajectoryPoint()
+                point.time_from_start = rospy.Duration.from_sec(
+                    p0.time_from_start.to_sec() + t * dt
+                )
+                point.positions = [
+                    (1 - t) * a + t * b for a, b in zip(p0.positions, p1.positions)
+                ]
+                point.velocities = [
+                    (1 - t) * a + t * b for a, b in zip(p0.velocities, p1.velocities)
+                ]
+                result.points.append(point)
+        result.points.append(trajectory.points[-1])
+        return result
 
     def _get_aligned_joint_positions(self, current, target):
         return [
