@@ -18,6 +18,7 @@ from sensor_msgs.msg import JointState
 from ..logic.initial_pose_file_manager import load_initial_pose
 from ..logic.initial_pose_file_manager import save_initial_pose
 from ..visualizer.initial_pose_visualizer import InitialPoseVisualizer
+from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .feedback_expression_dialog import FeedbackExpressionDialog
 from .pid_config_dialog import PIDConfigDialog
 
@@ -25,9 +26,15 @@ from .pid_config_dialog import PIDConfigDialog
 class InitialPoseEditor(QWidget):
     pose_updated = pyqtSignal()
 
-    def __init__(self, joint_names, joint_limits, available_variables, trajectory_visualizer):
+    def __init__(
+            self,
+            joint_names,
+            joint_limits,
+            available_variables,
+            motion_directory=None,
+            trajectory_visualizer: TrajectoryVisualizer = None):
         super().__init__()
-        self.motion_directory = None
+        self.motion_directory = motion_directory
         self.joint_names = joint_names
         self.joint_limits = joint_limits
         self.available_variables = available_variables

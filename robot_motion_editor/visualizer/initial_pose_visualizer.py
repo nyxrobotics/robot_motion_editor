@@ -4,9 +4,11 @@ import threading
 import rospy
 from sensor_msgs.msg import JointState
 
+from .trajectory_visualizer import TrajectoryVisualizer
+
 
 class InitialPoseVisualizer:
-    def __init__(self, joint_names, trajectory_visualizer):
+    def __init__(self, joint_names, trajectory_visualizer: TrajectoryVisualizer):
         self.joint_names = joint_names
         self.trajectory_visualizer = trajectory_visualizer
         self.lock = threading.Lock()

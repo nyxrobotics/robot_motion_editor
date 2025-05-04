@@ -18,7 +18,7 @@ class IfConditionEditorDialog(QDialog):
         self.setWindowTitle(f"If Condition Editor: {os.path.basename(condition_path)}")
         self.available_variables = available_variables or []
         self.condition_path = condition_path
-        self.animation_root, self.animation_name, self.condition_name = self.parse_path(condition_path)
+        self.motion_directory, self.animation_name, self.condition_name = self.parse_path(condition_path)
         self.init_ui()
         self.load_condition()
 
@@ -26,8 +26,8 @@ class IfConditionEditorDialog(QDialog):
         condition_name = os.path.splitext(os.path.basename(path))[0]
         conditions_dir = os.path.dirname(os.path.dirname(path))
         animation_name = os.path.basename(os.path.dirname(conditions_dir))
-        animation_root = os.path.dirname(os.path.dirname(conditions_dir))
-        return animation_root, animation_name, condition_name
+        motion_directory = os.path.dirname(os.path.dirname(conditions_dir))
+        return motion_directory, animation_name, condition_name
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -60,7 +60,7 @@ class IfConditionEditorDialog(QDialog):
         QMessageBox.information(self, "Available Variables", "\n".join(self.available_variables))
 
     def load_condition(self):
-        data = load_if_condition(self.animation_root, self.animation_name, self.condition_name)
+        data = load_if_condition(self.motion_directory, self.animation_name, self.condition_name)
         if data:
             self.expression_edit.setPlainText(data.get('expression', ''))
             self.condition_edit.setPlainText(data.get('condition', ''))
@@ -108,7 +108,7 @@ class IfConditionEditorDialog(QDialog):
 
         # 保存処理
         save_if_condition(
-            self.animation_root,
+            self.motion_directory,
             self.animation_name,
             self.condition_name,
             {"expression": expression, "condition": condition}

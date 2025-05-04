@@ -13,9 +13,9 @@ from PyQt5.QtWidgets import QTreeWidgetItem
 
 
 class AnimationTreeWidget(QTreeWidget):
-    def __init__(self, animation_root, parent=None):
+    def __init__(self, motion_directory, parent=None):
         super().__init__(parent)
-        self.animation_root = animation_root
+        self.motion_directory = motion_directory
         self.setHeaderLabel("Animations")
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
@@ -58,8 +58,8 @@ class AnimationTreeWidget(QTreeWidget):
         if not ok or not new_name or old_name == new_name:
             return
 
-        old_path = os.path.join(self.animation_root, old_name)
-        new_path = os.path.join(self.animation_root, new_name)
+        old_path = os.path.join(self.motion_directory, old_name)
+        new_path = os.path.join(self.motion_directory, new_name)
 
         if os.path.exists(new_path):
             QMessageBox.warning(self, "Error", f"'{new_name}' already exists.")
@@ -85,7 +85,7 @@ class AnimationTreeWidget(QTreeWidget):
             animation_item = animation_item.parent()
         animation_name = animation_item.text(0)
 
-        base_dir = self.animation_root
+        base_dir = self.motion_directory
 
         # 対象ディレクトリ決定
         if category == "frames":

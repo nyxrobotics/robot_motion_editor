@@ -937,7 +937,7 @@ class MotionFlowScene(QGraphicsScene):
         elif item_type == "switch":
             # switchのcase数をyamlから取得して反映（オプション）
             switch_path = os.path.join(
-                self.editor_widget.animation_root,
+                self.editor_widget.motion_directory,
                 self.editor_widget.current_animation_name,
                 "conditions", "switch", f"{name}.yaml"
             )
@@ -1031,7 +1031,7 @@ class MotionFlowScene(QGraphicsScene):
                 if ok and name.strip():
                     name = name.strip()
                     frames_dir = os.path.join(
-                        self.editor_widget.animation_root,
+                        self.editor_widget.motion_directory,
                         self.editor_widget.current_animation_name,
                         "frames")
                     frame_path = os.path.join(frames_dir, f"{name}.yaml")
@@ -1057,7 +1057,7 @@ class MotionFlowScene(QGraphicsScene):
                 if ok and name.strip():
                     name = name.strip()
                     conditions_dir = os.path.join(
-                        self.editor_widget.animation_root,
+                        self.editor_widget.motion_directory,
                         self.editor_widget.current_animation_name,
                         "conditions",
                         "if")
@@ -1070,7 +1070,7 @@ class MotionFlowScene(QGraphicsScene):
                     os.makedirs(conditions_dir, exist_ok=True)
                     default_if_data = {"expression": "", "condition": ""}
                     save_if_condition(
-                        self.editor_widget.animation_root,
+                        self.editor_widget.motion_directory,
                         self.editor_widget.current_animation_name,
                         name,
                         default_if_data)
@@ -1088,7 +1088,7 @@ class MotionFlowScene(QGraphicsScene):
                 if ok and name.strip():
                     name = name.strip()
                     conditions_dir = os.path.join(
-                        self.editor_widget.animation_root,
+                        self.editor_widget.motion_directory,
                         self.editor_widget.current_animation_name,
                         "conditions",
                         "switch")
@@ -1101,7 +1101,7 @@ class MotionFlowScene(QGraphicsScene):
                     os.makedirs(conditions_dir, exist_ok=True)
                     default_switch_data = {"expression": "", "condition": "", "case": [0]}
                     save_switch_condition(
-                        self.editor_widget.animation_root,
+                        self.editor_widget.motion_directory,
                         self.editor_widget.current_animation_name,
                         name,
                         default_switch_data)

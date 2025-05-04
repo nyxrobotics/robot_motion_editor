@@ -29,13 +29,13 @@ from .switch_condition_editor import SwitchConditionEditorDialog
 
 
 class MotionEditorWidget(QWidget):
-    def __init__(self, animation_root=".", joint_names=None, joint_limits=None, available_variables=None):
+    def __init__(self, motion_directory=".", joint_names=None, joint_limits=None, available_variables=None):
         super().__init__()
-        self.animation_root = animation_root
+        self.motion_directory = motion_directory
         self.joint_names = joint_names or []
         self.joint_limits = joint_limits or {}
         self.available_variables = available_variables or []
-        self.animation_tree = AnimationTreeWidget(animation_root=self.animation_root, parent=self)
+        self.animation_tree = AnimationTreeWidget(motion_directory=self.motion_directory, parent=self)
         self.current_animation_name = None
         self.init_ui()
         self.load_animation_list()
@@ -108,7 +108,7 @@ class MotionEditorWidget(QWidget):
             animation_name = animation_item.text(0)
             frame_name = item.text(0)
 
-            frame_path = os.path.join(self.animation_root, animation_name, "frames", f"{frame_name}.yaml")
+            frame_path = os.path.join(self.motion_directory, animation_name, "frames", f"{frame_name}.yaml")
             if not os.path.exists(frame_path):
                 QMessageBox.warning(self, "Missing File", f"{frame_path} not found.")
                 return
@@ -129,7 +129,7 @@ class MotionEditorWidget(QWidget):
             condition_name = item.text(0)
 
             condition_path = os.path.join(
-                self.animation_root, animation_name, "conditions", "if", f"{condition_name}.yaml"
+                self.motion_directory, animation_name, "conditions", "if", f"{condition_name}.yaml"
             )
             if not os.path.exists(condition_path):
                 QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
@@ -149,7 +149,7 @@ class MotionEditorWidget(QWidget):
             condition_name = item.text(0)
 
             condition_path = os.path.join(
-                self.animation_root, animation_name, "conditions", "switch", f"{condition_name}.yaml"
+                self.motion_directory, animation_name, "conditions", "switch", f"{condition_name}.yaml"
             )
             if not os.path.exists(condition_path):
                 QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
@@ -166,11 +166,11 @@ class MotionEditorWidget(QWidget):
 
     def load_animation_list(self):
         self.animation_tree.clear()
-        if not os.path.isdir(self.animation_root):
+        if not os.path.isdir(self.motion_directory):
             return
 
-        for animation_name in sorted(os.listdir(self.animation_root)):
-            animation_dir = os.path.join(self.animation_root, animation_name)
+        for animation_name in sorted(os.listdir(self.motion_directory)):
+            animation_dir = os.path.join(self.motion_directory, animation_name)
             if not os.path.isdir(animation_dir):
                 continue
 
@@ -214,7 +214,7 @@ class MotionEditorWidget(QWidget):
         if not self.confirm_save_if_unsaved_changes():
             return
         self.current_animation_name = animation_name
-        layout = load_animation_file(self.animation_root, animation_name)
+        layout = load_animation_file(self.motion_directory, animation_name)
         self.scene.load_layout_yaml(layout)
 
     def save_current_animation(self):
@@ -224,7 +224,7 @@ class MotionEditorWidget(QWidget):
 
         layout = self.scene.save_layout_yaml()
         print("[DEBUG] Final layout from scene:", layout)
-        save_animation_file(self.animation_root, self.current_animation_name, layout)
+        save_animation_file(self.motion_directory, self.current_animation_name, layout)
         print("Saved:", self.current_animation_name)
 
     def create_new_animation(self):
@@ -232,7 +232,7 @@ class MotionEditorWidget(QWidget):
         if not ok or not name.strip():
             return
         name = name.strip()
-        animation_path = os.path.join(self.animation_root, name)
+        animation_path = os.path.join(self.motion_directory, name)
         if os.path.exists(animation_path):
             QMessageBox.warning(self, "Name Conflict", f"Animation '{name}' already exists.")
             return
@@ -254,7 +254,7 @@ class MotionEditorWidget(QWidget):
 
         animation_item = current_item.parent() if current_item.parent() else current_item
         animation_name = animation_item.text(0)
-        frames_dir = os.path.join(self.animation_root, animation_name, "frames")
+        frames_dir = os.path.join(self.motion_directory, animation_name, "frames")
 
         name, ok = QInputDialog.getText(self, "New Frame", "Enter frame name:")
         if not ok or not name.strip():
@@ -277,7 +277,7 @@ class MotionEditorWidget(QWidget):
             QMessageBox.warning(self, "Selection Error", "Please select an animation to delete.")
             return
         name = item.text(0)
-        path = os.path.join(self.animation_root, name)
+        path = os.path.join(self.motion_directory, name)
 
         reply = QMessageBox.question(self, "Delete Animation",
                                      f"Are you sure you want to delete animation '{name}'?",
@@ -297,7 +297,7 @@ class MotionEditorWidget(QWidget):
 
         anim_name = parent.text(0)
         frame_name = item.text(0)
-        path = os.path.join(self.animation_root, anim_name, "frames", f"{frame_name}.yaml")
+        path = os.path.join(self.motion_directory, anim_name, "frames", f"{frame_name}.yaml")
 
         reply = QMessageBox.question(self, "Delete Frame",
                                      f"Are you sure you want to delete frame '{frame_name}'?",
@@ -309,7 +309,7 @@ class MotionEditorWidget(QWidget):
             self.load_animation_by_name(anim_name)
 
     def open_offset_editor(self):
-        offset_path = os.path.join(self.animation_root, self.current_animation_name, "offset.yaml")
+        offset_path = os.path.join(self.motion_directory, self.current_animation_name, "offset.yaml")
 
         dlg = OffsetEditorDialog(
             joint_names=self.joint_names,
@@ -321,7 +321,7 @@ class MotionEditorWidget(QWidget):
         if dlg.exec_():
             updated_data = dlg.get_joint_data()
             save_initial_pose(
-                os.path.join(self.animation_root, self.current_animation_name),
+                os.path.join(self.motion_directory, self.current_animation_name),
                 joint_names=list(updated_data.keys()),
                 positions=[v["position"] for v in updated_data.values()],
                 enabled={k: v["enable"] for k, v in updated_data.items()},
@@ -331,7 +331,7 @@ class MotionEditorWidget(QWidget):
             )
 
     def open_frame_editor(self, frame_name):
-        frame_path = os.path.join(self.animation_root, self.current_animation_name, "frames", f"{frame_name}.yaml")
+        frame_path = os.path.join(self.motion_directory, self.current_animation_name, "frames", f"{frame_name}.yaml")
         dlg = FrameEditorDialog(
             joint_names=self.joint_names,
             joint_limits=self.joint_limits,
@@ -342,7 +342,7 @@ class MotionEditorWidget(QWidget):
 
     def open_if_condition_editor(self, condition_name):
         condition_path = os.path.join(
-            self.animation_root,
+            self.motion_directory,
             self.current_animation_name,
             "conditions",
             "if",
@@ -355,7 +355,7 @@ class MotionEditorWidget(QWidget):
 
     def open_switch_condition_editor(self, condition_name):
         condition_path = os.path.join(
-            self.animation_root,
+            self.motion_directory,
             self.current_animation_name,
             "conditions", "switch", f"{condition_name}.yaml"
         )
@@ -375,7 +375,7 @@ class MotionEditorWidget(QWidget):
             return True
 
         current_layout = self.scene.save_layout_yaml()
-        saved_layout = load_animation_file(self.animation_root, self.current_animation_name)
+        saved_layout = load_animation_file(self.motion_directory, self.current_animation_name)
 
         if current_layout == saved_layout:
             return True
