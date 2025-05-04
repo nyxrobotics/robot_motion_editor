@@ -40,6 +40,11 @@ class MotionEditorWidget(QWidget):
         self.init_ui()
         self.load_animation_list()
 
+    def set_motion_directory(self, motion_directory):
+        self.motion_directory = motion_directory
+        self.animation_tree.set_motion_directory(motion_directory)
+        self.load_animation_list()
+
     def init_ui(self):
         splitter = QSplitter(Qt.Horizontal)
 

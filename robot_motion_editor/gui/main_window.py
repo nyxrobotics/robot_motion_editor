@@ -60,6 +60,8 @@ class MainWindow(QWidget):
             self.path_lineedit.setText(folder)
             if self.initial_pose_editor:
                 self.initial_pose_editor.set_motion_directory(folder)
+            if self.motion_editor:
+                self.motion_editor.set_motion_directory(folder)
 
     def init_ui(self):
         layout = QVBoxLayout()

@@ -21,6 +21,9 @@ class AnimationTreeWidget(QTreeWidget):
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
 
+    def set_motion_directory(self, motion_directory):
+        self.motion_directory = motion_directory
+
     def show_context_menu(self, pos: QPoint):
         item = self.itemAt(pos)
         if item is None:

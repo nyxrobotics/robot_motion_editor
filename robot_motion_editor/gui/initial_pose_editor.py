@@ -49,6 +49,10 @@ class InitialPoseEditor(QWidget):
         self.initial_pose_visualizer = InitialPoseVisualizer(joint_names, trajectory_visualizer)
         self.init_ui()
 
+    def set_motion_directory(self, directory):
+        self.motion_directory = directory
+        self.load_joint_pose_from_file()
+
     def init_ui(self):
         main_layout = QVBoxLayout()
 
@@ -145,10 +149,6 @@ class InitialPoseEditor(QWidget):
                 msg.name = self.joint_names
                 msg.position = current
                 self.initial_pose_visualizer.update_target_pose(msg)
-
-    def set_motion_directory(self, directory):
-        self.motion_directory = directory
-        self.load_joint_pose_from_file()
 
     def save_pose_to_file(self):
         positions = self.get_target_joints()
