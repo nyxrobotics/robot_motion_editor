@@ -15,14 +15,13 @@ class TrajectoryVisualizer:
         self.visualize_as_state = visualize_as_state
         self.rate = rate
 
+        self._lock = threading.Lock()
+        self._trajectory = None
+
         if self.visualize_as_state:
-            self._lock = threading.Lock()
-            self._current = None
-            self._target = None
-            self._duration = 1.0
             self.pub = rospy.Publisher("/display_planned_state", DisplayRobotState, queue_size=1)
             self.cancel_event = threading.Event()
-            self.loop_enabled = True
+            self.loop_enabled = False
             self._playback_thread = threading.Thread(target=self._playback_loop)
             self._playback_thread.daemon = True
             self._playback_thread.start()
@@ -31,15 +30,24 @@ class TrajectoryVisualizer:
 
         self.goal_state_pub = rospy.Publisher("/display_robot_state", DisplayRobotState, queue_size=1)
 
-    def visualize_current2target(self, current: JointState, target: JointState, duration: float = None):
+    def visualize_current2target(self, current: JointState, target: JointState, duration: float = 1.0):
+        start_state = JointState(
+            name=target.name,
+            position=self._get_aligned_joint_positions(current, target)
+        )
+        trajectory = self._interpolate_trajectory(start_state, target, duration, self.rate)
+        self.visualize_joint_trajectory(trajectory)
+
+    def visualize_joint_trajectory(self, trajectory: JointTrajectory):
+        with self._lock:
+            self._trajectory = trajectory
+
         if self.visualize_as_state:
-            with self._lock:
-                self._current = current
-                self._target = target
-                self.duration = duration if duration is not None else self.duration
             self.cancel_event.set()
         else:
-            self._publish_trajectory_once(current, target, duration)
+            traj_msg = DisplayTrajectory()
+            traj_msg.trajectory.append(RobotTrajectory(joint_trajectory=trajectory))
+            self.pub.publish(traj_msg)
 
     def publish_goal_state(self, joint_state: JointState):
         robot_state = RobotState()
@@ -51,15 +59,11 @@ class TrajectoryVisualizer:
             self.loop_enabled = enabled
             if enabled:
                 self.cancel_event.set()
-        elif enabled:
+        else:
             rospy.logwarn("Looping is only supported in state visualization mode.")
 
     def _publish_trajectory_once(self, current, target, duration):
-        if current is None:
-            rospy.logwarn("Current joint state is None.")
-            return
-        if target is None:
-            rospy.logwarn("Target joint state is None.")
+        if current is None or target is None:
             return
 
         start_state = JointState(
@@ -80,27 +84,21 @@ class TrajectoryVisualizer:
 
             while not rospy.is_shutdown():
                 with self._lock:
-                    current = self._current
-                    target = self._target
-                    duration = self.duration
+                    trajectory = self._trajectory
 
-                if current is None or target is None:
+                if trajectory:
+                    for point in trajectory.points:
+                        if self.cancel_event.is_set():
+                            break
+                        robot_state = RobotState()
+                        robot_state.joint_state.name = trajectory.joint_names
+                        robot_state.joint_state.position = point.positions
+                        robot_state.joint_state.velocity = point.velocities
+                        self.pub.publish(DisplayRobotState(state=robot_state))
+                        rospy.sleep(point.time_from_start.to_sec())
                     break
-
-                start_state = JointState(
-                    name=target.name,
-                    position=self._get_aligned_joint_positions(current, target)
-                )
-                trajectory = self._interpolate_trajectory(start_state, target, duration, self.rate)
-
-                for point in trajectory.points:
-                    if self.cancel_event.is_set():
-                        break
-                    robot_state = RobotState()
-                    robot_state.joint_state.name = trajectory.joint_names
-                    robot_state.joint_state.position = point.positions
-                    self.pub.publish(DisplayRobotState(state=robot_state))
-                    rospy.sleep(1.0 / self.rate)
+                else:
+                    break
 
                 if not self.loop_enabled or self.cancel_event.is_set():
                     break

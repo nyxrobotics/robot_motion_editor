@@ -53,7 +53,6 @@ class FrameEditorDialog(QDialog):
         content = QWidget()
         form = QFormLayout(content)
 
-        # Move/Wait時間
         self.duration_spin = QDoubleSpinBox()
         self.duration_spin.setDecimals(2)
         self.duration_spin.setRange(0.0, 10.0)
