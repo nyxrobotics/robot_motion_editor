@@ -148,14 +148,16 @@ class TrajectoryVisualizer:
         for i in range(len(trajectory.points) - 1):
             p0 = trajectory.points[i]
             p1 = trajectory.points[i + 1]
-            dt = (p1.time_from_start - p0.time_from_start).to_sec()
+            t0 = p0.time_from_start.to_sec()
+            t1 = p1.time_from_start.to_sec()
+            dt = t1 - t0
+
             steps = max(int(dt * rate), 1)
+
             for step in range(steps):
                 t = step / steps
                 point = JointTrajectoryPoint()
-                point.time_from_start = rospy.Duration.from_sec(
-                    p0.time_from_start.to_sec() + t * dt
-                )
+                point.time_from_start = rospy.Duration.from_sec(t0 + t * dt)
                 point.positions = [
                     (1 - t) * a + t * b for a, b in zip(p0.positions, p1.positions)
                 ]
@@ -163,11 +165,29 @@ class TrajectoryVisualizer:
                     (1 - t) * a + t * b for a, b in zip(p0.velocities, p1.velocities)
                 ]
                 result.points.append(point)
+
+            # Add wait segment: repeat p1 for the duration until next point or +1s if last
+            if i == len(trajectory.points) - 2:
+                wait_time = 1.0  # default if no info
+            else:
+                next_p = trajectory.points[i + 2]
+                wait_time = next_p.time_from_start.to_sec() - p1.time_from_start.to_sec()
+
+            if wait_time > 0.0:
+                wait_steps = max(int(wait_time * rate), 1)
+                for step in range(wait_steps):
+                    point = JointTrajectoryPoint()
+                    point.time_from_start = rospy.Duration.from_sec(p1.time_from_start.to_sec() + (step + 1) / rate)
+                    point.positions = p1.positions
+                    point.velocities = [0.0] * len(p1.positions)
+                    result.points.append(point)
+
+        # 最後の点も追加
         result.points.append(trajectory.points[-1])
         return result
 
-    def _get_aligned_joint_positions(self, current, target):
-        return [
-            current.position[current.name.index(name)] if name in current.name else 0.0
-            for name in target.name
-        ]
+        def _get_aligned_joint_positions(self, current, target):
+            return [
+                current.position[current.name.index(name)] if name in current.name else 0.0
+                for name in target.name
+            ]
