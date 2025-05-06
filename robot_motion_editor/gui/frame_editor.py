@@ -321,6 +321,7 @@ class FrameEditorDialog(QDialog):
         wait_duration = self.wait_spin.value()
 
         # FrameVisualizerに渡す
+        self.trajectory_visualizer.publish_goal_state(msg)
         self.frame_visualizer.set_current_frame(msg, move_duration, wait_duration)
 
         # 再生実行（シンプルな if-elif）

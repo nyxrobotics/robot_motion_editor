@@ -62,6 +62,10 @@ class FrameVisualizer:
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
     def play_in_out_trajectory(self):
+        print("[DEBUG] play_in_out_trajectory called")
+        print("[DEBUG] in_frame:", self.in_frame)
+        print("[DEBUG] current_frame:", self.current_frame)
+        print("[DEBUG] out_frame:", self.out_frame)
         traj = self._make_trajectory_sequence([self.in_frame, self.current_frame, self.out_frame])
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 

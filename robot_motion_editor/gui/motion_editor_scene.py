@@ -1445,10 +1445,3 @@ class MotionFlowScene(QGraphicsScene):
                     if result:
                         return result
         return None
-
-    def get_block_by_name(self, name):
-        for block in self.block_objects.values():
-            if hasattr(block, "filename") and block.filename:
-                if block.filename.endswith(f"/{name}.yaml"):
-                    return block
-        return None

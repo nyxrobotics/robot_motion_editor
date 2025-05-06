@@ -392,16 +392,31 @@ class MotionEditorWidget(QWidget):
             if hasattr(self, "initial_joint_state"):
                 dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
 
-            block = self.scene.get_block_by_name(frame_name)
+            block = self.scene.block_objects.get(frame_name)
             if block:
                 in_block = self.scene.find_previous_frame_block(block)
+                print("[DEBUG] in_block:", in_block)
                 if in_block and in_block.filename:
-                    in_state, in_move, in_wait = self.load_joint_state_and_durations(in_block.filename)
+                    print("[DEBUG] in_block.filename:", in_block.filename)
+                    in_frame_path = os.path.join(
+                        self.motion_directory,
+                        self.current_animation_name,
+                        "frames",
+                        f"{in_block.filename}.yaml"
+                    )
+                    in_state, in_move, in_wait = self.load_joint_state_and_durations(in_frame_path)
                     dlg.frame_visualizer.set_in_frame(in_state, in_move, in_wait)
 
                 out_block = self.scene.find_next_frame_block(block)
                 if out_block and out_block.filename:
-                    out_state, out_move, out_wait = self.load_joint_state_and_durations(out_block.filename)
+                    print("[DEBUG] out_block.filename:", out_block.filename)
+                    out_frame_path = os.path.join(
+                        self.motion_directory,
+                        self.current_animation_name,
+                        "frames",
+                        f"{out_block.filename}.yaml"
+                    )
+                    out_state, out_move, out_wait = self.load_joint_state_and_durations(out_frame_path)
                     dlg.frame_visualizer.set_out_frame(out_state, out_move, out_wait)
 
         dlg.exec_()
