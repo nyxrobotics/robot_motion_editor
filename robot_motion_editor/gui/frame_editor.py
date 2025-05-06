@@ -231,8 +231,8 @@ class FrameEditorDialog(QDialog):
             return
 
         time_data = data.get("time", {})
-        self.duration_spin.setValue(time_data.get("duration", 2.0))
-        self.wait_spin.setValue(time_data.get("wait", 0.0))
+        self.duration_spin.setValue(time_data.get("move_duration", 2.0))
+        self.wait_spin.setValue(time_data.get("wait_duration", 0.0))
 
         velocity_data = data.get("velocity_scale", {})
         joints_data = data.get("joints", {})
@@ -264,8 +264,8 @@ class FrameEditorDialog(QDialog):
 
         output = {
             "time": {
-                "duration": self.duration_spin.value(),
-                "wait": self.wait_spin.value(),
+                "move_duration": self.duration_spin.value(),
+                "wait_duration": self.wait_spin.value(),
             },
             "velocity_scale": {name: self.joint_widgets[name][2].value() for name in self.joint_names},
             "joints": {}

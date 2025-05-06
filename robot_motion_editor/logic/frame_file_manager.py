@@ -28,8 +28,8 @@ def create_default_frame():
             # }
         },
         "time": {
-            # "duration": 1.0,
-            # "wait": 0.0
+            # "move_duration": 1.0,
+            # "wait_duration": 0.0
         },
         "velocity_scale": {
             # "joint1": 1.0
