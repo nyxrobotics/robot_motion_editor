@@ -1423,3 +1423,25 @@ class MotionFlowScene(QGraphicsScene):
                     del self.arrow_objects[arrow.name]
 
         # 新しく増えたケースについては矢印なしの状態（何もしない）
+
+    def find_previous_frame_block(self, block):
+        for arrow in self.arrow_objects.values():
+            if arrow.end_item == block:
+                source = arrow.start_item
+                if isinstance(source, FrameBlockItem):
+                    return source
+                else:
+                    return self.find_previous_frame_block(source)
+        return None
+
+    def find_next_frame_block(self, block):
+        for arrow in self.arrow_objects.values():
+            if arrow.start_item == block:
+                target = arrow.end_item
+                if isinstance(target, FrameBlockItem):
+                    return target
+                else:
+                    result = self.find_next_frame_block(target)
+                    if result:
+                        return result
+        return None
