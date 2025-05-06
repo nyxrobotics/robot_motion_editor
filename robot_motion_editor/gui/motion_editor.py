@@ -1,5 +1,8 @@
+import math
 import os
 
+import rospy
+import yaml
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QFileDialog
@@ -13,6 +16,7 @@ from PyQt5.QtWidgets import QSplitter
 from PyQt5.QtWidgets import QTreeWidgetItem
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
+from sensor_msgs.msg import JointState
 
 from ..logic.animation_file_manager import load_animation_file
 from ..logic.animation_file_manager import save_animation_file
@@ -339,22 +343,16 @@ class MotionEditorWidget(QWidget):
                 filename="offset.yaml"
             )
 
+    def load_joint_state(self, path):
+        with open(path, "r") as f:
+            data = yaml.safe_load(f)
+        msg = JointState()
+        msg.name = list(data["joints"].keys())
+        msg.position = [math.radians(data["joints"][name]) for name in msg.name]
+        msg.header.stamp = rospy.Time.now()
+        return msg
+
     def open_frame_editor(self, frame_name):
-        import math
-        import os
-
-        import rospy
-        import yaml
-        from sensor_msgs.msg import JointState
-
-        def load_joint_state(path):
-            with open(path, "r") as f:
-                data = yaml.safe_load(f)
-            msg = JointState()
-            msg.name = list(data["joints"].keys())
-            msg.position = [math.radians(data["joints"][name]) for name in msg.name]
-            msg.header.stamp = rospy.Time.now()
-            return msg
 
         frame_path = os.path.join(self.motion_directory, self.current_animation_name, "frames", f"{frame_name}.yaml")
 
@@ -369,7 +367,7 @@ class MotionEditorWidget(QWidget):
 
         # setup frame_visualizer
         if hasattr(dlg, "frame_visualizer"):
-            current_state = load_joint_state(frame_path)
+            current_state = self.load_joint_state(frame_path)
             dlg.frame_visualizer.set_current_frame(current_state)
 
             if hasattr(self, "initial_joint_state"):
@@ -379,12 +377,12 @@ class MotionEditorWidget(QWidget):
             if block:
                 in_block = self.scene.find_previous_frame_block(block)
                 if in_block and in_block.filename:
-                    in_state = load_joint_state(in_block.filename)
+                    in_state = self.load_joint_state(in_block.filename)
                     dlg.frame_visualizer.set_in_frame(in_state)
 
                 out_block = self.scene.find_next_frame_block(block)
                 if out_block and out_block.filename:
-                    out_state = load_joint_state(out_block.filename)
+                    out_state = self.load_joint_state(out_block.filename)
                     dlg.frame_visualizer.set_out_frame(out_state)
 
         dlg.exec_()
