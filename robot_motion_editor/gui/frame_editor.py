@@ -140,8 +140,14 @@ class FrameEditorDialog(QDialog):
             spin.setSingleStep(1.0)
             spin.setRange(lower_deg, upper_deg)
 
-            slider.valueChanged.connect(lambda val, s=spin: s.setValue(float(val)))
-            spin.valueChanged.connect(lambda val, sl=slider: sl.setValue(int(round(val))))
+            slider.valueChanged.connect(
+                lambda val,
+                s=spin: (
+                    s.setValue(
+                        float(val)),
+                    self.publish_goal_state_from_gui()))
+            spin.valueChanged.connect(lambda val, sl=slider: (
+                sl.setValue(int(round(val))), self.publish_goal_state_from_gui()))
 
             vel_spin = QDoubleSpinBox()
             vel_spin.setDecimals(2)
@@ -336,3 +342,19 @@ class FrameEditorDialog(QDialog):
         if state == Qt.Unchecked:
             for btn in [self.play_in_current_btn, self.play_in_current_out_btn, self.play_current_out_btn]:
                 btn.setChecked(False)
+
+    def publish_goal_state_from_gui(self):
+        import rospy
+        from sensor_msgs.msg import JointState
+        msg = JointState()
+        msg.name = []
+        msg.position = []
+        for joint in self.joint_names:
+            if self.joint_enabled.get(joint, True):
+                _, spin, _ = self.joint_widgets[joint]
+                pos_deg = spin.value()
+                pos_rad = math.radians(pos_deg)
+                msg.name.append(joint)
+                msg.position.append(pos_rad)
+        msg.header.stamp = rospy.Time.now()
+        self.trajectory_visualizer.publish_goal_state(msg)
