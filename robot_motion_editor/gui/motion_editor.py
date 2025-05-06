@@ -343,19 +343,36 @@ class MotionEditorWidget(QWidget):
                 filename="offset.yaml"
             )
 
-    def load_joint_state(self, path):
+    def load_joint_state_and_durations(self, path):
         with open(path, "r") as f:
             data = yaml.safe_load(f)
+
+        if not data or "joints" not in data:
+            raise ValueError(f"[ERROR] Invalid or empty frame file: {path}")
+
+        joints_data = data["joints"]
         msg = JointState()
-        msg.name = list(data["joints"].keys())
-        msg.position = [math.radians(data["joints"][name]) for name in msg.name]
+        msg.name = []
+        msg.position = []
+
+        for name, joint_info in joints_data.items():
+            if isinstance(joint_info, dict) and "position" in joint_info:
+                position = joint_info["position"]
+            else:
+                position = joint_info  # fallback if flat format
+
+            msg.name.append(name)
+            msg.position.append(math.radians(position))
+
         msg.header.stamp = rospy.Time.now()
-        return msg
+
+        move_duration = data.get("time", {}).get("move_duration", 1.0)
+        wait_duration = data.get("time", {}).get("wait_duration", 0.0)
+
+        return msg, move_duration, wait_duration
 
     def open_frame_editor(self, frame_name):
-
         frame_path = os.path.join(self.motion_directory, self.current_animation_name, "frames", f"{frame_name}.yaml")
-
         dlg = FrameEditorDialog(
             joint_names=self.joint_names,
             joint_limits=self.joint_limits,
@@ -367,8 +384,8 @@ class MotionEditorWidget(QWidget):
 
         # setup frame_visualizer
         if hasattr(dlg, "frame_visualizer"):
-            current_state = self.load_joint_state(frame_path)
-            dlg.frame_visualizer.set_current_frame(current_state)
+            current_state, current_move, current_wait = self.load_joint_state_and_durations(frame_path)
+            dlg.frame_visualizer.set_current_frame(current_state, current_move, current_wait)
 
             if hasattr(self, "initial_joint_state"):
                 dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
@@ -377,13 +394,13 @@ class MotionEditorWidget(QWidget):
             if block:
                 in_block = self.scene.find_previous_frame_block(block)
                 if in_block and in_block.filename:
-                    in_state = self.load_joint_state(in_block.filename)
-                    dlg.frame_visualizer.set_in_frame(in_state)
+                    in_state, in_move, in_wait = self.load_joint_state_and_durations(in_block.filename)
+                    dlg.frame_visualizer.set_in_frame(in_state, in_move, in_wait)
 
                 out_block = self.scene.find_next_frame_block(block)
                 if out_block and out_block.filename:
-                    out_state = self.load_joint_state(out_block.filename)
-                    dlg.frame_visualizer.set_out_frame(out_state)
+                    out_state, out_move, out_wait = self.load_joint_state_and_durations(out_block.filename)
+                    dlg.frame_visualizer.set_out_frame(out_state, out_move, out_wait)
 
         dlg.exec_()
 
