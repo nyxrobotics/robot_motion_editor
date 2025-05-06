@@ -300,18 +300,36 @@ class FrameEditorDialog(QDialog):
         if not self.loop_checkbox.isChecked():
             sender.setChecked(False)
 
-        # ここで選択状態に応じた再生モードに切り替える（本体処理と連携）
-        mode = None
-        if sender == self.play_in_current_btn:
-            mode = "in_current"
-        elif sender == self.play_in_current_out_btn:
-            mode = "in_current_out"
-        elif sender == self.play_current_out_btn:
-            mode = "current_out"
+        # 現在のGUI状態からJointStateを構築
+        import rospy
+        from sensor_msgs.msg import JointState
+        msg = JointState()
+        msg.name = []
+        msg.position = []
+        for joint in self.joint_names:
+            if self.joint_enabled.get(joint, True):
+                _, spin, _ = self.joint_widgets[joint]
+                pos_deg = spin.value()
+                pos_rad = math.radians(pos_deg)
+                msg.name.append(joint)
+                msg.position.append(pos_rad)
 
-        if mode:
-            print(f"Play mode: {mode}, loop: {self.loop_checkbox.isChecked()}")
-            # TODO: フレームデータの保存と再生トリガー処理と接続する
+        msg.header.stamp = rospy.Time.now()
+
+        # move_duration, wait_duration はGUIから取得
+        move_duration = self.duration_spin.value()
+        wait_duration = self.wait_spin.value()
+
+        # FrameVisualizerに渡す
+        self.frame_visualizer.set_current_frame(msg, move_duration, wait_duration)
+
+        # 再生実行（シンプルな if-elif）
+        if sender == self.play_in_current_btn:
+            self.frame_visualizer.play_in_trajectory()
+        elif sender == self.play_in_current_out_btn:
+            self.frame_visualizer.play_in_out_trajectory()
+        elif sender == self.play_current_out_btn:
+            self.frame_visualizer.play_out_trajectory()
 
     def on_loop_checkbox_changed(self, state):
         if state == Qt.Unchecked:
