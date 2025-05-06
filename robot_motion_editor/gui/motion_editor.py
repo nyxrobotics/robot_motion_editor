@@ -18,6 +18,7 @@ from ..logic.animation_file_manager import load_animation_file
 from ..logic.animation_file_manager import save_animation_file
 from ..logic.initial_pose_file_manager import load_initial_pose
 from ..logic.initial_pose_file_manager import save_initial_pose
+from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .frame_editor import FrameEditorDialog
 from .if_condition_editor import IfConditionEditorDialog
 from .motion_editor_animation_tree_widget import AnimationTreeWidget
@@ -29,8 +30,11 @@ from .switch_condition_editor import SwitchConditionEditorDialog
 
 
 class MotionEditorWidget(QWidget):
-    def __init__(self, motion_directory=".", joint_names=None, joint_limits=None, available_variables=None):
+    def __init__(self, motion_directory=".", joint_names=None, joint_limits=None, available_variables=None,
+                 trajectory_visualizer: TrajectoryVisualizer = None):
         super().__init__()
+
+        self.trajectory_visualizer = trajectory_visualizer
         self.motion_directory = motion_directory
         self.joint_names = joint_names or []
         self.joint_limits = joint_limits or {}
@@ -336,13 +340,53 @@ class MotionEditorWidget(QWidget):
             )
 
     def open_frame_editor(self, frame_name):
+        import math
+        import os
+
+        import rospy
+        import yaml
+        from sensor_msgs.msg import JointState
+
+        def load_joint_state(path):
+            with open(path, "r") as f:
+                data = yaml.safe_load(f)
+            msg = JointState()
+            msg.name = list(data["joints"].keys())
+            msg.position = [math.radians(data["joints"][name]) for name in msg.name]
+            msg.header.stamp = rospy.Time.now()
+            return msg
+
         frame_path = os.path.join(self.motion_directory, self.current_animation_name, "frames", f"{frame_name}.yaml")
+
         dlg = FrameEditorDialog(
             joint_names=self.joint_names,
             joint_limits=self.joint_limits,
             available_variables=self.available_variables,
-            frame_path=frame_path
+            frame_path=frame_path,
+            parent=self,
+            trajectory_visualizer=self.trajectory_visualizer
         )
+
+        # setup frame_visualizer
+        if hasattr(dlg, "frame_visualizer"):
+            current_state = load_joint_state(frame_path)
+            dlg.frame_visualizer.set_current_frame(current_state)
+
+            if hasattr(self, "initial_joint_state"):
+                dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
+
+            block = self.scene.get_block_by_name(frame_name)
+            if block:
+                in_block = self.scene.find_previous_frame_block(block)
+                if in_block and in_block.filename:
+                    in_state = load_joint_state(in_block.filename)
+                    dlg.frame_visualizer.set_in_frame(in_state)
+
+                out_block = self.scene.find_next_frame_block(block)
+                if out_block and out_block.filename:
+                    out_state = load_joint_state(out_block.filename)
+                    dlg.frame_visualizer.set_out_frame(out_state)
+
         dlg.exec_()
 
     def open_if_condition_editor(self, condition_name):
