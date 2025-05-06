@@ -164,7 +164,8 @@ class FrameBlockItem(QGraphicsRectItem):
 
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
-        self.scene().editor_widget.open_frame_editor(self.filename)
+        if hasattr(self.scene(), "editor_widget"):
+            self.scene().editor_widget.open_frame_block_editor(self.name)
 
     def remove_from_scene(self):
         scene = self.scene()

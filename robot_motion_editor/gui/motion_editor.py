@@ -373,8 +373,27 @@ class MotionEditorWidget(QWidget):
 
         return msg, move_duration, wait_duration
 
-    def open_frame_editor(self, frame_name):
+    def open_frame_file_editor(self, frame_name):
         frame_path = os.path.join(self.motion_directory, self.current_animation_name, "frames", f"{frame_name}.yaml")
+        dlg = FrameEditorDialog(
+            joint_names=self.joint_names,
+            joint_limits=self.joint_limits,
+            available_variables=self.available_variables,
+            frame_path=frame_path
+        )
+        dlg.exec_()
+
+    def open_frame_block_editor(self, block_id: str):
+        block = self.scene.block_objects.get(block_id)
+        if not block:
+            print(f"[WARN] No block found for id: {block_id}")
+            return
+
+        frame_path = os.path.join(
+            self.motion_directory,
+            self.current_animation_name,
+            "frames",
+            f"{block.filename}.yaml")
         dlg = FrameEditorDialog(
             joint_names=self.joint_names,
             joint_limits=self.joint_limits,
@@ -384,7 +403,6 @@ class MotionEditorWidget(QWidget):
             trajectory_visualizer=self.trajectory_visualizer
         )
 
-        # setup frame_visualizer
         if hasattr(dlg, "frame_visualizer"):
             current_state, current_move, current_wait = self.load_joint_state_and_durations(frame_path)
             dlg.frame_visualizer.set_current_frame(current_state, current_move, current_wait)
@@ -392,32 +410,27 @@ class MotionEditorWidget(QWidget):
             if hasattr(self, "initial_joint_state"):
                 dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
 
-            block = self.scene.block_objects.get(frame_name)
-            if block:
-                in_block = self.scene.find_previous_frame_block(block)
-                print("[DEBUG] in_block:", in_block)
-                if in_block and in_block.filename:
-                    print("[DEBUG] in_block.filename:", in_block.filename)
-                    in_frame_path = os.path.join(
-                        self.motion_directory,
-                        self.current_animation_name,
-                        "frames",
-                        f"{in_block.filename}.yaml"
-                    )
-                    in_state, in_move, in_wait = self.load_joint_state_and_durations(in_frame_path)
-                    dlg.frame_visualizer.set_in_frame(in_state, in_move, in_wait)
+            in_block = self.scene.find_previous_frame_block(block)
+            if in_block and in_block.filename:
+                in_path = os.path.join(
+                    self.motion_directory,
+                    self.current_animation_name,
+                    "frames",
+                    f"{in_block.filename}.yaml"
+                )
+                in_state, in_move, in_wait = self.load_joint_state_and_durations(in_path)
+                dlg.frame_visualizer.set_in_frame(in_state, in_move, in_wait)
 
-                out_block = self.scene.find_next_frame_block(block)
-                if out_block and out_block.filename:
-                    print("[DEBUG] out_block.filename:", out_block.filename)
-                    out_frame_path = os.path.join(
-                        self.motion_directory,
-                        self.current_animation_name,
-                        "frames",
-                        f"{out_block.filename}.yaml"
-                    )
-                    out_state, out_move, out_wait = self.load_joint_state_and_durations(out_frame_path)
-                    dlg.frame_visualizer.set_out_frame(out_state, out_move, out_wait)
+            out_block = self.scene.find_next_frame_block(block)
+            if out_block and out_block.filename:
+                out_path = os.path.join(
+                    self.motion_directory,
+                    self.current_animation_name,
+                    "frames",
+                    f"{out_block.filename}.yaml"
+                )
+                out_state, out_move, out_wait = self.load_joint_state_and_durations(out_path)
+                dlg.frame_visualizer.set_out_frame(out_state, out_move, out_wait)
 
         dlg.exec_()
 

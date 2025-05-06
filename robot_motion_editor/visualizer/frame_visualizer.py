@@ -1,4 +1,5 @@
 import threading
+from typing import List
 
 import rospy
 from sensor_msgs.msg import JointState
@@ -69,42 +70,25 @@ class FrameVisualizer:
         traj = self._make_trajectory_sequence([self.in_frame, self.current_frame, self.out_frame])
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
-    def _make_trajectory_pair(self, start_data, end_data) -> JointTrajectory:
-
-        if start_data is None and self.initial_frame is not None:
-            start_data = self.initial_frame
-        if end_data is None and self.initial_frame is not None:
-            end_data = self.initial_frame
-        if start_data is None or end_data is None:
-            return JointTrajectory()
-
-            return JointTrajectory()
-
-        start_state, move_duration, wait_duration = start_data
-        end_state, _, _ = end_data
-
-        traj = JointTrajectory()
-        traj.joint_names = end_state.name
-
-        start_point = JointTrajectoryPoint()
-        start_point.time_from_start = rospy.Duration(wait_duration)
-        start_point.positions = self._get_aligned_joint_positions(start_state, end_state)
-        start_point.velocities = [
-            (b - a) / move_duration
-            for a, b in zip(start_point.positions, end_state.position)
-        ]
-
-        end_point = JointTrajectoryPoint()
-        end_point.time_from_start = rospy.Duration(wait_duration + move_duration)
-        end_point.positions = end_state.position
-        end_point.velocities = [0.0] * len(end_state.position)
-
-        traj.points = [start_point, end_point]
-        return traj
-
     def _make_trajectory_sequence(self, frame_data_list) -> JointTrajectory:
         traj = JointTrajectory()
         current_time = 0.0
+
+        # Determine reference joint order from current_frame or first valid frame
+        reference_names = None
+        if self.current_frame is not None:
+            reference_names = self.current_frame[0].name
+        else:
+            for data in frame_data_list:
+                if data is not None:
+                    reference_names = data[0].name
+                    break
+        if reference_names is None and self.initial_frame is not None:
+            reference_names = self.initial_frame[0].name
+        if reference_names is None:
+            return traj
+
+        traj.joint_names = reference_names
 
         for i in range(len(frame_data_list) - 1):
             start_data = frame_data_list[i]
@@ -120,23 +104,21 @@ class FrameVisualizer:
             start_state, _, _ = start_data
             end_state, move_duration, wait_duration = end_data
 
-            if not traj.joint_names:
-                traj.joint_names = end_state.name
-
-            aligned_start = self._get_aligned_joint_positions(start_state, end_state)
+            aligned_start = self._get_aligned_joint_positions(start_state, reference_names)
+            aligned_end = self._get_aligned_joint_positions(end_state, reference_names)
 
             point_start = JointTrajectoryPoint()
             point_start.time_from_start = rospy.Duration(current_time + wait_duration)
             point_start.positions = aligned_start
             point_start.velocities = [
                 (b - a) / move_duration
-                for a, b in zip(aligned_start, end_state.position)
+                for a, b in zip(aligned_start, aligned_end)
             ]
 
             point_end = JointTrajectoryPoint()
             point_end.time_from_start = rospy.Duration(current_time + wait_duration + move_duration)
-            point_end.positions = end_state.position
-            point_end.velocities = [0.0] * len(end_state.position)
+            point_end.positions = aligned_end
+            point_end.velocities = [0.0] * len(aligned_end)
 
             traj.points.append(point_start)
             traj.points.append(point_end)
@@ -145,8 +127,10 @@ class FrameVisualizer:
 
         return traj
 
-    def _get_aligned_joint_positions(self, current: JointState, target: JointState):
-        return [
-            current.position[current.name.index(name)] if name in current.name else 0.0
-            for name in target.name
-        ]
+    def _get_aligned_joint_positions(self, source: JointState, reference_names: List[str]):
+        """
+        source の関節角度を reference_names の順に並び替えたリストを返す。
+        """
+        source_dict = dict(zip(source.name, source.position))
+        aligned_positions = [source_dict.get(name, 0.0) for name in reference_names]
+        return aligned_positions
