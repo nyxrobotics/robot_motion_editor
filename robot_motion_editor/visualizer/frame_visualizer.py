@@ -15,6 +15,11 @@ class FrameVisualizer:
         self.in_frame = None
         self.current_frame = None
         self.out_frame = None
+        self.initial_frame = None
+
+    def set_initial_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
+        with self._lock:
+            self.initial_frame = (joint_state, move_duration, wait_duration)
 
     def set_in_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
         with self._lock:
@@ -27,6 +32,18 @@ class FrameVisualizer:
     def set_out_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
         with self._lock:
             self.out_frame = (joint_state, move_duration, wait_duration)
+
+    def reset_in_frame(self):
+        with self._lock:
+            self.in_frame = None
+
+    def reset_current_frame(self):
+        with self._lock:
+            self.current_frame = None
+
+    def reset_out_frame(self):
+        with self._lock:
+            self.out_frame = None
 
     def get_in_trajectory(self) -> JointTrajectory:
         with self._lock:
@@ -49,11 +66,18 @@ class FrameVisualizer:
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
     def _make_trajectory_pair(self, start_data, end_data) -> JointTrajectory:
+
+        if start_data is None and self.initial_frame is not None:
+            start_data = self.initial_frame
+        if end_data is None and self.initial_frame is not None:
+            end_data = self.initial_frame
         if start_data is None or end_data is None:
             return JointTrajectory()
 
-        start_state, _, _ = start_data
-        end_state, move_duration, wait_duration = end_data
+            return JointTrajectory()
+
+        start_state, move_duration, wait_duration = start_data
+        end_state, _, _ = end_data
 
         traj = JointTrajectory()
         traj.joint_names = end_state.name
@@ -82,6 +106,10 @@ class FrameVisualizer:
             start_data = frame_data_list[i]
             end_data = frame_data_list[i + 1]
 
+            if start_data is None:
+                start_data = self.initial_frame
+            if end_data is None:
+                end_data = self.initial_frame
             if start_data is None or end_data is None:
                 continue
 
