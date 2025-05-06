@@ -1,111 +1,120 @@
 import threading
 
 import rospy
-from moveit_msgs.msg import DisplayTrajectory
-from moveit_msgs.msg import RobotTrajectory
+from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
 
+from .trajectory_visualizer import TrajectoryVisualizer
+
 
 class FrameVisualizer:
-    def __init__(self, rate: float = 30.0):
-        self.in_trajectory = None
-        self.current_trajectory = None
-        self.out_trajectory = None
-
-        self.loop_enabled = False
-        self._rate = rate
+    def __init__(self, trajectory_visualizer: TrajectoryVisualizer):
+        self.trajectory_visualizer = trajectory_visualizer
         self._lock = threading.Lock()
-        self._trajectory = None
-        self._playback_cancel_event = threading.Event()
-        self._playback_thread = threading.Thread(target=self._playback_loop)
-        self._playback_thread.daemon = True
-        self._playback_thread.start()
+        self.in_frame = None
+        self.current_frame = None
+        self.out_frame = None
 
-        self.pub = rospy.Publisher("/move_group/display_planned_path", DisplayTrajectory, queue_size=1)
-
-    def set_in_trajectory(self, traj: JointTrajectory):
+    def set_in_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
         with self._lock:
-            self.in_trajectory = traj
-        self._request_replay()
+            self.in_frame = (joint_state, move_duration, wait_duration)
 
-    def set_current_trajectory(self, traj: JointTrajectory):
+    def set_current_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
         with self._lock:
-            self.current_trajectory = traj
-        self._request_replay()
+            self.current_frame = (joint_state, move_duration, wait_duration)
 
-    def set_out_trajectory(self, traj: JointTrajectory):
+    def set_out_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
         with self._lock:
-            self.out_trajectory = traj
-        self._request_replay()
+            self.out_frame = (joint_state, move_duration, wait_duration)
 
-    def enable_loop(self, enabled: bool):
+    def get_in_trajectory(self) -> JointTrajectory:
         with self._lock:
-            self.loop_enabled = enabled
-        self._request_replay()
+            return self._make_trajectory_pair(self.in_frame, self.current_frame)
 
-    def play_in_current(self):
+    def get_out_trajectory(self) -> JointTrajectory:
         with self._lock:
-            self._trajectory = self._concat_trajectories([self.in_trajectory, self.current_trajectory])
-        self._request_replay()
+            return self._make_trajectory_pair(self.current_frame, self.out_frame)
 
-    def play_current_out(self):
-        with self._lock:
-            self._trajectory = self._concat_trajectories([self.current_trajectory, self.out_trajectory])
-        self._request_replay()
+    def play_in_trajectory(self):
+        traj = self.get_in_trajectory()
+        self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
-    def play_in_current_out(self):
-        with self._lock:
-            self._trajectory = self._concat_trajectories(
-                [self.in_trajectory, self.current_trajectory, self.out_trajectory])
-        self._request_replay()
+    def play_out_trajectory(self):
+        traj = self.get_out_trajectory()
+        self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
-    def _concat_trajectories(self, trajs):
-        combined = JointTrajectory()
+    def play_in_out_trajectory(self):
+        traj = self._make_trajectory_sequence([self.in_frame, self.current_frame, self.out_frame])
+        self.trajectory_visualizer.visualize_joint_trajectory(traj)
+
+    def _make_trajectory_pair(self, start_data, end_data) -> JointTrajectory:
+        if start_data is None or end_data is None:
+            return JointTrajectory()
+
+        start_state, _, _ = start_data
+        end_state, move_duration, wait_duration = end_data
+
+        traj = JointTrajectory()
+        traj.joint_names = end_state.name
+
+        start_point = JointTrajectoryPoint()
+        start_point.time_from_start = rospy.Duration(wait_duration)
+        start_point.positions = self._get_aligned_joint_positions(start_state, end_state)
+        start_point.velocities = [
+            (b - a) / move_duration
+            for a, b in zip(start_point.positions, end_state.position)
+        ]
+
+        end_point = JointTrajectoryPoint()
+        end_point.time_from_start = rospy.Duration(wait_duration + move_duration)
+        end_point.positions = end_state.position
+        end_point.velocities = [0.0] * len(end_state.position)
+
+        traj.points = [start_point, end_point]
+        return traj
+
+    def _make_trajectory_sequence(self, frame_data_list) -> JointTrajectory:
+        traj = JointTrajectory()
         current_time = 0.0
-        for traj in trajs:
-            if traj is None or not traj.points:
+
+        for i in range(len(frame_data_list) - 1):
+            start_data = frame_data_list[i]
+            end_data = frame_data_list[i + 1]
+
+            if start_data is None or end_data is None:
                 continue
-            if not combined.joint_names:
-                combined.joint_names = traj.joint_names
-            for pt in traj.points:
-                new_pt = JointTrajectoryPoint()
-                new_pt.positions = pt.positions
-                new_pt.velocities = pt.velocities
-                new_pt.time_from_start = rospy.Duration.from_sec(current_time + pt.time_from_start.to_sec())
-                combined.points.append(new_pt)
-            current_time = combined.points[-1].time_from_start.to_sec()
-        return combined
 
-    def _request_replay(self):
-        self._playback_cancel_event.set()
+            start_state, _, _ = start_data
+            end_state, move_duration, wait_duration = end_data
 
-    def _playback_loop(self):
-        while not rospy.is_shutdown():
-            self._playback_cancel_event.wait()
-            self._playback_cancel_event.clear()
+            if not traj.joint_names:
+                traj.joint_names = end_state.name
 
-            while not rospy.is_shutdown():
-                with self._lock:
-                    traj = self._trajectory
+            aligned_start = self._get_aligned_joint_positions(start_state, end_state)
 
-                if traj and traj.points:
-                    traj_msg = DisplayTrajectory()
-                    traj_msg.trajectory.append(RobotTrajectory(joint_trajectory=traj))
-                    self.pub.publish(traj_msg)
+            point_start = JointTrajectoryPoint()
+            point_start.time_from_start = rospy.Duration(current_time + wait_duration)
+            point_start.positions = aligned_start
+            point_start.velocities = [
+                (b - a) / move_duration
+                for a, b in zip(aligned_start, end_state.position)
+            ]
 
-                    total_time = traj.points[-1].time_from_start.to_sec()
-                    start_time = rospy.Time.now().to_sec()
+            point_end = JointTrajectoryPoint()
+            point_end.time_from_start = rospy.Duration(current_time + wait_duration + move_duration)
+            point_end.positions = end_state.position
+            point_end.velocities = [0.0] * len(end_state.position)
 
-                    while rospy.Time.now().to_sec() - start_time < total_time:
-                        if self._playback_cancel_event.is_set():
-                            break
-                        rospy.sleep(0.01)
+            traj.points.append(point_start)
+            traj.points.append(point_end)
 
-                    if self._playback_cancel_event.is_set():
-                        break
+            current_time = point_end.time_from_start.to_sec()
 
-                    if not self.loop_enabled:
-                        break
-                else:
-                    break
+        return traj
+
+    def _get_aligned_joint_positions(self, current: JointState, target: JointState):
+        return [
+            current.position[current.name.index(name)] if name in current.name else 0.0
+            for name in target.name
+        ]
