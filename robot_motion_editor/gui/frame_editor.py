@@ -17,12 +17,21 @@ from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
+from ..visualizer.frame_visualizer import FrameVisualizer
+from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .feedback_expression_dialog import FeedbackExpressionDialog
 from .pid_config_dialog import PIDConfigDialog
 
 
 class FrameEditorDialog(QDialog):
-    def __init__(self, joint_names, joint_limits, available_variables, frame_path=None, parent=None):
+    def __init__(
+            self,
+            joint_names,
+            joint_limits,
+            available_variables,
+            frame_path=None,
+            parent=None,
+            trajectory_visualizer: TrajectoryVisualizer = None):
         super().__init__(parent)
         self.setWindowTitle("Edit Frame")
 
@@ -40,6 +49,8 @@ class FrameEditorDialog(QDialog):
         self.duration_value = 2.0
         self.wait_value = 0.0
 
+        self.trajectory_visualizer = trajectory_visualizer
+        self.frame_visualizer = FrameVisualizer(trajectory_visualizer)
         self.init_ui()
 
         if frame_path and os.path.exists(frame_path):
