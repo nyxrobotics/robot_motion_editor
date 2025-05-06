@@ -52,6 +52,27 @@ class FrameEditorDialog(QDialog):
         scroll.setWidgetResizable(True)
         content = QWidget()
         form = QFormLayout(content)
+        # 再生制御エリア
+        playback_row = QHBoxLayout()
+
+        self.loop_checkbox = QCheckBox("Loop")
+        self.loop_checkbox.setChecked(False)
+        self.loop_checkbox.stateChanged.connect(self.on_loop_checkbox_changed)
+        playback_row.addWidget(self.loop_checkbox)
+
+        self.play_in_current_btn = QPushButton("In-Current")
+        self.play_in_current_out_btn = QPushButton("In-Current-Out")
+        self.play_current_out_btn = QPushButton("Current-Out")
+
+        for btn in [self.play_in_current_btn, self.play_in_current_out_btn, self.play_current_out_btn]:
+            btn.setCheckable(True)
+            btn.clicked.connect(self.handle_play_button)
+
+        playback_row.addWidget(self.play_in_current_btn)
+        playback_row.addWidget(self.play_in_current_out_btn)
+        playback_row.addWidget(self.play_current_out_btn)
+
+        form.addRow(playback_row)
 
         self.duration_spin = QDoubleSpinBox()
         self.duration_spin.setDecimals(2)
@@ -255,3 +276,33 @@ class FrameEditorDialog(QDialog):
             yaml.safe_dump(output, f, allow_unicode=True)
 
         self.accept()
+
+    def handle_play_button(self):
+        sender = self.sender()
+
+        # 全ボタンのチェックを外す
+        for btn in [self.play_in_current_btn, self.play_in_current_out_btn, self.play_current_out_btn]:
+            if btn != sender:
+                btn.setChecked(False)
+
+        # ループ再生が有効でないなら押しっぱなしを解除
+        if not self.loop_checkbox.isChecked():
+            sender.setChecked(False)
+
+        # ここで選択状態に応じた再生モードに切り替える（本体処理と連携）
+        mode = None
+        if sender == self.play_in_current_btn:
+            mode = "in_current"
+        elif sender == self.play_in_current_out_btn:
+            mode = "in_current_out"
+        elif sender == self.play_current_out_btn:
+            mode = "current_out"
+
+        if mode:
+            print(f"Play mode: {mode}, loop: {self.loop_checkbox.isChecked()}")
+            # TODO: フレームデータの保存と再生トリガー処理と接続する
+
+    def on_loop_checkbox_changed(self, state):
+        if state == Qt.Unchecked:
+            for btn in [self.play_in_current_btn, self.play_in_current_out_btn, self.play_current_out_btn]:
+                btn.setChecked(False)
