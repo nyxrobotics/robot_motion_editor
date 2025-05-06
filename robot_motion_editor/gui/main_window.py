@@ -124,7 +124,8 @@ class MainWindow(QWidget):
             motion_directory="motion_directory",
             joint_names=self.joint_names,
             joint_limits=self.joint_limits,
-            available_variables=self.variable_names
+            available_variables=self.variable_names,
+            trajectory_visualizer=self.trajectory_visualizer
         )
         self.tabs.addTab(self.motion_editor, "Motion Editor")
 

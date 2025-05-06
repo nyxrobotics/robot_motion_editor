@@ -344,30 +344,32 @@ class MotionEditorWidget(QWidget):
             )
 
     def load_joint_state_and_durations(self, path):
-        with open(path, "r") as f:
-            data = yaml.safe_load(f)
-
-        if not data or "joints" not in data:
-            raise ValueError(f"[ERROR] Invalid or empty frame file: {path}")
-
-        joints_data = data["joints"]
+        move_duration = 1.0
+        wait_duration = 0.0
         msg = JointState()
         msg.name = []
         msg.position = []
 
-        for name, joint_info in joints_data.items():
-            if isinstance(joint_info, dict) and "position" in joint_info:
-                position = joint_info["position"]
-            else:
-                position = joint_info  # fallback if flat format
+        try:
+            with open(path, "r") as f:
+                data = yaml.safe_load(f)
+        except Exception as e:
+            print(f"[WARN] Failed to load {path}: {e}")
+            return msg, move_duration, wait_duration
 
-            msg.name.append(name)
-            msg.position.append(math.radians(position))
+        if not data:
+            print(f"[WARN] Empty or invalid YAML in {path}")
+            return msg, move_duration, wait_duration
+        joints_data = data.get("joints", {})
+        for name, joint_info in joints_data.items():
+            pos = joint_info.get("position") if isinstance(joint_info, dict) else joint_info
+            if pos is not None:
+                msg.name.append(name)
+                msg.position.append(math.radians(pos))
 
         msg.header.stamp = rospy.Time.now()
-
-        move_duration = data.get("time", {}).get("move_duration", 1.0)
-        wait_duration = data.get("time", {}).get("wait_duration", 0.0)
+        move_duration = data.get("time", {}).get("move_duration", move_duration)
+        wait_duration = data.get("time", {}).get("wait_duration", wait_duration)
 
         return msg, move_duration, wait_duration
 
