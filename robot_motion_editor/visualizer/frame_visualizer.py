@@ -96,7 +96,7 @@ class FrameVisualizer:
             aligned_end = self.trajectory_visualizer._get_aligned_joint_positions(end_state, reference_names)
 
             point_start = JointTrajectoryPoint()
-            point_start.time_from_start = rospy.Duration(current_time + wait_duration)
+            point_start.time_from_start = rospy.Duration(current_time)
             point_start.positions = aligned_start
             point_start.velocities = [
                 (b - a) / move_duration
