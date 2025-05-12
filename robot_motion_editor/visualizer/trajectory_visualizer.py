@@ -1,4 +1,5 @@
 import threading
+from typing import List
 
 import rospy
 from moveit_msgs.msg import DisplayRobotState
@@ -186,8 +187,14 @@ class TrajectoryVisualizer:
         result.points.append(trajectory.points[-1])
         return result
 
-        def _get_aligned_joint_positions(self, current, target):
-            return [
-                current.position[current.name.index(name)] if name in current.name else 0.0
-                for name in target.name
-            ]
+    def _get_aligned_joint_positions(self, source: JointState, reference_names):
+        """
+        source の関節角度を reference_names の順に並び替えたリストを返す。
+        reference_names は List[str] または JointState。
+        """
+        if isinstance(reference_names, JointState):
+            reference_names = reference_names.name
+
+        source_dict = dict(zip(source.name, source.position))
+        aligned_positions = [source_dict.get(name, 0.0) for name in reference_names]
+        return aligned_positions

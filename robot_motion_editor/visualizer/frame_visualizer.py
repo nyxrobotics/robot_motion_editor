@@ -46,27 +46,15 @@ class FrameVisualizer:
         with self._lock:
             self.out_frame = None
 
-    def get_in_trajectory(self) -> JointTrajectory:
-        with self._lock:
-            return self._make_trajectory_pair(self.in_frame, self.current_frame)
-
-    def get_out_trajectory(self) -> JointTrajectory:
-        with self._lock:
-            return self._make_trajectory_pair(self.current_frame, self.out_frame)
-
     def play_in_trajectory(self):
-        traj = self.get_in_trajectory()
+        traj = self._make_trajectory_sequence([self.in_frame, self.current_frame])
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
     def play_out_trajectory(self):
-        traj = self.get_out_trajectory()
+        traj = self._make_trajectory_sequence([self.current_frame, self.out_frame])
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
     def play_in_out_trajectory(self):
-        print("[DEBUG] play_in_out_trajectory called")
-        print("[DEBUG] in_frame:", self.in_frame)
-        print("[DEBUG] current_frame:", self.current_frame)
-        print("[DEBUG] out_frame:", self.out_frame)
         traj = self._make_trajectory_sequence([self.in_frame, self.current_frame, self.out_frame])
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
@@ -104,8 +92,8 @@ class FrameVisualizer:
             start_state, _, _ = start_data
             end_state, move_duration, wait_duration = end_data
 
-            aligned_start = self._get_aligned_joint_positions(start_state, reference_names)
-            aligned_end = self._get_aligned_joint_positions(end_state, reference_names)
+            aligned_start = self.trajectory_visualizer._get_aligned_joint_positions(start_state, reference_names)
+            aligned_end = self.trajectory_visualizer._get_aligned_joint_positions(end_state, reference_names)
 
             point_start = JointTrajectoryPoint()
             point_start.time_from_start = rospy.Duration(current_time + wait_duration)
@@ -126,11 +114,3 @@ class FrameVisualizer:
             current_time = point_end.time_from_start.to_sec()
 
         return traj
-
-    def _get_aligned_joint_positions(self, source: JointState, reference_names: List[str]):
-        """
-        source の関節角度を reference_names の順に並び替えたリストを返す。
-        """
-        source_dict = dict(zip(source.name, source.position))
-        aligned_positions = [source_dict.get(name, 0.0) for name in reference_names]
-        return aligned_positions
