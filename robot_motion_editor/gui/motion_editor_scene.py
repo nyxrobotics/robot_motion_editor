@@ -217,10 +217,14 @@ class OutputSubBlockItem(QGraphicsRectItem):
         super().__init__(0, 0, width, height)
 
         # Appearance settings
-        self.setBrush(QBrush(QColor("#2b2b2b")))
+        self.default_brush = QBrush(QColor("#2b2b2b"))
+        self.preview_brush = QBrush(QColor(80, 120, 200))
+        self.selected_brush = self.default_brush
+        self.highlight_brush = self.default_brush
         self.default_pen = QPen(QColor("#aaaaaa"), 2)
         self.highlight_pen = QPen(QColor("#00ff00"), 3)
         self.selected_pen = QPen(QColor("#00ffff"), 3)
+        self.setBrush(self.default_brush)
         self.setPen(self.default_pen)
 
         self.setFlags(self.ItemIsSelectable | self.ItemSendsGeometryChanges)
@@ -257,9 +261,9 @@ class OutputSubBlockItem(QGraphicsRectItem):
             # If parent block is IfBlockItem or SwitchBlockItem, set color based on preview output index
             idx = list(self.parent_block.output_sub_blocks.keys()).index(self.name)
             if self.parent_block.preview_output_index == idx:
-                self.setBrush(QBrush(QColor(80, 120, 200)))
+                self.setBrush(self.preview_brush)
             else:
-                self.setBrush(QBrush(QColor("#2b2b2b")))
+                self.setBrush(self.default_brush)
         else:
             self.setPen(self.default_pen)
         super().paint(painter, option, widget)
@@ -805,7 +809,7 @@ class ArrowItem(QGraphicsPathItem):
         if self.isSelected():
             pen = self.selected_pen
         elif self.is_preview_path:
-            pen = QPen(QColor("#66ccff"), 3)
+            pen = self.preview_pen
         else:
             pen = self.default_pen
 
