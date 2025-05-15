@@ -1425,14 +1425,26 @@ class MotionFlowScene(QGraphicsScene):
 
         # 新しく増えたケースについては矢印なしの状態（何もしない）
 
-    def find_previous_frame_block(self, block):
+    def find_previous_frame_block(self, block, visited=None):
+        if visited is None:
+            visited = set()
+
+        if block in visited:
+            return None
+        visited.add(block)
+
         for arrow in self.arrow_objects.values():
             if arrow.end_item == block:
                 source = arrow.start_item
+                if isinstance(source, StartBlockItem):
+                    return None  # Startの直後にフレームがない場合はNone
                 if isinstance(source, FrameBlockItem):
-                    return source
-                else:
-                    return self.find_previous_frame_block(source)
+                    # Startから到達できるかチェック
+                    if self._is_reachable_from_start(source, visited=set()):
+                        return source
+                result = self.find_previous_frame_block(source, visited)
+                if result:
+                    return result
         return None
 
     def find_next_frame_block(self, block):
