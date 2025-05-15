@@ -253,6 +253,13 @@ class OutputSubBlockItem(QGraphicsRectItem):
             self.setPen(self.selected_pen)
         elif self.is_highlighted:
             self.setPen(self.highlight_pen)
+        elif isinstance(self.parent_block, (IfBlockItem, SwitchBlockItem)):
+            # If parent block is IfBlockItem or SwitchBlockItem, set color based on preview output index
+            idx = list(self.parent_block.output_sub_blocks.keys()).index(self.name)
+            if self.parent_block.preview_output_index == idx:
+                self.setBrush(QBrush(QColor(80, 120, 200)))
+            else:
+                self.setBrush(QBrush(QColor("#2b2b2b")))
         else:
             self.setPen(self.default_pen)
         super().paint(painter, option, widget)
@@ -324,6 +331,7 @@ class IfBlockItem(QGraphicsRectItem):
         self.input_arrows = []
         self.output_arrows = []
         self.output_sub_blocks = {}
+        self.preview_output_index = 0
 
         label_text = QGraphicsTextItem(self.name)
         font_metrics = QFontMetricsF(label_text.font())
@@ -461,6 +469,7 @@ class SwitchBlockItem(QGraphicsRectItem):
         self.input_arrows = []
         self.output_arrows = []
         self.output_sub_blocks = {}
+        self.preview_output_index = 0
 
         label_text = QGraphicsTextItem(self.name)
         font_metrics = QFontMetricsF(label_text.font())
@@ -748,9 +757,11 @@ class ArrowItem(QGraphicsPathItem):
         self._force_snap_end = False
         self.start_handle.setParentItem(self)
         self.end_handle.setParentItem(self)
+        self.is_preview_path = False
         self.default_pen = QPen(QColor("#ffffff"), 3)
-        self.highlight_pen = QPen(QColor("#00ff00"), 3)
         self.selected_pen = QPen(QColor("#00ffff"), 4)
+        self.preview_pen = QPen(QColor("#66ccff"), 3)
+        self.highlight_pen = QPen(QColor("#00ff00"), 3)
         self.setPen(self.default_pen)
         self.setFlags(self.ItemIsSelectable)
 
@@ -791,6 +802,13 @@ class ArrowItem(QGraphicsPathItem):
 
     def update_path(self):
         pen = self.selected_pen if self.isSelected() else self.default_pen
+        if self.isSelected():
+            pen = self.selected_pen
+        elif self.is_preview_path:
+            pen = QPen(QColor("#66ccff"), 3)
+        else:
+            pen = self.default_pen
+
         is_connected = self.start_item is not None and self.end_item is not None
         pen.setStyle(Qt.SolidLine if is_connected else Qt.DashLine)
         self.setPen(pen)
@@ -899,6 +917,35 @@ class MotionFlowScene(QGraphicsScene):
         self.block_objects = {}
         self.arrow_objects = {}
         self.setSceneRect(0, 0, 1000, 1000)
+
+    def highlight_preview_path(self):
+        for arrow in self.arrow_objects.values():
+            arrow.is_preview_path = False
+            arrow.update_path()
+        current = None
+        for block in self.block_objects.values():
+            if isinstance(block, StartBlockItem):
+                current = block
+                break
+        while current:
+            next_arrow = None
+            if isinstance(current, (IfBlockItem, SwitchBlockItem)):
+                subblocks = list(current.output_sub_blocks.values())
+                if not subblocks:
+                    break
+                idx = current.preview_output_index
+                if idx >= len(subblocks):
+                    break
+                subblock = subblocks[idx]
+                if subblock.output_arrows:
+                    next_arrow = subblock.output_arrows[0]
+            elif current.output_arrows:
+                next_arrow = current.output_arrows[0]
+            if not next_arrow:
+                break
+            next_arrow.is_preview_path = True
+            next_arrow.update_path()
+            current = next_arrow.end_item
 
     def _generate_block_id(self):
         used_ids = {block.id for block in self.block_objects.values()}
