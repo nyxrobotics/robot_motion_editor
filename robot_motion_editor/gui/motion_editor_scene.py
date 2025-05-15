@@ -238,6 +238,17 @@ class OutputSubBlockItem(QGraphicsRectItem):
         )
         self.is_highlighted = False
 
+    def mousePressEvent(self, event):
+        # 自分がクリックされたら、親ブロックに preview_index を記録
+        if isinstance(self.parent_block, (IfBlockItem, SwitchBlockItem)):
+            keys = list(self.parent_block.output_sub_blocks.keys())
+            idx = keys.index(self.name)
+            self.parent_block.preview_output_index = idx
+            self.parent_block.update()
+            for sibling in self.parent_block.output_sub_blocks.values():
+                sibling.update()
+        super().mousePressEvent(event)
+
     def can_accept_input(self):
         # Returns True if more input arrows can be accepted
         return self.max_inputs == -1 or len(self.input_arrows) < self.max_inputs
