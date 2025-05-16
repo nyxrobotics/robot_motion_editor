@@ -239,14 +239,16 @@ class OutputSubBlockItem(QGraphicsRectItem):
         self.is_highlighted = False
 
     def mousePressEvent(self, event):
-        # 自分がクリックされたら、親ブロックに preview_index を記録
+        # クリック時に preview_index を更新し即反映
         if isinstance(self.parent_block, (IfBlockItem, SwitchBlockItem)):
             keys = list(self.parent_block.output_sub_blocks.keys())
             idx = keys.index(self.name)
             self.parent_block.preview_output_index = idx
-            self.parent_block.update()
             for sibling in self.parent_block.output_sub_blocks.values():
+                sibling.setSelected(False)  # 明示的に非選択化
                 sibling.update()
+            self.setSelected(True)
+            self.update()
         super().mousePressEvent(event)
 
     def can_accept_input(self):
@@ -290,6 +292,8 @@ class OutputSubBlockItem(QGraphicsRectItem):
                         item._force_snap_end = True
                     if item.start_item == self or item.end_item == self:
                         item.update_path()
+        elif change == self.ItemSelectedChange:
+            self.update()
         return super().itemChange(change, value)
 
     def mouseReleaseEvent(self, event):
