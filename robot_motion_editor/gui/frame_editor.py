@@ -326,6 +326,11 @@ class FrameEditorDialog(QDialog):
         move_duration = self.duration_spin.value()
         wait_duration = self.wait_spin.value()
 
+        # visualizer未接続の場合は警告して中止
+        if self.trajectory_visualizer is None or self.frame_visualizer is None:
+            rospy.logwarn("FrameVisualizer is not connected to TrajectoryVisualizer.")
+            return
+
         # FrameVisualizerに渡す
         self.trajectory_visualizer.publish_goal_state(msg)
         self.frame_visualizer.set_current_frame(msg, move_duration, wait_duration)

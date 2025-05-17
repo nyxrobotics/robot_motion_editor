@@ -239,16 +239,14 @@ class OutputSubBlockItem(QGraphicsRectItem):
         self.is_highlighted = False
 
     def mousePressEvent(self, event):
-        # クリック時に preview_index を更新し即反映
+        # previewインデックス反映と即描画更新（選択より先に行う）
         if isinstance(self.parent_block, (IfBlockItem, SwitchBlockItem)):
             keys = list(self.parent_block.output_sub_blocks.keys())
             idx = keys.index(self.name)
             self.parent_block.preview_output_index = idx
             for sibling in self.parent_block.output_sub_blocks.values():
-                sibling.setSelected(False)  # 明示的に非選択化
                 sibling.update()
-            self.setSelected(True)
-            self.update()
+            self.parent_block.update()
         super().mousePressEvent(event)
 
     def can_accept_input(self):
@@ -1491,26 +1489,34 @@ class MotionFlowScene(QGraphicsScene):
 
         # 新しく増えたケースについては矢印なしの状態（何もしない）
 
-    def find_previous_frame_block(self, block, visited=None):
-        if visited is None:
-            visited = set()
-
-        if block in visited:
-            return None
-        visited.add(block)
-
+    def find_previous_frame_block(self, block):
+        input_sources = []
         for arrow in self.arrow_objects.values():
             if arrow.end_item == block:
-                source = arrow.start_item
-                if isinstance(source, StartBlockItem):
-                    return None  # Startの直後にフレームがない場合はNone
-                if isinstance(source, FrameBlockItem):
-                    # Startから到達できるかチェック
-                    if self._is_reachable_from_start(source, visited=set()):
-                        return source
-                result = self.find_previous_frame_block(source, visited)
-                if result:
-                    return result
+                input_sources.append(arrow.start_item)
+
+        if not input_sources:
+            return None
+
+        # 入力が1本ならそれだけをたどればよい
+        if len(input_sources) == 1:
+            source = input_sources[0]
+            if isinstance(source, FrameBlockItem):
+                return source
+            return self.find_previous_frame_block(source)
+
+        # 複数入力がある場合
+        for source in input_sources:
+            if isinstance(source, FrameBlockItem) and self._is_reachable_from_start(source):
+                return source
+
+        # どれも Start からつながっていなければ最初のFrameを返す
+        for source in input_sources:
+            if isinstance(source, FrameBlockItem):
+                return source
+            result = self.find_previous_frame_block(source)
+            if result:
+                return result
         return None
 
     def find_next_frame_block(self, block):
@@ -1524,3 +1530,20 @@ class MotionFlowScene(QGraphicsScene):
                     if result:
                         return result
         return None
+
+    def _is_reachable_from_start(self, block, visited=None):
+        if visited is None:
+            visited = set()
+
+        if block in visited:
+            return False
+        visited.add(block)
+
+        if isinstance(block, StartBlockItem):
+            return True
+
+        for arrow in self.arrow_objects.values():
+            if arrow.end_item == block:
+                if self._is_reachable_from_start(arrow.start_item, visited):
+                    return True
+        return False

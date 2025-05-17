@@ -130,8 +130,18 @@ class MotionEditorWidget(QWidget):
                 joint_names=self.joint_names,
                 joint_limits=self.joint_limits,
                 available_variables=self.available_variables,
-                frame_path=frame_path
+                frame_path=frame_path,
+                trajectory_visualizer=self.trajectory_visualizer
             )
+            current_state, move, wait = self.load_joint_state_and_durations(frame_path)
+            dlg.frame_visualizer.set_current_frame(current_state, move, wait)
+
+            if hasattr(self, "initial_joint_state"):
+                dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
+
+            # in/out は接続されていないため current をそのまま使用
+            dlg.frame_visualizer.set_in_frame(current_state, move, wait)
+            dlg.frame_visualizer.set_out_frame(current_state, move, wait)
             dlg.exec_()
 
         elif item.parent() and item.parent().text(0) == "if":
