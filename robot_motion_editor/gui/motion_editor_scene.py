@@ -239,14 +239,13 @@ class OutputSubBlockItem(QGraphicsRectItem):
         self.is_highlighted = False
 
     def mousePressEvent(self, event):
-        # previewインデックス反映と即描画更新（選択より先に行う）
+        # クリック時に preview_index を反映
         if isinstance(self.parent_block, (IfBlockItem, SwitchBlockItem)):
             keys = list(self.parent_block.output_sub_blocks.keys())
             idx = keys.index(self.name)
             self.parent_block.preview_output_index = idx
             for sibling in self.parent_block.output_sub_blocks.values():
                 sibling.update()
-            self.parent_block.update()
         super().mousePressEvent(event)
 
     def can_accept_input(self):
@@ -263,20 +262,24 @@ class OutputSubBlockItem(QGraphicsRectItem):
         self.update()
 
     def paint(self, painter, option, widget=None):
-        # Set pen based on selection/highlight state
+        # 選択状態 → 選択用ペン
         if self.isSelected():
             self.setPen(self.selected_pen)
         elif self.is_highlighted:
             self.setPen(self.highlight_pen)
-        elif isinstance(self.parent_block, (IfBlockItem, SwitchBlockItem)):
-            # If parent block is IfBlockItem or SwitchBlockItem, set color based on preview output index
-            idx = list(self.parent_block.output_sub_blocks.keys()).index(self.name)
-            if self.parent_block.preview_output_index == idx:
-                self.setBrush(self.preview_brush)
-            else:
-                self.setBrush(self.default_brush)
         else:
             self.setPen(self.default_pen)
+
+        # 背景色の決定（preview_index による）
+        brush = self.default_brush
+        if isinstance(self.parent_block, (IfBlockItem, SwitchBlockItem)):
+            keys = list(self.parent_block.output_sub_blocks.keys())
+            if self.name in keys:
+                idx = keys.index(self.name)
+                if self.parent_block.preview_output_index == idx:
+                    brush = self.preview_brush
+        self.setBrush(brush)
+
         super().paint(painter, option, widget)
 
     def itemChange(self, change, value):
