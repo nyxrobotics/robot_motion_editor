@@ -966,13 +966,14 @@ class MotionFlowScene(QGraphicsScene):
             arrow.is_preview_path = False
             arrow.update_path()
 
-        visited_frames = set()
+        visited_ids = set()
 
         def dfs(block):
-            if isinstance(block, FrameBlockItem):
-                if block.filename in visited_frames:
-                    return
-                visited_frames.add(block.filename)
+            if not hasattr(block, 'id'):
+                return
+            if block.id in visited_ids:
+                return
+            visited_ids.add(block.id)
 
             if isinstance(block, (IfBlockItem, SwitchBlockItem)):
                 outputs = list(block.output_sub_blocks.values())
