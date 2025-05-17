@@ -246,6 +246,12 @@ class OutputSubBlockItem(QGraphicsRectItem):
             self.parent_block.preview_output_index = idx
             for sibling in self.parent_block.output_sub_blocks.values():
                 sibling.update()
+
+        # preview経路の再描画（Startからたどる）
+        scene = self.scene()
+        if hasattr(scene, "highlight_preview_path"):
+            scene.highlight_preview_path()
+
         super().mousePressEvent(event)
 
     def can_accept_input(self):
@@ -726,6 +732,17 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
         target = None
         for item in scene.items(self.scenePos()):
             if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem, OutputSubBlockItem, StartBlockItem)):
+                is_same = (item == (self.arrow.start_item if self.is_start else self.arrow.end_item))
+
+                # remove old connection
+                if self.is_start and self.arrow.start_item:
+                    if self.arrow in self.arrow.start_item.output_arrows:
+                        self.arrow.start_item.output_arrows.remove(self.arrow)
+                elif not self.is_start and self.arrow.end_item:
+                    if self.arrow in self.arrow.end_item.input_arrows:
+                        self.arrow.end_item.input_arrows.remove(self.arrow)
+
+                # check max connections
                 if self.is_start:
                     is_same = item == self.arrow.start_item
                     if item.max_outputs != -1 and len(item.output_arrows) >= item.max_outputs and not is_same:
@@ -750,11 +767,17 @@ class ArrowEndpointHandle(QGraphicsEllipseItem):
                 self.arrow.end_item.input_arrows.remove(self.arrow)
             self.arrow.end_item = target
 
+        # reset highlights
         for item in scene.items():
             if hasattr(item, "set_highlighted"):
                 item.set_highlighted(False)
+
         self.arrow.update_path()
         super().mouseReleaseEvent(event)
+
+        # 💡 finally: rerun preview path with correct connections
+        if hasattr(scene, "highlight_preview_path"):
+            scene.highlight_preview_path()
 
 
 class ArrowItem(QGraphicsPathItem):
