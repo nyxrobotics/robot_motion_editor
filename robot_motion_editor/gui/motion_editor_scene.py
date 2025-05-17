@@ -942,30 +942,38 @@ class MotionFlowScene(QGraphicsScene):
         for arrow in self.arrow_objects.values():
             arrow.is_preview_path = False
             arrow.update_path()
-        current = None
+
+        visited_frames = set()
+
+        def dfs(block):
+            if isinstance(block, FrameBlockItem):
+                if block.filename in visited_frames:
+                    return
+                visited_frames.add(block.filename)
+
+            if isinstance(block, (IfBlockItem, SwitchBlockItem)):
+                outputs = list(block.output_sub_blocks.values())
+                if outputs:
+                    idx = block.preview_output_index
+                    if idx < len(outputs):
+                        sub = outputs[idx]
+                        if sub.output_arrows:
+                            arrow = sub.output_arrows[0]
+                            arrow.is_preview_path = True
+                            arrow.update_path()
+                            dfs(arrow.end_item)
+                return
+
+            if hasattr(block, "output_arrows"):
+                for arrow in block.output_arrows:
+                    arrow.is_preview_path = True
+                    arrow.update_path()
+                    dfs(arrow.end_item)
+
         for block in self.block_objects.values():
             if isinstance(block, StartBlockItem):
-                current = block
+                dfs(block)
                 break
-        while current:
-            next_arrow = None
-            if isinstance(current, (IfBlockItem, SwitchBlockItem)):
-                subblocks = list(current.output_sub_blocks.values())
-                if not subblocks:
-                    break
-                idx = current.preview_output_index
-                if idx >= len(subblocks):
-                    break
-                subblock = subblocks[idx]
-                if subblock.output_arrows:
-                    next_arrow = subblock.output_arrows[0]
-            elif current.output_arrows:
-                next_arrow = current.output_arrows[0]
-            if not next_arrow:
-                break
-            next_arrow.is_preview_path = True
-            next_arrow.update_path()
-            current = next_arrow.end_item
 
     def _generate_block_id(self):
         used_ids = {block.id for block in self.block_objects.values()}
