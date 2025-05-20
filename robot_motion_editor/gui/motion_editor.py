@@ -403,15 +403,18 @@ class MotionEditorWidget(QWidget):
             print(f"[WARN] Failed to load {path}: {e}")
             return msg, move_duration, wait_duration
 
-        if not data:
+        if not data or not isinstance(data, dict):
             print(f"[WARN] Empty or invalid YAML in {path}")
+            msg.name = self.joint_names[:]  # fallback to known joint names
+            msg.position = [0.0] * len(self.joint_names)
             return msg, move_duration, wait_duration
+
         joints_data = data.get("joints", {})
         for name, joint_info in joints_data.items():
             pos = joint_info.get("position") if isinstance(joint_info, dict) else joint_info
             if pos is not None:
                 msg.name.append(name)
-                msg.position.append(pos)
+                msg.position.append(pos)  # radian already assumed
 
         msg.header.stamp = rospy.Time.now()
         move_duration = data.get("time", {}).get("move_duration", move_duration)

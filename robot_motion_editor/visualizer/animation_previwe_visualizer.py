@@ -24,7 +24,7 @@ class AnimationPreviewVisualizer:
         self.next_block = None
         self._prev_snapshot = self._get_scene_snapshot()
 
-        self._pause_event.set()  # 初期状態は再生可能
+        self._pause_event.set()
 
     def start(self):
         self.visualizer.enable_loop(False)
@@ -41,12 +41,12 @@ class AnimationPreviewVisualizer:
     def pause(self):
         with self._lock:
             self.state = 'paused'
-            self._pause_event.clear()  # 停止中にする
+            self._pause_event.clear()
 
     def resume(self):
         with self._lock:
             self.state = 'playing'
-            self._pause_event.set()  # 再生状態にする
+            self._pause_event.set()
 
     def stop(self):
         self._stop_event.set()
@@ -145,7 +145,9 @@ class AnimationPreviewVisualizer:
             while elapsed < total_duration:
                 if self._stop_event.is_set():
                     return
-                self._pause_event.wait()
+                if self.state == 'paused':
+                    self._pause_event.wait()
+                    start_time = time.perf_counter() - elapsed
                 time.sleep(0.001)
                 elapsed = time.perf_counter() - start_time
 
