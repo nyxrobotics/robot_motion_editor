@@ -8,31 +8,32 @@ from ..gui.motion_editor_scene import SwitchBlockItem
 
 
 class AnimationPreviewVisualizer:
-    def __init__(self, scene, trajectory_visualizer, frame_loader):
-        self.scene = scene  # MotionFlowScene
-        self.visualizer = trajectory_visualizer  # TrajectoryVisualizer
-        self.load_frame = frame_loader  # Callable: frame_name -> (JointState, move_duration, wait_duration)
+    def __init__(self, scene, trajectory_visualizer, frame_loader, initial_joint_state=None):
+        self.scene = scene
+        self.visualizer = trajectory_visualizer
+        self.load_frame = frame_loader
+        self.initial_joint_state = initial_joint_state
 
         self._thread = None
         self._stop_event = threading.Event()
         self._pause_event = threading.Event()
         self._lock = threading.Lock()
 
+        self.state = 'stopped'
         self.current_block = None
         self.next_block = None
-        self.state = 'stopped'
-
         self._prev_snapshot = self._get_scene_snapshot()
 
     def start(self):
-        if self._thread and self._thread.is_alive():
-            return
-        self._stop_event.clear()
-        self._pause_event.clear()
-        self.state = 'playing'
-        self._prev_snapshot = self._get_scene_snapshot()  # snapshotを記録
-        self._thread = threading.Thread(target=self._run)
-        self._thread.start()
+        with self._lock:
+            if self._thread and self._thread.is_alive():
+                return
+            self._stop_event.clear()
+            self._pause_event.clear()
+            self.state = 'playing'
+            self._prev_snapshot = self._get_scene_snapshot()
+            self._thread = threading.Thread(target=self._run)
+            self._thread.start()
 
     def pause(self):
         with self._lock:
@@ -52,34 +53,34 @@ class AnimationPreviewVisualizer:
             self._thread.join()
 
     def update_scene(self, new_scene):
-        self.scene = new_scene
+        with self._lock:
+            self.scene = new_scene
 
     def _get_scene_snapshot(self):
         snapshot = {}
-        for block_id, block in self.scene.block_objects.items():
+        for name, block in self.scene.block_objects.items():
             entry = {
+                'id': getattr(block, 'id', None),
                 'type': type(block).__name__,
                 'filename': getattr(block, 'filename', ''),
                 'preview_output_index': getattr(block, 'preview_output_index', None),
                 'num_outputs': len(getattr(block, 'output_arrows', [])),
+                'subblock_keys': sorted(block.output_sub_blocks.keys())
+                if hasattr(block, 'output_sub_blocks') else [],
             }
-            if hasattr(block, 'output_sub_blocks'):
-                entry['subblock_keys'] = sorted(block.output_sub_blocks.keys())
-            snapshot[block_id] = entry
+            snapshot[name] = entry
         return snapshot
 
     def _scene_changed(self):
         current = self._get_scene_snapshot()
-        if set(current.keys()) != set(self._prev_snapshot.keys()):
+        if current.keys() != self._prev_snapshot.keys():
             return True
-        for block_id in current:
-            curr = current[block_id]
-            prev = self._prev_snapshot.get(block_id)
-            if not prev:
-                return True
+        for name in current:
+            prev = self._prev_snapshot[name]
+            curr = current[name]
             for key in curr:
-                if key == "preview_output_index":
-                    continue  # preview index の変更は許容
+                if key == 'preview_output_index':
+                    continue
                 if curr[key] != prev.get(key):
                     return True
         return False
@@ -93,51 +94,56 @@ class AnimationPreviewVisualizer:
     def _get_next_block(self, block):
         if isinstance(block, FrameBlockItem):
             return block.output_arrows[0].end_item if block.output_arrows else None
-
-        if isinstance(block, (IfBlockItem, SwitchBlockItem)):
-            outputs = list(block.output_sub_blocks.values())
+        elif isinstance(block, (IfBlockItem, SwitchBlockItem)):
             idx = block.preview_output_index
+            outputs = list(block.output_sub_blocks.values())
             if 0 <= idx < len(outputs):
                 sub = outputs[idx]
                 if sub.output_arrows:
                     return sub.output_arrows[0].end_item
-            return None
-
-        if isinstance(block, StartBlockItem):
+        elif isinstance(block, StartBlockItem):
             return block.output_arrows[0].end_item if block.output_arrows else None
-
         return None
 
     def _run(self):
         self.current_block = self._get_start_block()
-        self.next_block = self._get_next_block(self.current_block)
         start_time = time.perf_counter()
+        previous_joint_state = self.initial_joint_state
 
         while self.current_block and not self._stop_event.is_set():
             if self.state == 'paused':
                 self._pause_event.wait()
 
             if self._scene_changed():
-                print("[AnimationPreviewVisualizer] Scene structure changed. Stopping playback.")
+                print("[AnimationPreviewVisualizer] Scene changed. Stopping.")
                 self.stop()
                 return
 
             if not isinstance(self.current_block, FrameBlockItem):
-                break
+                self.current_block = self._get_next_block(self.current_block)
+                continue
 
             frame_name = self.current_block.filename
-            joint_state, move_duration, wait_duration = self.load_frame(frame_name)
+            try:
+                target_joint_state, move_duration, wait_duration = self.load_frame(frame_name)
+            except Exception as e:
+                print(f"[Visualizer] Failed to load frame {frame_name}: {e}")
+                self.stop()
+                return
 
-            self.visualizer.publish_goal_state(joint_state)
+            if previous_joint_state is None:
+                previous_joint_state = target_joint_state  # fallback
 
-            next_block = self._get_next_block(self.current_block)
-            self.next_block = next_block  # 分岐変更に対応
+            self.visualizer.visualize_current2target(previous_joint_state, target_joint_state, move_duration)
+            self.visualizer.publish_goal_state(target_joint_state)
 
-            duration = move_duration + wait_duration
-            while time.perf_counter() - start_time < duration:
+            total_duration = move_duration + wait_duration
+            start_time = time.perf_counter()
+
+            while (time.perf_counter() - start_time) < total_duration:
                 if self._stop_event.is_set() or self.state == 'paused':
                     break
-                time.sleep(0.0001)  # 0.1ms 高精度sleep
+                time.sleep(0.0001)
 
-            self.current_block = next_block
-            start_time = time.perf_counter()
+            previous_joint_state = target_joint_state
+            self.current_block = self._get_next_block(self.current_block)

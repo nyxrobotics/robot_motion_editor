@@ -22,7 +22,9 @@ from ..logic.animation_file_manager import load_animation_file
 from ..logic.animation_file_manager import save_animation_file
 from ..logic.initial_pose_file_manager import load_initial_pose
 from ..logic.initial_pose_file_manager import save_initial_pose
+from ..visualizer.animation_previwe_visualizer import AnimationPreviewVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
+from .animation_preview_button_widget import AnimationPreviewButtonWidget
 from .frame_editor import FrameEditorDialog
 from .if_condition_editor import IfConditionEditorDialog
 from .motion_editor_animation_tree_widget import AnimationTreeWidget
@@ -34,53 +36,65 @@ from .switch_condition_editor import SwitchConditionEditorDialog
 
 
 class MotionEditorWidget(QWidget):
-    def __init__(self, motion_directory=".", joint_names=None, joint_limits=None, available_variables=None,
-                 trajectory_visualizer: TrajectoryVisualizer = None):
+    def __init__(self, motion_directory=".", joint_names=None, joint_limits=None,
+                 available_variables=None, trajectory_visualizer: TrajectoryVisualizer = None):
         super().__init__()
-
-        self.trajectory_visualizer = trajectory_visualizer
         self.motion_directory = motion_directory
         self.joint_names = joint_names or []
         self.joint_limits = joint_limits or {}
         self.available_variables = available_variables or []
-        self.animation_tree = AnimationTreeWidget(motion_directory=self.motion_directory, parent=self)
+        self.trajectory_visualizer = trajectory_visualizer
         self.current_animation_name = None
-        self.init_ui()
-        self.load_animation_list()
 
-    def set_motion_directory(self, motion_directory):
-        self.motion_directory = motion_directory
-        self.animation_tree.set_motion_directory(motion_directory)
+        self.animation_tree = AnimationTreeWidget(motion_directory=self.motion_directory, parent=self)
+        self.scene = MotionFlowScene(editor_widget=self)
+        self.view = MotionGraphicsView(self.scene)
+
+        self.preview_controller = AnimationPreviewVisualizer(
+            scene=self.scene,
+            trajectory_visualizer=self.trajectory_visualizer,
+            frame_loader=lambda name: self.load_joint_state_and_durations(self.resolve_frame_path(name)),
+            initial_joint_state=None
+        )
+
+        self.init_ui()
         self.load_animation_list()
 
     def init_ui(self):
         splitter = QSplitter(Qt.Horizontal)
 
         left_widget = QWidget()
-        left_panel = QVBoxLayout(left_widget)
+        left_layout = QVBoxLayout(left_widget)
+
+        # プレビューボタンを縦に並べて配置
+        self.preview_buttons = AnimationPreviewButtonWidget(self.preview_controller)
+        preview_layout = QVBoxLayout()
+        preview_layout.addWidget(self.preview_buttons.play_btn)
+        preview_layout.addWidget(self.preview_buttons.pause_btn)
+        preview_layout.addWidget(self.preview_buttons.stop_btn)
+        left_layout.addLayout(preview_layout)
+
         self.save_anim_btn = QPushButton("Save Animation")
         self.new_anim_btn = QPushButton("New Animation")
         self.new_frame_btn = QPushButton("New Frame")
         self.delete_anim_btn = QPushButton("Delete Animation")
         self.delete_frame_btn = QPushButton("Delete Frame")
 
+        for btn in [self.save_anim_btn, self.new_anim_btn, self.new_frame_btn,
+                    self.delete_anim_btn, self.delete_frame_btn]:
+            left_layout.addWidget(btn)
+
+        left_layout.addWidget(QLabel("Animation List"))
+        left_layout.addWidget(self.animation_tree)
+
         self.save_anim_btn.clicked.connect(self.save_current_animation)
         self.new_anim_btn.clicked.connect(self.create_new_animation)
         self.new_frame_btn.clicked.connect(self.create_new_frame)
         self.delete_anim_btn.clicked.connect(self.delete_animation)
         self.delete_frame_btn.clicked.connect(self.delete_frame)
-
-        left_panel.addWidget(QLabel("Animation List"))
-        for btn in [self.save_anim_btn, self.new_anim_btn, self.new_frame_btn,
-                    self.delete_anim_btn, self.delete_frame_btn]:
-            left_panel.addWidget(btn)
-        left_panel.addWidget(self.animation_tree)
-
         self.animation_tree.itemClicked.connect(self.on_tree_item_clicked)
         self.animation_tree.itemDoubleClicked.connect(self.on_tree_item_double_clicked)
 
-        self.scene = MotionFlowScene(editor_widget=self)
-        self.view = MotionGraphicsView(self.scene)
         self.view.setAcceptDrops(True)
         self.view.setRenderHints(self.view.renderHints() | QPainter.Antialiasing)
 
@@ -92,6 +106,14 @@ class MotionEditorWidget(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(splitter)
         self.setLayout(layout)
+
+    def resolve_frame_path(self, frame_name):
+        return os.path.join(
+            self.motion_directory,
+            self.current_animation_name,
+            "frames",
+            f"{frame_name}.yaml"
+        )
 
     def on_tree_item_clicked(self, item):
         # Get the top animation name from any hierarchy
@@ -245,11 +267,8 @@ class MotionEditorWidget(QWidget):
         if not self.current_animation_name:
             QMessageBox.information(self, "Save", "No animation selected to save.")
             return
-
         layout = self.scene.save_layout_yaml()
-        print("[DEBUG] Final layout from scene:", layout)
         save_animation_file(self.motion_directory, self.current_animation_name, layout)
-        print("Saved:", self.current_animation_name)
 
     def create_new_animation(self):
         name, ok = QInputDialog.getText(self, "New Animation", "Enter animation name:")
@@ -260,18 +279,16 @@ class MotionEditorWidget(QWidget):
         if os.path.exists(animation_path):
             QMessageBox.warning(self, "Name Conflict", f"Animation '{name}' already exists.")
             return
-
         os.makedirs(os.path.join(animation_path, "frames"), exist_ok=True)
         with open(os.path.join(animation_path, f"{name}.yaml"), "w") as f:
-            f.write("  # animation flowchart\n")
+            f.write("  # animation flowchart")
         with open(os.path.join(animation_path, "offset.yaml"), "w") as f:
-            f.write("  # initial frame offset\n")
-
+            f.write("  # initial frame offset")
         self.load_animation_list()
         self.load_animation_by_name(name)
 
     def create_new_frame(self):
-        current_item = self.animation_tree.currentItem()
+        # ...省略（通常のframe追加処理）...
         if not current_item:
             QMessageBox.information(self, "Selection Error", "Please select an animation.")
             return
