@@ -45,6 +45,7 @@ class MotionEditorWidget(QWidget):
         self.available_variables = available_variables or []
         self.trajectory_visualizer = trajectory_visualizer
         self.current_animation_name = None
+        self.initial_joint_state = None
 
         self.animation_tree = AnimationTreeWidget(motion_directory=self.motion_directory, parent=self)
         self.scene = MotionFlowScene(editor_widget=self)
@@ -54,11 +55,36 @@ class MotionEditorWidget(QWidget):
             scene=self.scene,
             trajectory_visualizer=self.trajectory_visualizer,
             frame_loader=lambda name: self.load_joint_state_and_durations(self.resolve_frame_path(name)),
-            initial_joint_state=None
+            initial_joint_state=self.initial_joint_state
         )
 
         self.init_ui()
         self.load_animation_list()
+
+    def resolve_frame_path(self, frame_name):
+        return os.path.join(
+            self.motion_directory,
+            self.current_animation_name,
+            "frames",
+            f"{frame_name}.yaml"
+        )
+
+    def load_animation_by_name(self, animation_name):
+        if not self.confirm_save_if_unsaved_changes():
+            return
+        self.current_animation_name = animation_name
+        layout = load_animation_file(self.motion_directory, animation_name)
+        self.scene.load_layout_yaml(layout)
+        self.scene.highlight_preview_path()
+
+        # 初期姿勢読み込み（initial_frame）
+        try:
+            self.initial_joint_state, _, _ = self.load_joint_state_and_durations(
+                self.resolve_frame_path("initial_frame")
+            )
+            self.preview_controller.initial_joint_state = self.initial_joint_state
+        except Exception as e:
+            rospy.logwarn(f"[MotionEditor] Failed to load initial_frame: {e}")
 
     def init_ui(self):
         splitter = QSplitter(Qt.Horizontal)
@@ -106,14 +132,6 @@ class MotionEditorWidget(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(splitter)
         self.setLayout(layout)
-
-    def resolve_frame_path(self, frame_name):
-        return os.path.join(
-            self.motion_directory,
-            self.current_animation_name,
-            "frames",
-            f"{frame_name}.yaml"
-        )
 
     def on_tree_item_clicked(self, item):
         # Get the top animation name from any hierarchy
@@ -393,7 +411,7 @@ class MotionEditorWidget(QWidget):
             pos = joint_info.get("position") if isinstance(joint_info, dict) else joint_info
             if pos is not None:
                 msg.name.append(name)
-                msg.position.append(math.radians(pos))
+                msg.position.append(pos)
 
         msg.header.stamp = rospy.Time.now()
         move_duration = data.get("time", {}).get("move_duration", move_duration)

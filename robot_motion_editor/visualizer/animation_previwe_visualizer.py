@@ -25,6 +25,7 @@ class AnimationPreviewVisualizer:
         self._prev_snapshot = self._get_scene_snapshot()
 
     def start(self):
+        self.visualizer.enable_loop(False)
         with self._lock:
             if self._thread and self._thread.is_alive():
                 return

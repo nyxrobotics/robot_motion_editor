@@ -44,7 +44,7 @@ class TrajectoryVisualizer:
         point_start.time_from_start = rospy.Duration(0.0)
         point_start.positions = start_state.position
         point_start.velocities = [
-            (b - a) / duration for a, b in zip(start_state.position, target.position)
+            1000.0 if duration == 0.0 else (b - a) / duration for a, b in zip(start_state.position, target.position)
         ]
 
         point_end = JointTrajectoryPoint()
@@ -97,7 +97,7 @@ class TrajectoryVisualizer:
         point_start.time_from_start = rospy.Duration(0.0)
         point_start.positions = start_state.position
         point_start.velocities = [
-            (b - a) / duration for a, b in zip(start_state.position, target.position)
+            1000.0 if duration == 0.0 else (b - a) / duration for a, b in zip(start_state.position, target.position)
         ]
 
         point_end = JointTrajectoryPoint()
@@ -159,7 +159,6 @@ class TrajectoryVisualizer:
                 time = t0 + t * dt
                 pos = [a + v * (time - t0) for a, v in zip(p0.positions, p0.velocities)]
 
-                # Clamp to avoid overshoot beyond p1
                 pos = [
                     min(max(p1_i, p0_i), p_i) if p0_i < p1_i else max(min(p1_i, p0_i), p_i)
                     for p_i, p0_i, p1_i in zip(pos, p0.positions, p1.positions)
@@ -175,10 +174,6 @@ class TrajectoryVisualizer:
         return result
 
     def _get_aligned_joint_positions(self, source: JointState, reference_names):
-        """
-        source の関節角度を reference_names の順に並び替えたリストを返す。
-        reference_names は List[str] または JointState。
-        """
         if isinstance(reference_names, JointState):
             reference_names = reference_names.name
 
