@@ -24,13 +24,15 @@ class AnimationPreviewVisualizer:
         self.next_block = None
         self._prev_snapshot = self._get_scene_snapshot()
 
+        self._pause_event.set()  # 初期状態は再生可能
+
     def start(self):
         self.visualizer.enable_loop(False)
         with self._lock:
             if self._thread and self._thread.is_alive():
                 return
             self._stop_event.clear()
-            self._pause_event.clear()
+            self._pause_event.set()
             self.state = 'playing'
             self._prev_snapshot = self._get_scene_snapshot()
             self._thread = threading.Thread(target=self._run)
@@ -39,12 +41,12 @@ class AnimationPreviewVisualizer:
     def pause(self):
         with self._lock:
             self.state = 'paused'
-            self._pause_event.set()
+            self._pause_event.clear()  # 停止中にする
 
     def resume(self):
         with self._lock:
             self.state = 'playing'
-            self._pause_event.clear()
+            self._pause_event.set()  # 再生状態にする
 
     def stop(self):
         self._stop_event.set()
@@ -108,12 +110,10 @@ class AnimationPreviewVisualizer:
 
     def _run(self):
         self.current_block = self._get_start_block()
-        start_time = time.perf_counter()
         previous_joint_state = self.initial_joint_state
 
         while self.current_block and not self._stop_event.is_set():
-            if self.state == 'paused':
-                self._pause_event.wait()
+            self._pause_event.wait()
 
             if self._scene_changed():
                 print("[AnimationPreviewVisualizer] Scene changed. Stopping.")
@@ -133,18 +133,21 @@ class AnimationPreviewVisualizer:
                 return
 
             if previous_joint_state is None:
-                previous_joint_state = target_joint_state  # fallback
+                previous_joint_state = target_joint_state
 
             self.visualizer.visualize_current2target(previous_joint_state, target_joint_state, move_duration)
             self.visualizer.publish_goal_state(target_joint_state)
 
             total_duration = move_duration + wait_duration
+            elapsed = 0.0
             start_time = time.perf_counter()
 
-            while (time.perf_counter() - start_time) < total_duration:
-                if self._stop_event.is_set() or self.state == 'paused':
-                    break
-                time.sleep(0.0001)
+            while elapsed < total_duration:
+                if self._stop_event.is_set():
+                    return
+                self._pause_event.wait()
+                time.sleep(0.001)
+                elapsed = time.perf_counter() - start_time
 
             previous_joint_state = target_joint_state
             self.current_block = self._get_next_block(self.current_block)
