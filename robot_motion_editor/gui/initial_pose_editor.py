@@ -29,7 +29,6 @@ class InitialPoseEditor(QWidget):
     def __init__(self, joint_names, joint_limits, available_variables,
                  motion_directory=None, trajectory_visualizer: TrajectoryVisualizer = None):
         super().__init__()
-        self.joint_names = joint_names
         self.joint_limits = joint_limits
         self.available_variables = available_variables
         self.motion_directory = motion_directory
@@ -70,9 +69,10 @@ class InitialPoseEditor(QWidget):
 
         layout.addLayout(header_layout)
 
-        max_label_width = QLabel(max(self.joint_names, key=len)).sizeHint().width() if self.joint_names else 80
+        max_label_width = QLabel(max(self.initial_pose_data.get_joint_names(), key=len)
+                                 ).sizeHint().width() if self.initial_pose_data.get_joint_names() else 80
 
-        for joint_name in self.joint_names:
+        for joint_name in self.initial_pose_data.get_joint_names():
             row = QHBoxLayout()
 
             enable_cb = QCheckBox()
@@ -130,7 +130,7 @@ class InitialPoseEditor(QWidget):
         joint_data = InitialPoseFileManager.load_dict(self.motion_directory, filename)
         self.initial_pose_data.set_dict(joint_data)
 
-        for joint_name in self.joint_names:
+        for joint_name in self.initial_pose_data.get_joint_names():
             if joint_name not in self.joint_widgets:
                 continue
 
@@ -147,7 +147,7 @@ class InitialPoseEditor(QWidget):
             rospy.logwarn("No path specified for saving pose.")
             return
 
-        for joint_name in self.joint_names:
+        for joint_name in self.initial_pose_data.get_joint_names():
             _, spin = self.joint_widgets[joint_name]
             position_rad = math.radians(spin.value())
             self.initial_pose_data.set_pose(joint_name, position_rad)
@@ -157,7 +157,7 @@ class InitialPoseEditor(QWidget):
         self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
 
     def get_target_joints(self):
-        return [math.radians(self.joint_widgets[name][1].value()) for name in self.joint_names]
+        return [math.radians(self.joint_widgets[name][1].value()) for name in self.initial_pose_data.get_joint_names()]
 
     def on_pose_changed(self):
         if not self.isVisible():
