@@ -61,6 +61,10 @@ class AnimaitonWidget(QWidget):
         self.init_ui()
         self.load_animation_list()
 
+    def set_motion_directory(self, directory):
+        self.motion_directory = directory
+        self.load_animation_list()
+
     def resolve_frame_path(self, frame_name):
         return os.path.join(
             self.motion_directory,

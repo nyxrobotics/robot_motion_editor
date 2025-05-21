@@ -1,3 +1,4 @@
+
 import math
 
 import rospy
@@ -26,61 +27,50 @@ from .pid_gain_editor import PIDGainEditorDialog
 class InitialPoseEditor(QWidget):
     pose_updated = pyqtSignal()
 
-    def __init__(
-            self,
-            joint_names,
-            joint_limits,
-            available_variables,
-            motion_directory=None,
-            trajectory_visualizer: TrajectoryVisualizer = None):
+    def __init__(self, joint_names, joint_limits, available_variables,
+                 motion_directory=None, trajectory_visualizer: TrajectoryVisualizer = None):
         super().__init__()
-        self.motion_directory = motion_directory
         self.joint_names = joint_names
         self.joint_limits = joint_limits
         self.available_variables = available_variables
+        self.motion_directory = motion_directory
+        self.initial_pose_visualizer = InitialPoseVisualizer(joint_names, trajectory_visualizer)
 
         self.joint_widgets = {}
-        self.joint_enabled = {}
-        self.enable_checkbox_widgets = {}
+        self.enable_checkboxes = {}
         self.pid_config = {}
         self.feedback_expressions = {}
         self.prev_pose = []
-        self.trajectory_visualizer = trajectory_visualizer
-        self.initial_pose_visualizer = InitialPoseVisualizer(joint_names, trajectory_visualizer)
+
         self.init_ui()
 
     def set_motion_directory(self, directory):
         self.motion_directory = directory
-        self.load_pose_from_file()
+        self.load_pose()
 
     def init_ui(self):
         main_layout = QVBoxLayout()
-
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
         layout = QVBoxLayout(content)
 
-        # Save + All Enable row
-        save_row = QHBoxLayout()
+        # Header row with All Enable, Reload, Save
+        header_layout = QHBoxLayout()
         self.all_enable_checkbox = QCheckBox("All Enable")
         self.all_enable_checkbox.stateChanged.connect(self.set_all_enable_checkboxes)
-        save_row.addWidget(self.all_enable_checkbox)
+        header_layout.addWidget(self.all_enable_checkbox)
 
         reload_button = QPushButton("Reload")
-        reload_button.clicked.connect(lambda: self.load_pose_from_file(self.motion_directory))
-        save_button = QPushButton("Save")
-        save_button.clicked.connect(lambda: self.save_pose_to_file(self.motion_directory))
-        save_row.addWidget(reload_button)
-        save_row.addWidget(save_button)
-        layout.addLayout(save_row)
+        reload_button.clicked.connect(lambda: self.load_pose())
+        header_layout.addWidget(reload_button)
 
-        if self.joint_names:
-            max_label = QLabel(max(self.joint_names, key=len))
-        else:
-            max_label = QLabel("Joint")
-            rospy.logwarn("No joints found.")
-        max_label_width = max_label.sizeHint().width()
+        save_button = QPushButton("Save")
+        save_button.clicked.connect(lambda: self.save_pose())
+        header_layout.addWidget(save_button)
+        layout.addLayout(header_layout)
+
+        max_label_width = QLabel(max(self.joint_names, key=len)).sizeHint().width() if self.joint_names else 80
 
         for joint in self.joint_names:
             row = QHBoxLayout()
@@ -88,8 +78,7 @@ class InitialPoseEditor(QWidget):
             enable_cb = QCheckBox()
             enable_cb.setChecked(True)
             enable_cb.stateChanged.connect(self.update_all_enable_checkbox)
-            self.enable_checkbox_widgets[joint] = enable_cb
-            self.joint_enabled[joint] = True
+            self.enable_checkboxes[joint] = enable_cb
 
             label = QLabel(joint)
             label.setFixedWidth(max_label_width)
@@ -101,9 +90,8 @@ class InitialPoseEditor(QWidget):
             spin.setDecimals(1)
             spin.setSingleStep(1.0)
 
-            lower_rad, upper_rad = self.joint_limits.get(joint, (-math.pi, math.pi))
-            lower_deg = math.degrees(lower_rad)
-            upper_deg = math.degrees(upper_rad)
+            lower, upper = self.joint_limits.get(joint, (-math.pi, math.pi))
+            lower_deg, upper_deg = math.degrees(lower), math.degrees(upper)
 
             slider.setRange(int(lower_deg), int(upper_deg))
             spin.setRange(lower_deg, upper_deg)
@@ -114,11 +102,11 @@ class InitialPoseEditor(QWidget):
 
             pid_button = QPushButton("PID")
             pid_button.setFixedWidth(50)
-            pid_button.clicked.connect(lambda _, j=joint, btn=pid_button: self.open_pid_dialog(j, btn))
+            pid_button.clicked.connect(lambda _, j=joint, b=pid_button: self.open_pid_dialog(j, b))
 
             fb_button = QPushButton("FB")
             fb_button.setFixedWidth(50)
-            fb_button.clicked.connect(lambda _, j=joint, btn=fb_button: self.open_feedback_dialog(j, btn))
+            fb_button.clicked.connect(lambda _, j=joint, b=fb_button: self.open_feedback_dialog(j, b))
 
             row.addWidget(enable_cb)
             row.addWidget(label)
@@ -134,134 +122,108 @@ class InitialPoseEditor(QWidget):
         main_layout.addWidget(scroll)
         self.setLayout(main_layout)
 
-    def get_target_joints(self):
-        positions = []
+    def set_motion_directory(self, directory):
+        self.motion_directory = directory
+        self.load_pose()
+
+    def load_pose(self, filename="initial_pose.yaml"):
+        if not self.motion_directory:
+            rospy.logwarn("No path specified for loading pose.")
+            return
+        joint_data = load_initial_pose(self.motion_directory, filename)
+
+        for joint, data in joint_data.items():
+            if joint not in self.joint_widgets:
+                continue
+            pos_deg = math.degrees(data.get("position", 0.0))
+            _, spin = self.joint_widgets[joint]
+            spin.setValue(pos_deg)
+
+            enable = data.get("enable", True)
+            self.enable_checkboxes[joint].setChecked(enable)
+
+            self.pid_config[joint] = tuple(data.get("pid", [0.0, 0.0, 0.0]))
+            self.feedback_expressions[joint] = data.get("feedback", "")
+
+        # Set the initial pose in the visualizer
+        joint_state = JointState()
+        for joint in self.joint_names:
+            joint_state.name.append(joint)
+            joint_state.position.append(joint_data[joint]["position"])
+        self.initial_pose_visualizer.set_start_pose(joint_state)
+
+    def save_pose(self, filename="initial_pose.yaml"):
+        if not self.motion_directory:
+            rospy.logwarn("No path specified for saving pose.")
+            return
+        joint_data = {}
         for joint in self.joint_names:
             _, spin = self.joint_widgets[joint]
-            degree = spin.value()
-            radian = math.radians(degree)
-            positions.append(radian)
-        return positions
+            pos_rad = math.radians(spin.value())
+            joint_data[joint] = {
+                "position": pos_rad,
+                "enable": self.enable_checkboxes[joint].isChecked(),
+                "pid": list(self.pid_config.get(joint, (0.0, 0.0, 0.0))),
+                "feedback": str(self.feedback_expressions.get(joint, "")).strip()
+            }
+        save_initial_pose(self.motion_directory, joint_data, filename)
+
+        # Set the initial pose in the visualizer
+        joint_state = JointState()
+        for joint in self.joint_names:
+            joint_state.name.append(joint)
+            joint_state.position.append(joint_data[joint]["position"])
+        self.initial_pose_visualizer.set_start_pose(joint_state)
+
+    def get_target_joints(self):
+        return [math.radians(self.joint_widgets[j][1].value()) for j in self.joint_names]
 
     def on_pose_changed(self):
-        if self.isVisible():
-            current = self.get_target_joints()
-            if current != self.prev_pose:
-                self.prev_pose = current
-                msg = JointState()
-                msg.name = self.joint_names
-                msg.position = current
-                self.initial_pose_visualizer.update_target_pose(msg)
-
-    def save_pose_to_file(self, path=None, filename="initial_pose.yaml"):
-        if path is None:
-            path = self.motion_directory
-        if not path:
-            rospy.logwarn("No path specified for loading pose.")
+        if not self.isVisible():
             return
-        positions = self.get_target_joints()
-        try:
-            save_initial_pose(
-                path,
-                self.joint_names,
-                positions,
-                enabled=self.joint_enabled,
-                pid_config=self.pid_config,
-                feedback_exprs=self.feedback_expressions,
-                filename=filename
-            )
-        except Exception as e:
-            rospy.logwarn(f"Failed to save pose to {path}/{filename}: {e}")
-            return
+        current = self.get_target_joints()
+        if current != self.prev_pose:
+            self.prev_pose = current
+            msg = JointState()
+            msg.name = self.joint_names
+            msg.position = current
+            self.initial_pose_visualizer.set_target_pose(msg)
 
-    def load_pose_from_file(self, path=None, filename="initial_pose.yaml"):
-        """
-        Read initial_pose.yaml or offset.yaml, etc. and reflect them in the GUI.
-        If there is no specified path, self.motion_directory is used.
-        """
-        if path is None:
-            path = self.motion_directory
-        if not path:
-            rospy.logwarn("No path specified for loading pose.")
-            return
-
-        try:
-            loaded = load_initial_pose(path, filename=filename)
-        except Exception as e:
-            rospy.logwarn(f"Failed to load pose from {path}/{filename}: {e}")
-            return
-
-        for name, settings in loaded.items():
-            if name not in self.joint_widgets:
-                continue
-
-            # Position
-            pos_rad = float(settings.get("position", 0.0))
-            deg = math.degrees(pos_rad)
-            _, spin = self.joint_widgets[name]
-            spin.setValue(deg)
-
-            # Enable
-            enable_cb = self.enable_checkbox_widgets.get(name)
-            if enable_cb:
-                state = bool(settings.get("enable", True))
-                enable_cb.setChecked(state)
-                self.joint_enabled[name] = state
-
-            # PID
-            pid = settings.get("pid", [0.0, 0.0, 0.0])
-            if isinstance(pid, list) and len(pid) == 3:
-                self.pid_config[name] = tuple(pid)
-
-            # Feedback
-            feedback = settings.get("feedback", "")
-            if isinstance(feedback, str):
-                self.feedback_expressions[name] = feedback
+    def update_all_enable_checkbox(self):
+        checked = [cb.isChecked() for cb in self.enable_checkboxes.values()]
+        total = len(checked)
+        count = sum(checked)
+        self.all_enable_checkbox.blockSignals(True)
+        if count == total:
+            self.all_enable_checkbox.setCheckState(Qt.Checked)
+        elif count == 0:
+            self.all_enable_checkbox.setCheckState(Qt.Unchecked)
+        else:
+            self.all_enable_checkbox.setTristate(True)
+            self.all_enable_checkbox.setCheckState(Qt.PartiallyChecked)
+        self.all_enable_checkbox.blockSignals(False)
 
     def set_all_enable_checkboxes(self, state):
         checked = state == Qt.Checked
-        for joint, checkbox in self.enable_checkbox_widgets.items():
-            checkbox.blockSignals(True)
-            checkbox.setChecked(checked)
-            self.joint_enabled[joint] = checked
-            checkbox.blockSignals(False)
+        for cb in self.enable_checkboxes.values():
+            cb.blockSignals(True)
+            cb.setChecked(checked)
+            cb.blockSignals(False)
 
-    def update_all_enable_checkbox(self):
-        checked_count = sum(cb.isChecked() for cb in self.enable_checkbox_widgets.values())
-        total = len(self.enable_checkbox_widgets)
-        if checked_count == total:
-            self.all_enable_checkbox.blockSignals(True)
-            self.all_enable_checkbox.setCheckState(Qt.Checked)
-            self.all_enable_checkbox.blockSignals(False)
-        elif checked_count == 0:
-            self.all_enable_checkbox.blockSignals(True)
-            self.all_enable_checkbox.setCheckState(Qt.Unchecked)
-            self.all_enable_checkbox.blockSignals(False)
-        else:
-            self.all_enable_checkbox.blockSignals(True)
-            self.all_enable_checkbox.setTristate(True)
-            self.all_enable_checkbox.setCheckState(Qt.PartiallyChecked)
-            self.all_enable_checkbox.blockSignals(False)
-
-    def open_pid_dialog(self, joint_name, button):
-        current = self.pid_config.get(joint_name, (0.0, 0.0, 0.0))
-        dialog = PIDGainEditorDialog(joint_name, current, parent=self)
+    def open_pid_dialog(self, joint, button):
+        current = self.pid_config.get(joint, (0.0, 0.0, 0.0))
+        dialog = PIDGainEditorDialog(joint, current, parent=self)
         if dialog.exec_() and dialog.result:
-            self.pid_config[joint_name] = dialog.result
-            p, i, d = dialog.result
-            if any(val != 0.0 for val in (p, i, d)):
-                button.setStyleSheet("background-color: lightblue;")
-            else:
-                button.setStyleSheet("")
-            rospy.loginfo(f"Updated PID for {joint_name}: {dialog.result}")
+            self.pid_config[joint] = dialog.result
+            color = "lightblue" if any(dialog.result) else ""
+            button.setStyleSheet(f"background-color: {color};")
+            rospy.loginfo(f"Updated PID for {joint}: {dialog.result}")
 
-    def open_feedback_dialog(self, joint_name, button):
-        current_expr = self.feedback_expressions.get(joint_name, "")
-        dialog = FeedbackExpressionDialog(
-            joint_name, current_expr, self.available_variables, parent=self
-        )
+    def open_feedback_dialog(self, joint, button):
+        current = self.feedback_expressions.get(joint, "")
+        dialog = FeedbackExpressionDialog(joint, current, self.available_variables, parent=self)
         if dialog.exec_() and dialog.result is not None:
-            self.feedback_expressions[joint_name] = dialog.result
             expr = dialog.result.strip()
+            self.feedback_expressions[joint] = expr
             button.setStyleSheet("background-color: lightblue" if expr else "")
-            rospy.loginfo(f"Updated Feedback expression for {joint_name}: {dialog.result}")
+            rospy.loginfo(f"Updated Feedback expression for {joint}: {expr}")
