@@ -51,7 +51,7 @@ class InitialPoseEditor(QWidget):
 
     def set_motion_directory(self, directory):
         self.motion_directory = directory
-        self.load_joint_pose_from_file()
+        self.load_pose_from_file()
 
     def init_ui(self):
         main_layout = QVBoxLayout()
@@ -67,8 +67,11 @@ class InitialPoseEditor(QWidget):
         self.all_enable_checkbox.stateChanged.connect(self.set_all_enable_checkboxes)
         save_row.addWidget(self.all_enable_checkbox)
 
-        save_button = QPushButton("Save Initial Pose")
-        save_button.clicked.connect(self.save_pose_to_file)
+        reload_button = QPushButton("Reload")
+        reload_button.clicked.connect(lambda: self.load_pose_from_file(self.motion_directory))
+        save_button = QPushButton("Save")
+        save_button.clicked.connect(lambda: self.save_pose_to_file(self.motion_directory))
+        save_row.addWidget(reload_button)
         save_row.addWidget(save_button)
         layout.addLayout(save_row)
 
@@ -150,20 +153,28 @@ class InitialPoseEditor(QWidget):
                 msg.position = current
                 self.initial_pose_visualizer.update_target_pose(msg)
 
-    def save_pose_to_file(self):
+    def save_pose_to_file(self, path=None, filename="initial_pose.yaml"):
+        if path is None:
+            path = self.motion_directory
+        if not path:
+            rospy.logwarn("No path specified for loading pose.")
+            return
         positions = self.get_target_joints()
-        if self.motion_directory:
+        try:
             save_initial_pose(
-                self.motion_directory,
+                path,
                 self.joint_names,
                 positions,
                 enabled=self.joint_enabled,
                 pid_config=self.pid_config,
-                feedback_exprs=self.feedback_expressions
+                feedback_exprs=self.feedback_expressions,
+                filename=filename
             )
-            rospy.loginfo("Initial pose saved.")
+        except Exception as e:
+            rospy.logwarn(f"Failed to save pose to {path}/{filename}: {e}")
+            return
 
-    def load_joint_pose_from_file(self, path=None, filename="initial_pose.yaml"):
+    def load_pose_from_file(self, path=None, filename="initial_pose.yaml"):
         """
         Read initial_pose.yaml or offset.yaml, etc. and reflect them in the GUI.
         If there is no specified path, self.motion_directory is used.

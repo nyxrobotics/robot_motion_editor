@@ -39,7 +39,7 @@ class OffsetEditorDialog(QDialog):
         self.enable_checkbox_widgets = {}
 
         self.init_ui()
-        self.load_joint_pose_from_file(offset_path)
+        self.load_pose_from_file(offset_path)
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -136,7 +136,7 @@ class OffsetEditorDialog(QDialog):
         for name, (slider, spin) in self.joint_widgets.items():
             spin.setValue(0.0)
 
-    def load_joint_pose_from_file(self, yaml_path):
+    def load_pose_from_file(self, yaml_path):
         if not yaml_path or not os.path.exists(yaml_path):
             rospy.loginfo(f"No offset.yaml found at {yaml_path}")
             return
