@@ -331,11 +331,24 @@ class FrameEditorDialog(QDialog):
 
         for joint_name, cmd in self.frame_data.joints.items():
             if joint_name not in self.joint_widgets:
+                print(f"[WARNING] Joint {joint_name} not found in joint widgets.")
+                print(f"[WARNING] Available joints: {self.joint_names}")
                 continue
+
             _, spin, vel_spin = self.joint_widgets[joint_name]
+
+            # Block signals to prevent .setValue() from triggering .valueChanged
+            spin.blockSignals(True)
             spin.setValue(math.degrees(cmd.position))
+            spin.blockSignals(False)
+
+            vel_spin.blockSignals(True)
             vel_spin.setValue(cmd.velocity_scale)
+            vel_spin.blockSignals(False)
+
+            self.enable_checkbox_widgets[joint_name].blockSignals(True)
             self.enable_checkbox_widgets[joint_name].setChecked(cmd.enable)
+            self.enable_checkbox_widgets[joint_name].blockSignals(False)
         print(f"[INFO] Loaded frame data from file: {path}")
 
     def save_frame(self):
