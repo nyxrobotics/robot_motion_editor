@@ -20,8 +20,6 @@ from sensor_msgs.msg import JointState
 
 from ..logic.animation_file_manager import load_animation_file
 from ..logic.animation_file_manager import save_animation_file
-from ..logic.initial_pose_file_manager import load_initial_pose
-from ..logic.initial_pose_file_manager import save_initial_pose
 from ..visualizer.animation_visualizer import AnimationVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .animation_editor_widget import AnimationEditorWidget
