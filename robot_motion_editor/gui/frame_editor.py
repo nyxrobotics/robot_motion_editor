@@ -42,6 +42,28 @@ class FrameData:
     wait_duration: float = 0.0
     joints: Dict[str, JointCommand] = field(default_factory=dict)
 
+    def to_dict(self):
+        joints_dict = {}
+        velocity_scale_dict = {}
+
+        for name, cmd in self.joints.items():
+            joints_dict[name] = {
+                "position": cmd.position,
+                "pid": cmd.pid,
+                "enable": cmd.enable,
+                "feedback": cmd.feedback
+            }
+            velocity_scale_dict[name] = cmd.velocity_scale
+
+        return {
+            "joints": joints_dict,
+            "time": {
+                "move_duration": self.move_duration,
+                "wait_duration": self.wait_duration
+            },
+            "velocity_scale": velocity_scale_dict
+        }
+
 
 class FrameFileManager:
     @staticmethod
@@ -124,6 +146,15 @@ class FrameEditorDialog(QDialog):
             wait_duration=0.0,
             joints={name: JointCommand() for name in joint_names}
         )
+
+        if frame_path and os.path.exists(frame_path):
+            loaded = FrameFileManager.load(frame_path, joint_names)
+            if not joint_names and loaded and loaded.joints:
+                joint_names = list(loaded.joints.keys())
+            elif loaded and loaded.joints:
+                for name in loaded.joints:
+                    if name not in joint_names:
+                        joint_names.append(name)
 
         self.joint_widgets = {}
         self.enable_checkbox_widgets = {}
@@ -378,3 +409,10 @@ class FrameEditorDialog(QDialog):
                 msg.position.append(cmd.position)
         msg.header.stamp = rospy.Time.now()
         self.trajectory_visualizer.publish_goal_state(msg)
+
+    def accept(self):
+        with open(self.frame_path, "w") as f:
+            yaml.dump(self.frame_data.to_dict(), f)
+
+        print(f"[INFO] Frame saved to {self.frame_path}")
+        super().accept()
