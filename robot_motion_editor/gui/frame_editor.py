@@ -49,7 +49,7 @@ class FrameData:
         for name, cmd in self.joints.items():
             joints_dict[name] = {
                 "position": cmd.position,
-                "pid": cmd.pid,
+                "pid": list(cmd.pid),
                 "enable": cmd.enable,
                 "feedback": cmd.feedback
             }
@@ -336,6 +336,7 @@ class FrameEditorDialog(QDialog):
             spin.setValue(math.degrees(cmd.position))
             vel_spin.setValue(cmd.velocity_scale)
             self.enable_checkbox_widgets[joint_name].setChecked(cmd.enable)
+        print(f"[INFO] Loaded frame data from file: {path}")
 
     def save_frame(self):
         if not self.frame_path:
@@ -346,12 +347,17 @@ class FrameEditorDialog(QDialog):
         self.frame_data.wait_duration = self.wait_spin.value()
 
         for joint_name in self.joint_names:
+            if joint_name not in self.frame_data.joints:
+                self.frame_data.joints[joint_name] = JointCommand()
+
+        for joint_name in self.joint_names:
             _, spin, vel_spin = self.joint_widgets[joint_name]
             self.frame_data.joints[joint_name].position = math.radians(spin.value())
             self.frame_data.joints[joint_name].velocity_scale = vel_spin.value()
             self.frame_data.joints[joint_name].enable = self.enable_checkbox_widgets[joint_name].isChecked()
 
         FrameFileManager.save(self.frame_path, self.frame_data)
+        print(f"[INFO] Frame saved to {self.frame_path}")
         self.accept()
 
     def handle_play_button(self):
@@ -414,5 +420,4 @@ class FrameEditorDialog(QDialog):
         with open(self.frame_path, "w") as f:
             yaml.dump(self.frame_data.to_dict(), f)
 
-        print(f"[INFO] Frame saved to {self.frame_path}")
         super().accept()
