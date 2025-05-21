@@ -16,8 +16,7 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 from sensor_msgs.msg import JointState
 
-from ..logic.initial_pose_file_manager import load_initial_pose
-from ..logic.initial_pose_file_manager import save_initial_pose
+from ..logic.initial_pose_file_manager import InitialPoseFileManager
 from ..visualizer.initial_pose_visualizer import InitialPoseVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .feedback_expression_dialog import FeedbackExpressionDialog
@@ -130,7 +129,7 @@ class InitialPoseEditor(QWidget):
         if not self.motion_directory:
             rospy.logwarn("No path specified for loading pose.")
             return
-        joint_data = load_initial_pose(self.motion_directory, filename)
+        joint_data = InitialPoseFileManager.load_dict(self.motion_directory, filename)
 
         for joint, data in joint_data.items():
             if joint not in self.joint_widgets:
@@ -166,7 +165,7 @@ class InitialPoseEditor(QWidget):
                 "pid": list(self.pid_config.get(joint, (0.0, 0.0, 0.0))),
                 "feedback": str(self.feedback_expressions.get(joint, "")).strip()
             }
-        save_initial_pose(self.motion_directory, joint_data, filename)
+        InitialPoseFileManager.save_dict(self.motion_directory, joint_data, filename)
 
         # Set the initial pose in the visualizer
         joint_state = JointState()

@@ -16,8 +16,7 @@ from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
-from ..logic.initial_pose_file_manager import load_initial_pose
-from ..logic.initial_pose_file_manager import save_initial_pose
+from ..logic.initial_pose_file_manager import InitialPoseFileManager
 from .feedback_expression_dialog import FeedbackExpressionDialog
 from .pid_gain_editor import PIDGainEditorDialog
 
@@ -142,7 +141,7 @@ class OffsetEditorDialog(QDialog):
             return
 
         try:
-            loaded = load_initial_pose(os.path.dirname(yaml_path), os.path.basename(yaml_path))
+            loaded = InitialPoseFileManager.load_dict(os.path.dirname(yaml_path), os.path.basename(yaml_path))
             for name in self.joint_names:
                 if name not in loaded:
                     continue
@@ -173,7 +172,7 @@ class OffsetEditorDialog(QDialog):
     def on_accept(self):
         if self.offset_path:
             data = self.get_joint_data()
-            save_initial_pose(
+            InitialPoseFileManager.save_dict(
                 os.path.dirname(self.offset_path),
                 joint_names=list(data.keys()),
                 positions=[v["position"] for v in data.values()],
