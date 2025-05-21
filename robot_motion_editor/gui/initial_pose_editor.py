@@ -33,14 +33,13 @@ class InitialPoseEditor(QWidget):
         self.joint_limits = joint_limits
         self.available_variables = available_variables
         self.motion_directory = motion_directory
-        self.pose_data = InitialPoseData()
-        self.pose_data.set_joint_names(joint_names)
+        self.initial_pose_data = InitialPoseData()
+        self.initial_pose_data.set_joint_names(joint_names)
         self.initial_pose_visualizer = InitialPoseVisualizer(joint_names, trajectory_visualizer)
 
-        self.joint_widgets = {}
         self.enable_checkboxes = {}
-        self.pid_config = {}
-        self.feedback_expressions = {}
+        self.joint_widgets = {}
+
         self.prev_pose = []
 
         self.init_ui()
@@ -123,32 +122,25 @@ class InitialPoseEditor(QWidget):
         main_layout.addWidget(scroll)
         self.setLayout(main_layout)
 
-    def set_motion_directory(self, directory):
-        self.motion_directory = directory
-        self.load_pose()
-
     def load_pose(self, filename="initial_pose.yaml"):
         if not self.motion_directory:
             rospy.logwarn("No path specified for loading pose.")
             return
 
         joint_data = InitialPoseFileManager.load_dict(self.motion_directory, filename)
-        self.pose_data.set_dict(joint_data)
+        self.initial_pose_data.set_dict(joint_data)
 
         for joint_name in self.joint_names:
             if joint_name not in self.joint_widgets:
                 continue
 
-            # UIに反映
-            pos_deg = math.degrees(self.pose_data.get_pose(joint_name))
+            # Apply values to widgets
+            pos_deg = math.degrees(self.initial_pose_data.get_pose(joint_name))
             _, spin = self.joint_widgets[joint_name]
             spin.setValue(pos_deg)
+            self.enable_checkboxes[joint_name].setChecked(self.initial_pose_data.get_enable(joint_name))
 
-            self.enable_checkboxes[joint_name].setChecked(self.pose_data.get_enable(joint_name))
-            self.pid_config[joint_name] = self.pose_data.get_pid(joint_name)
-            self.feedback_expressions[joint_name] = self.pose_data.get_feedback(joint_name)
-
-        self.initial_pose_visualizer.set_start_pose(self.pose_data.get_joint_state())
+        self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
 
     def save_pose(self, filename="initial_pose.yaml"):
         if not self.motion_directory:
@@ -158,11 +150,11 @@ class InitialPoseEditor(QWidget):
         for joint_name in self.joint_names:
             _, spin = self.joint_widgets[joint_name]
             position_rad = math.radians(spin.value())
-            self.pose_data.set_pose(joint_name, position_rad)
-            self.pose_data.set_enable(joint_name, self.enable_checkboxes[joint_name].isChecked())
+            self.initial_pose_data.set_pose(joint_name, position_rad)
+            self.initial_pose_data.set_enable(joint_name, self.enable_checkboxes[joint_name].isChecked())
 
-        InitialPoseFileManager.save_dict(self.motion_directory, self.pose_data.get_dict(), filename)
-        self.initial_pose_visualizer.set_start_pose(self.pose_data.get_joint_state())
+        InitialPoseFileManager.save_dict(self.motion_directory, self.initial_pose_data.get_dict(), filename)
+        self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
 
     def get_target_joints(self):
         return [math.radians(self.joint_widgets[name][1].value()) for name in self.joint_names]
@@ -173,7 +165,7 @@ class InitialPoseEditor(QWidget):
         current = self.get_target_joints()
         if current != self.prev_pose:
             self.prev_pose = current
-            self.initial_pose_visualizer.set_target_pose(self.pose_data.get_joint_state())
+            self.initial_pose_visualizer.set_target_pose(self.initial_pose_data.get_joint_state())
 
     def update_all_enable_checkbox(self):
         checked = [cb.isChecked() for cb in self.enable_checkboxes.values()]
@@ -191,24 +183,25 @@ class InitialPoseEditor(QWidget):
 
     def set_all_enable_checkboxes(self, state):
         checked = state == Qt.Checked
-        for cb in self.enable_checkboxes.values():
+        for joint_name, cb in self.enable_checkboxes.items():
             cb.blockSignals(True)
             cb.setChecked(checked)
+            self.initial_pose_data.set_enable(joint_name, checked)
             cb.blockSignals(False)
 
     def open_pid_dialog(self, joint_name: str, button):
-        current = self.pose_data.get_pid(joint_name)
+        current = self.initial_pose_data.get_pid(joint_name)
         dialog = PIDGainEditorDialog(joint_name, current, parent=self)
         if dialog.exec_() and dialog.result:
-            self.pose_data.set_pid(joint_name, dialog.result)
+            self.initial_pose_data.set_pid(joint_name, dialog.result)
             button.setStyleSheet("background-color: lightblue" if any(dialog.result) else "")
             rospy.loginfo(f"Updated PID for {joint_name}: {dialog.result}")
 
     def open_feedback_dialog(self, joint_name: str, button):
-        current = self.pose_data.get_feedback(joint_name)
+        current = self.initial_pose_data.get_feedback(joint_name)
         dialog = FeedbackExpressionDialog(joint_name, current, self.available_variables, parent=self)
         if dialog.exec_() and dialog.result is not None:
             expr = dialog.result.strip()
-            self.pose_data.set_feedback(joint_name, expr)
+            self.initial_pose_data.set_feedback(joint_name, expr)
             button.setStyleSheet("background-color: lightblue" if expr else "")
             rospy.loginfo(f"Updated Feedback expression for {joint_name}: {expr}")
