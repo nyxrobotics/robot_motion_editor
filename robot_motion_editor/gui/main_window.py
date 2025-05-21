@@ -68,7 +68,6 @@ class MainWindow(QWidget):
 
         self.torque_checkbox = QCheckBox("Torque ON")
         self.init_pose_button = QPushButton("Move to Initial Pose")
-        self.save_all_button = QPushButton("Save All")
         self.hardware_checkbox = QCheckBox("Use Real Robot")
 
         self.variable_names = self.generate_variable_names()
@@ -106,7 +105,6 @@ class MainWindow(QWidget):
 
         layout.addLayout(checkbox_row)
         layout.addWidget(self.init_pose_button)
-        layout.addWidget(self.save_all_button)
         layout.addLayout(com_layout)
         layout.addLayout(baud_layout)
         layout.addLayout(path_layout)
