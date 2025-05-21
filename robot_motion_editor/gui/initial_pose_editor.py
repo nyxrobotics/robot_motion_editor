@@ -39,7 +39,7 @@ class InitialPoseEditor(QWidget):
         self.enable_checkboxes = {}
         self.joint_widgets = {}
 
-        self.prev_pose = []
+        self.goal_pose = JointState()
 
         self.init_ui()
 
@@ -156,16 +156,20 @@ class InitialPoseEditor(QWidget):
         InitialPoseFileManager.save_dict(self.motion_directory, self.initial_pose_data.get_dict(), filename)
         self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
 
-    def get_target_joints(self):
-        return [math.radians(self.joint_widgets[name][1].value()) for name in self.initial_pose_data.get_joint_names()]
+    def get_gui_joints(self):
+        joint_msg = JointState()
+        joint_msg.name = self.initial_pose_data.get_joint_names()
+        joint_msg.position = [math.radians(self.joint_widgets[name][1].value())
+                              for name in self.initial_pose_data.get_joint_names()]
+        return joint_msg
 
     def on_pose_changed(self):
         if not self.isVisible():
             return
-        current = self.get_target_joints()
-        if current != self.prev_pose:
-            self.prev_pose = current
-            self.initial_pose_visualizer.set_target_pose(self.initial_pose_data.get_joint_state())
+        next_goal_pose = self.get_gui_joints()
+        if next_goal_pose != self.goal_pose:
+            self.goal_pose = next_goal_pose
+            self.initial_pose_visualizer.set_goal_pose(self.goal_pose)
 
     def update_all_enable_checkbox(self):
         checked = [cb.isChecked() for cb in self.enable_checkboxes.values()]
