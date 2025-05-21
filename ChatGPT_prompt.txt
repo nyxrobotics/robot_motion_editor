@@ -1,47 +1,33 @@
-下記のROS1のノードを作ってください
-関節目標角度を実機/gazeboに送信する処理、現在角度を受信する処理、IMUを受信する処理などハードウエアに依存する部分はソースファイルを分けてください。
-robot_descriptionからtransmissionが設定されているジョイントの一覧を所得する処理もソースを分けてください
-複雑なので適宜ソースファイルを分けて再利用性を高めてください
+# 📘 ロボットモーション作成ノード：改良版仕様書
 
---
+## 1. 目的と概要
+このROS1ノードは、GUI上でロボットの関節動作を作成・編集・保存・再生する統合ツールである。  
+Simulink風の状態遷移形式による視覚的な操作で、実機およびGazeboでの動作確認が可能。  
+関節角度、PID、IMUによるフィードバック制御もサポートする。
 
-ロボットモーション作成ノード 仕様書
+---
 
-1. 目的と概要
--------------------------------
-このROS1ノードは、ロボットの関節動作をGUIから作成・編集・送信・保存するための統合モジュールである。
-Simulink風の状態遷移形式で複雑な動作を視覚的に編集でき、実機・Gazebo両方で再生可能。
-関節角度、IMU、PID、フィードバック式も統合的に扱える。
+## 2. GUI共通構成（`main_window.py`）
+- モーション保存ディレクトリ入力（Browse可能）
+- 「Use Real Robot」チェックボックス（Gazeboと切替）
+- COMポート選択（自動検出 + 更新ボタン）
+- ボーレート選択（4500000 ～ 9600 + 手入力可）
+- 「Torque ON」チェックボックス
+- 「初期姿勢に移動」ボタン（現在姿勢→初期姿勢に3秒で遷移）
 
-2. GUI共通構成（main_window.py）
--------------------------------
-- 「全て保存」ボタン
-- モーション保存ディレクトリパス入力欄（Browse対応）
-- 実機 / Gazebo 切替チェックボックス
-- 実機用：COMポート選択（自動検出 + 更新）
-- ボーレート選択（4500000, 4000000, ..., 9600 + 自由入力）
-- 「トルクON/OFF」チェックボックス
-- 「初期姿勢に移動する」ボタン（現在姿勢→初期姿勢に3秒で遷移）
+---
 
-3. 初期姿勢編集タブ（initial_pose_editor.py）
--------------------------------
-- `robot_description` の transmission 定義から関節一覧取得
-- 各関節について：
-  - スライダー（1度刻み）＋数値入力（少数第1位まで）
-  - Enableチェックボックス（スライダー左）
-  - PID設定ボタン（青色ハイライト）
-  - フィードバック式入力ボタン（Python構文、IMU/他関節参照可）
-    - Show Variablesボタンあり
-    - 構文エラー・未定義変数 → 保存ブロック＋赤ハイライト
-- 「All Enable」チェックボックス
-- 「Save Initial Pose」ボタン（最上部）
-- 保存ファイル：`initial_pose.yaml`
-  - 各関節の角度（radian）
-  - Enable状態（true/false）
-  - PIDゲイン（[P, I, D]）
-  - フィードバック式（Python文字列）
-3.1 初期姿勢ファイル（<motion_dir>/initial_pose.yaml）
+## 3. 初期姿勢編集タブ（`initial_pose_editor.py`）
+### 機能
+- `robot_description` の transmission 定義からジョイント一覧を取得
+- 各ジョイントに対して以下を設定：
+  - スライダー + 数値入力（degree）
+  - Enable チェックボックス
+  - PID設定（PIDボタン）
+  - フィードバック式（FBボタン、式はPython構文）
 
+### 保存ファイル形式： `<motion_dir>/initial_pose.yaml`
+```yaml
 joints:
   head_joint_1:
     enable: true
@@ -59,67 +45,74 @@ joints:
     - 0.0
     - 0.0
     position: 0.0
+```
 
+---
 
-4. モーション作成タブ（animation_widget.py）
--------------------------------
-- Simulink風の状態遷移チャート形式のGUIを提供
-- 中央に編集用シーン（animation_editor_widget.py）
-- 左にアニメーション一覧ツリー（animation_file_widget.py）
-- ダブルクリックでフレーム/条件を編集画面へ移動可能
+## 4. モーション作成タブ（`animation_widget.py`）
 
-5. ブロック構造（animation_editor_widget.py）
--------------------------------
-5.1 フレームブロック（FrameBlockItem）
-- ラベル付き矩形、白文字、ダーク背景、太枠
-- 出力は1本まで接続可能
-- 入力は制限なしで複数の矢印を受け入れ可能
-- ドラッグで移動、クリックで選択、右クリックで編集メニュー表示
+### 4.1 GUI構成
+- 中央：編集シーン（`animation_editor_widget.py`）
+- 左：アニメーション一覧（`animation_file_widget.py`）
+- ダブルクリックで各要素を編集可能
 
-5.2 条件分岐ブロック
-- if条件：True/False分岐（Python式）
-- switch条件：整数式による任意個数の分岐
-- ブロックは角丸矩形で表現
+### 4.2 構成要素（`animation_editor_widget.py`）
 
-5.3 矢印（ArrowItem）
-- 出力→入力の方向を持つ
-- ドラッグで接続、自由なレイアウト
-- hoverで白点（hover_point）表示 → クリックで waypoint を即時追加＋ドラッグ開始
-- waypoint を端点 or 他の waypoint に近づけると削除
-- waypoint 削除後は接続線を自動で補完（直線化）
-- 矢印の両端がブロックに接続されていれば実線、それ以外は点線
+#### 4.2.1 ブロック
 
-6. フレーム編集画面（frame_editor.py）
--------------------------------
-- 各関節に対して以下の設定が可能：
-  - 移動時間（前フレームからの遷移）
-  - 待機時間（このフレームで静止）
-  - トルクON/OFF（チェック）
-  - PIDゲイン（有効化＋[P/I/D]）
+##### a. フレームブロック（`FrameBlockItem`）
+- ラベル付き矩形（ダーク背景＋白文字、太枠）
+- ドラッグで移動、右クリックで編集メニュー表示
+- 出力：最大1本、入力：制限なし
+
+##### b. 条件分岐ブロック
+- **IfBlockItem**：Python式で True/False に分岐
+  - 出力：2本、入力：制限なし
+- **SwitchBlockItem**：整数式による複数分岐
+  - 出力：制限なし、入力：制限なし
+
+#### 4.2.2 接続要素：矢印（`ArrowItem`）
+- 出力→入力方向を持つ
+- hover時に中間点（hover_point）を表示
+- 中間点クリックで waypoint を即時追加・ドラッグ可能
+- waypoint を端点や他waypointに近づけると削除
+- 接続状態に応じて：
+  - 両端接続 → 実線
+  - 片端のみ接続 → 点線
+- waypoint 削除後は自動で直線補完
+
+---
+
+## 5. フレーム編集画面（`frame_editor.py`）
+- 各ジョイントに対して：
+  - 移動時間（move_duration）
+  - 待機時間（wait_duration）
+  - トルクON/OFF
+  - PIDゲイン設定
   - フィードバック式（Python式）
-  - 速度倍率（デフォルト 1.0）
+  - 速度倍率（velocity_scale）
 
-- 「次のフレームを作成」時、直前の値を初期値としてコピー
+---
 
-7. 数式入力の挙動（共通：frame_editor / feedback_expression_dialog）
--------------------------------
+## 6. 数式入力の挙動（共通）
 - 使用可能変数：
-  - 他関節名（例：joint1）
-  - IMU：imu_pitch, imu_roll, imu_acc_x など
-- 数式評価：
-  - 不正な変数、構文エラー、循環参照 → 警告文字列＋赤ハイライト
-  - 警告表示中は保存禁止
-  - 警告は入力欄下に表示（非ブロッキング）
-- スライダーとの連動：
-  - 数式あり：変数=0仮定のスライダー位置を表示（色を薄く）
-  - スライダー操作時：
-    - 数式先頭/末尾が定数加算/除算なら編集可能
-    - なければ「+定数」を先頭に自動付加
+  - 他関節：`joint1` など
+  - IMU：`imu_pitch`, `imu_acc_x` など
 
-8. アニメーションの保存と読み込み
--------------------------------
-8.1 保存ディレクトリ構成（1アニメーションごと）
+- 式に不備があれば：
+  - 保存禁止
+  - 赤色ハイライトで警告
 
+- スライダーとの関係：
+  - 数式あり：スライダーは薄色
+  - 編集時、自動で `+定数` を付与することあり
+
+---
+
+## 7. アニメーションの保存と読み込み
+
+### 7.1 ディレクトリ構成
+```
 <motion_dir>/<animation_name>/
 ├── animation.yaml            # 全体レイアウト・接続情報
 ├── offset.yaml               # 初期姿勢との差分
@@ -131,9 +124,10 @@ joints:
 │   │   └── imu_if.yaml
 │   └── switch/
 │       └── button_switch.yaml
+```
 
-8.2 animation.yaml（例）
-
+### 7.2 animation.yaml の例
+```yaml
 layout:
   block:
     frame_000_pose1:
@@ -170,15 +164,14 @@ layout:
         id: 0
       waypoints:
         - [200, 200]
+```
 
-8.3 初期姿勢からのオフセット（initial_pose/offset.yaml）
-- ファイルは初期姿勢ファイルと同じ書式
-- エディタも同じ
-- positionは初期姿勢に対して追加する差分の値
-- enable, feedback, pidは上書き
+### 7.3 offset.yaml
+- `initial_pose.yaml` と同形式で各アニメーションの初期姿勢を設定
+- `initial_pose.yaml` と差分がない場合、`initial_pose.yaml`の変更と同時に`initial_pose.yaml`と同じ内容で上書き
 
-8.4 frame.yaml（例）
-
+### 7.4 frame.yaml の例
+```yaml
 time:
   duration: 2.0
   wait: 1.0
@@ -204,23 +197,16 @@ joints:
       - 0.0
       - 0.0
     position: 0.0
+```
 
-8.5 if条件（conditions/if/*.yaml）
-- フローチャート上ではTrueとFalseの２箇所から矢印を出せる
-
-例：step_if.yaml
-
+### 7.5 if条件の例（`conditions/if/*.yaml`）
+```yaml
 expression: "def imu_norm = fabs(imu_gyro_x)"
 condition: "imu_norm > 0.5"
+```
 
-=======
-
-8.6 switch条件（conditions/switch/*.yaml）
-- caseの要素数はswitch_condition_editor.py上で追加できる
-- フローチャート上ではdefault＋caseの要素数の矢印を出せる
-
-例：mode_switch.yaml
-
+### 7.6 switch条件の例（`conditions/switch/*.yaml`）
+```yaml
 expression: "mode = 2"
 condition: "mode"
 case:
@@ -232,70 +218,64 @@ case:
     value: 2
   case_3:
     value: 3
+```
 
+---
 
-9. RViz連携（trajectory_visualizer.py）
--------------------------------
-- 初期姿勢 → フレームへの遷移を /move_group/display_planned_path に可視化
-- 各関節の角度を JointTrajectory で表現
-- トルクOFFの関節は固定角度
-- PIDゲインは表示に影響しない
+## 8. RViz連携（`trajectory_visualizer.py`）
+- 初期姿勢 → フレームへの遷移を可視化
+- `JointTrajectory` で表示
+- トルクOFFジョイントは静止角度を保持
 
-10. ハードウェア連携（robot_interface/）
--------------------------------
-- joint_command_publisher.py
-  - 実機 or Gazebo への角度コマンドを送信
-- joint_state_listener.py
-  - /joint_states トピック購読
-- imu_listener.py
-  - IMUの orientation / angular_velocity / linear_acceleration を購読
-- urdf_joint_extractor.py
-  - robot_description から transmission を持つ関節を抽出
+---
 
-11. ロジック層（logic/）
--------------------------------
-- trajectory_executor.py
-  - 初期姿勢・フレーム→フレームへのJointTrajectoryを生成
-- expression_evaluator.py
-  - Python式評価エンジン（IMUや他関節参照）
-- animation_file_manager.py
-  - animation.yaml 読み書き、構文検証、接続整合チェック
-- frame_file_manager.py
-  - フレームYAMLの読み書き、初期値補完
-- initial_pose_file_manager.py
-  - initial_pose.yaml および offset.yaml を扱う
+## 9. ハードウェア連携（`robot_interface/`）
+- `joint_command_publisher.py`：角度コマンド送信
+- `joint_state_listener.py`：/joint_states 受信
+- `imu_listener.py`：IMU値受信
+- `urdf_joint_extractor.py`：URDFからジョイント抽出
 
-12. RViz連携（rviz_interface/）
--------------------------------
-- trajectory_visualizer.py
-  - move_group連携なしで可視化用JointTrajectoryをRVizに送信
+---
 
-13. 起動構成とエントリポイント
--------------------------------
+## 10. ロジック層（`logic/`）
+- `*_file_manager.py`：各種YAMLの読み書き
+
+---
+
+## 11. RViz連携層（`visualizer/`）
+- `trajectory_visualizer.py`：RVizへのTrajectory送信
+
+---
+
+## 12. 起動構成
 - launch/animation_widget.launch
   - GUIおよびインタフェースノードを一括起動
 - main.py
   - Qt GUIノードのメインエントリ（main_window.py を呼び出す）
 
+---
+
 14. ディレクトリ構成
 -------------------------------
-robot_animation_widget/
+robot_motion_editor/
 ├── CMakeLists.txt
 ├── package.xml
 ├── requirements.txt
 ├── setup.cfg
 ├── setup.py
-│
-├── gui/
-│   └── [各編集画面・UI構成要素]
-├── robot_interface/
-│   └── [joint送信/受信/IMU/URDF]
-├── logic/
-│   └── [保存・計算・解析ロジック]
-├── rviz_interface/
-│   └── [trajectory可視化]
 ├── launch/
 │   └── animation_widget.launch
-└── main.py
+├── scripts/
+│   └── main.py
+├── robot_motion_editor/
+│   ├── __init__.py
+│   ├── gui/
+│   │   └── [各編集画面・UI構成要素]
+│   ├── robot_interface/
+│   │   └── [joint送信/受信/IMU/URDF]
+│   ├── logic/
+│   │   └── [保存・計算・解析ロジック]
+│   ├── visualizer/
+│   │   └── [trajectory可視化]
 
 ---
