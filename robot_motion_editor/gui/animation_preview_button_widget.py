@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QWidget
 class AnimationPreviewButtonWidget(QWidget):
     def __init__(self, preview_controller, parent=None):
         super().__init__(parent)
-        self.controller = preview_controller  # AnimationPreviewVisualizer
+        self.controller = preview_controller  # AnimationVisualizer
 
         self.play_btn = QPushButton("▶ Play")
         self.pause_btn = QPushButton("❚❚ Pause")

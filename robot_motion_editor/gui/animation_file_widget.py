@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import QTreeWidget
 from PyQt5.QtWidgets import QTreeWidgetItem
 
 
-class AnimationTreeWidget(QTreeWidget):
+class AnimationFileWidget(QTreeWidget):
     def __init__(self, motion_directory, parent=None):
         super().__init__(parent)
         self.motion_directory = motion_directory
@@ -77,7 +77,7 @@ class AnimationTreeWidget(QTreeWidget):
         # ツリー表示を更新
         item.setText(0, new_name)
 
-        # 現在編集中のアニメーション名も更新（MotionEditorWidget から取得）
+        # 現在編集中のアニメーション名も更新（AnimaitonWidget から取得）
         if hasattr(self.parent(), "current_animation_name") and self.parent().current_animation_name == old_name:
             self.parent().current_animation_name = new_name
 
@@ -113,12 +113,12 @@ class AnimationTreeWidget(QTreeWidget):
             QMessageBox.critical(self, "Rename Failed", str(e))
             return False
 
-        # MotionEditorWidget を取得
+        # AnimaitonWidget を取得
         editor = self
         while editor and not hasattr(editor, "scene"):
             editor = editor.parent()
         if not editor:
-            QMessageBox.critical(self, "Error", "MotionEditorWidget not found.")
+            QMessageBox.critical(self, "Error", "AnimaitonWidget not found.")
             return False
 
         # layout 修正処理

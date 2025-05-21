@@ -12,11 +12,11 @@ from PyQt5.QtWidgets import QTabWidget
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
-from robot_motion_editor.gui.initial_pose_editor import InitialPoseEditor
-from robot_motion_editor.gui.motion_editor import MotionEditorWidget
-from robot_motion_editor.robot_interface.urdf_joint_extractor import get_joint_limit
-from robot_motion_editor.robot_interface.urdf_joint_extractor import get_transmission_joints
-from robot_motion_editor.visualizer.trajectory_visualizer import TrajectoryVisualizer
+from ..robot_interface.urdf_joint_extractor import get_joint_limit
+from ..robot_interface.urdf_joint_extractor import get_transmission_joints
+from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
+from .animation_widget import AnimaitonWidget
+from .initial_pose_editor import InitialPoseEditor
 
 
 class MainWindow(QWidget):
@@ -60,8 +60,8 @@ class MainWindow(QWidget):
             self.path_lineedit.setText(folder)
             if self.initial_pose_editor:
                 self.initial_pose_editor.set_motion_directory(folder)
-            if self.motion_editor:
-                self.motion_editor.set_motion_directory(folder)
+            if self.animation_widget:
+                self.animation_widget.set_motion_directory(folder)
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -120,14 +120,14 @@ class MainWindow(QWidget):
             trajectory_visualizer=self.trajectory_visualizer)
         self.tabs.addTab(self.initial_pose_editor, "Initial Pose")
 
-        self.motion_editor = MotionEditorWidget(
+        self.animation_widget = AnimaitonWidget(
             motion_directory="motion_directory",
             joint_names=self.joint_names,
             joint_limits=self.joint_limits,
             available_variables=self.variable_names,
             trajectory_visualizer=self.trajectory_visualizer
         )
-        self.tabs.addTab(self.motion_editor, "Motion Editor")
+        self.tabs.addTab(self.animation_widget, "Motion Editor")
 
         layout.addWidget(self.tabs)
         self.setLayout(layout)

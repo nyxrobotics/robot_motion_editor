@@ -61,14 +61,14 @@ joints:
     position: 0.0
 
 
-4. モーション作成タブ（motion_editor.py）
+4. モーション作成タブ（animation_widget.py）
 -------------------------------
 - Simulink風の状態遷移チャート形式のGUIを提供
-- 中央に編集用シーン（motion_editor_scene.py）
-- 左にアニメーション一覧ツリー（motion_editor_animation_tree_widget.py）
+- 中央に編集用シーン（animation_editor_widget.py）
+- 左にアニメーション一覧ツリー（animation_file_widget.py）
 - ダブルクリックでフレーム/条件を編集画面へ移動可能
 
-5. ブロック構造（motion_editor_scene.py）
+5. ブロック構造（animation_editor_widget.py）
 -------------------------------
 5.1 フレームブロック（FrameBlockItem）
 - ラベル付き矩形、白文字、ダーク背景、太枠
@@ -272,14 +272,14 @@ case:
 
 13. 起動構成とエントリポイント
 -------------------------------
-- launch/motion_editor.launch
+- launch/animation_widget.launch
   - GUIおよびインタフェースノードを一括起動
 - main.py
   - Qt GUIノードのメインエントリ（main_window.py を呼び出す）
 
 14. ディレクトリ構成
 -------------------------------
-robot_motion_editor/
+robot_animation_widget/
 ├── CMakeLists.txt
 ├── package.xml
 ├── requirements.txt
@@ -295,7 +295,7 @@ robot_motion_editor/
 ├── rviz_interface/
 │   └── [trajectory可視化]
 ├── launch/
-│   └── motion_editor.launch
+│   └── animation_widget.launch
 └── main.py
 
 ---

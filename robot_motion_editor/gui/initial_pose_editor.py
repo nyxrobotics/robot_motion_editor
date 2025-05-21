@@ -20,7 +20,7 @@ from ..logic.initial_pose_file_manager import save_initial_pose
 from ..visualizer.initial_pose_visualizer import InitialPoseVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .feedback_expression_dialog import FeedbackExpressionDialog
-from .pid_config_dialog import PIDConfigDialog
+from .pid_gain_editor import PIDGainEditorDialog
 
 
 class InitialPoseEditor(QWidget):
@@ -234,7 +234,7 @@ class InitialPoseEditor(QWidget):
 
     def open_pid_dialog(self, joint_name, button):
         current = self.pid_config.get(joint_name, (0.0, 0.0, 0.0))
-        dialog = PIDConfigDialog(joint_name, current, parent=self)
+        dialog = PIDGainEditorDialog(joint_name, current, parent=self)
         if dialog.exec_() and dialog.result:
             self.pid_config[joint_name] = dialog.result
             p, i, d = dialog.result

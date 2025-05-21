@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QVBoxLayout
 
 
-class PIDConfigDialog(QDialog):
+class PIDGainEditorDialog(QDialog):
     def __init__(self, joint_name, current_values=(0.0, 0.0, 0.0), parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"{joint_name} PID Settings")

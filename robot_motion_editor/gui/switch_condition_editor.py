@@ -9,8 +9,8 @@ from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtWidgets import QVBoxLayout
 
-from robot_motion_editor.logic.switch_condition_file_manager import load_switch_condition
-from robot_motion_editor.logic.switch_condition_file_manager import save_switch_condition
+from ..logic.switch_condition_file_manager import load_switch_condition
+from ..logic.switch_condition_file_manager import save_switch_condition
 
 
 class SwitchConditionEditorDialog(QDialog):

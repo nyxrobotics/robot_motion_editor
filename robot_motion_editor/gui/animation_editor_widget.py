@@ -952,7 +952,7 @@ class ArrowItem(QGraphicsPathItem):
             self.scene().removeItem(self)
 
 
-class MotionFlowScene(QGraphicsScene):
+class AnimationEditorWidget(QGraphicsScene):
     def __init__(self, editor_widget, parent=None):
         super().__init__(parent)
         self.editor_widget = editor_widget

@@ -1,13 +1,13 @@
 import threading
 import time
 
-from ..gui.motion_editor_scene import FrameBlockItem
-from ..gui.motion_editor_scene import IfBlockItem
-from ..gui.motion_editor_scene import StartBlockItem
-from ..gui.motion_editor_scene import SwitchBlockItem
+from ..gui.animation_editor_widget import FrameBlockItem
+from ..gui.animation_editor_widget import IfBlockItem
+from ..gui.animation_editor_widget import StartBlockItem
+from ..gui.animation_editor_widget import SwitchBlockItem
 
 
-class AnimationPreviewVisualizer:
+class AnimationVisualizer:
     def __init__(self, scene, trajectory_visualizer, frame_loader, initial_joint_state=None):
         self.scene = scene
         self.visualizer = trajectory_visualizer
@@ -116,7 +116,7 @@ class AnimationPreviewVisualizer:
             self._pause_event.wait()
 
             if self._scene_changed():
-                print("[AnimationPreviewVisualizer] Scene changed. Stopping.")
+                print("[AnimationVisualizer] Scene changed. Stopping.")
                 self.stop()
                 return
 

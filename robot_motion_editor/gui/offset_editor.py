@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import QWidget
 from ..logic.initial_pose_file_manager import load_initial_pose
 from ..logic.initial_pose_file_manager import save_initial_pose
 from .feedback_expression_dialog import FeedbackExpressionDialog
-from .pid_config_dialog import PIDConfigDialog
+from .pid_gain_editor import PIDGainEditorDialog
 
 
 class OffsetEditorDialog(QDialog):
@@ -187,7 +187,7 @@ class OffsetEditorDialog(QDialog):
 
     def open_pid_dialog(self, joint_name, button):
         current = self.pid_config.get(joint_name, [0.0, 0.0, 0.0])
-        dialog = PIDConfigDialog(joint_name, current, parent=self)
+        dialog = PIDGainEditorDialog(joint_name, current, parent=self)
         if dialog.exec_() and dialog.result:
             self.pid_config[joint_name] = dialog.result
             if any(val != 0.0 for val in dialog.result):

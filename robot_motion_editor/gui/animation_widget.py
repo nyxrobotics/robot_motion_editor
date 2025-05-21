@@ -22,20 +22,20 @@ from ..logic.animation_file_manager import load_animation_file
 from ..logic.animation_file_manager import save_animation_file
 from ..logic.initial_pose_file_manager import load_initial_pose
 from ..logic.initial_pose_file_manager import save_initial_pose
-from ..visualizer.animation_previwe_visualizer import AnimationPreviewVisualizer
+from ..visualizer.animation_visualizer import AnimationVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
+from .animation_editor_widget import AnimationEditorWidget
+from .animation_editor_widget import FrameBlockItem
+from .animation_file_widget import AnimationFileWidget
+from .animation_graphics_view import AnimatioGraphicsView
 from .animation_preview_button_widget import AnimationPreviewButtonWidget
 from .frame_editor import FrameEditorDialog
 from .if_condition_editor import IfConditionEditorDialog
-from .motion_editor_animation_tree_widget import AnimationTreeWidget
-from .motion_editor_scene import FrameBlockItem
-from .motion_editor_scene import MotionFlowScene
-from .motion_graphics_view import MotionGraphicsView
 from .offset_editor import OffsetEditorDialog
 from .switch_condition_editor import SwitchConditionEditorDialog
 
 
-class MotionEditorWidget(QWidget):
+class AnimaitonWidget(QWidget):
     def __init__(self, motion_directory=".", joint_names=None, joint_limits=None,
                  available_variables=None, trajectory_visualizer: TrajectoryVisualizer = None):
         super().__init__()
@@ -47,11 +47,11 @@ class MotionEditorWidget(QWidget):
         self.current_animation_name = None
         self.initial_joint_state = None
 
-        self.animation_tree = AnimationTreeWidget(motion_directory=self.motion_directory, parent=self)
-        self.scene = MotionFlowScene(editor_widget=self)
-        self.view = MotionGraphicsView(self.scene)
+        self.animation_tree = AnimationFileWidget(motion_directory=self.motion_directory, parent=self)
+        self.scene = AnimationEditorWidget(editor_widget=self)
+        self.view = AnimatioGraphicsView(self.scene)
 
-        self.preview_controller = AnimationPreviewVisualizer(
+        self.preview_controller = AnimationVisualizer(
             scene=self.scene,
             trajectory_visualizer=self.trajectory_visualizer,
             frame_loader=lambda name: self.load_joint_state_and_durations(self.resolve_frame_path(name)),

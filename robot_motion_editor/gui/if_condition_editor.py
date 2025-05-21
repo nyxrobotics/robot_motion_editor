@@ -8,8 +8,8 @@ from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtWidgets import QVBoxLayout
 
-from robot_motion_editor.logic.if_condition_file_manager import load_if_condition
-from robot_motion_editor.logic.if_condition_file_manager import save_if_condition
+from ..logic.if_condition_file_manager import load_if_condition
+from ..logic.if_condition_file_manager import save_if_condition
 
 
 class IfConditionEditorDialog(QDialog):

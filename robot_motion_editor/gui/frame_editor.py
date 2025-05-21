@@ -24,7 +24,7 @@ from PyQt5.QtWidgets import QWidget
 from ..visualizer.frame_visualizer import FrameVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .feedback_expression_dialog import FeedbackExpressionDialog
-from .pid_config_dialog import PIDConfigDialog
+from .pid_gain_editor import PIDGainEditorDialog
 
 
 @dataclass
@@ -312,7 +312,7 @@ class FrameEditorDialog(QDialog):
 
     def open_pid_dialog(self, joint_name, button):
         current = self.frame_data.joints[joint_name].pid
-        dialog = PIDConfigDialog(joint_name, current, parent=self)
+        dialog = PIDGainEditorDialog(joint_name, current, parent=self)
         if dialog.exec_() and dialog.result:
             self.frame_data.joints[joint_name].pid = dialog.result
             button.setStyleSheet("background-color: lightblue;" if any(v != 0.0 for v in dialog.result) else "")

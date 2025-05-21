@@ -6,7 +6,7 @@ from PyQt5.QtGui import QWheelEvent
 from PyQt5.QtWidgets import QGraphicsView
 
 
-class MotionGraphicsView(QGraphicsView):
+class AnimatioGraphicsView(QGraphicsView):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._zoom = 0
