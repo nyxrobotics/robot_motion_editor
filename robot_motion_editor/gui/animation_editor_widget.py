@@ -12,6 +12,8 @@ from PyQt5.QtWidgets import QInputDialog
 from PyQt5.QtWidgets import QMenu
 from PyQt5.QtWidgets import QMessageBox
 
+from ..logic.animation_file_manager import AnimationData
+from ..logic.animation_file_manager import AnimationFileManager
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
 from ..logic.if_condition_file_manager import IfConditionData
@@ -379,27 +381,19 @@ class AnimationEditorWidget(QGraphicsScene):
         # ドロップした直後にもsceneRectを更新
         self.update_scene_rect()
 
-    def save_layout_yaml(self):
-        layout = {"block": {}, "arrow": {}}
+    def get_animation_data(self) -> AnimationData:
+        anim_data = AnimationData()
 
         for item in self.items():
             if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem, StartBlockItem)):
-                block_data = {
-                    "info": {
-                        "type": item.type,
-                        "filename": getattr(item, "filename", ""),  # StartBlockItem は filename 持たないがOK
-                        "id": item.id,
-                    },
-                    "place": {
-                        "x": item.pos().x(),
-                        "y": item.pos().y(),
-                    },
-                    "connection": {
-                        "output": {}
-                    }
+                info = {
+                    "type": item.type,
+                    "filename": getattr(item, "filename", ""),
+                    "id": item.id,
                 }
+                place = {"x": item.pos().x(), "y": item.pos().y()}
+                output = {}
 
-                # 出力接続の構成（Start, Frame, If, Switch）
                 output_labels = []
                 if isinstance(item, FrameBlockItem):
                     output_labels = ["out_0"]
@@ -410,57 +404,55 @@ class AnimationEditorWidget(QGraphicsScene):
 
                 for label in output_labels:
                     subblock = item.output_sub_blocks.get(label) if hasattr(item, 'output_sub_blocks') else item
-                    connection_data = {"ch": output_labels.index(label)}
+                    connection = {"ch": output_labels.index(label)}
                     if subblock.output_arrows:
                         arrow = subblock.output_arrows[0]
                         if arrow.end_item:
-                            connection_data.update({
+                            connection.update({
                                 "target": arrow.end_item.name,
                                 "arrow": arrow.name
                             })
-                    block_data["connection"]["output"][label] = connection_data
+                    output[label] = connection
 
-                layout["block"][item.name] = block_data
-
-            elif isinstance(item, ArrowItem):
-                layout["arrow"][item.name] = {
-                    "info": {"id": item.id},
-                    "waypoints": [[wp.pos().x(), wp.pos().y()] for wp in item.waypoints],
+                anim_data.block[item.name] = anim_data.block.get(item.name)
+                anim_data.block[item.name] = {
+                    "info": info,
+                    "place": place,
+                    "connection": {"output": output}
                 }
 
-        return layout
+            elif isinstance(item, ArrowItem):
+                anim_data.arrow[item.name] = {
+                    "info": {"id": item.id},
+                    "waypoints": [[wp.pos().x(), wp.pos().y()] for wp in item.waypoints]
+                }
 
-    def load_layout_yaml(self, layout_data):
+        return anim_data
+
+    def set_animation_data(self, anim_data: AnimationData):
         self.clear()
         self.block_objects.clear()
         self.arrow_objects.clear()
 
-        # --- 1. ブロック作成 ---
-        for block_key, block_value in layout_data.get("block", {}).items():
-            info = block_value.get("info", {})
-            block_type = info.get("type")
-            block_filename = info.get("filename", "")
-            block_id = info.get("id", 0)
-            x = block_value.get("place", {}).get("x", 0)
-            y = block_value.get("place", {}).get("y", 0)
+        layout_data = anim_data.get_dict()
 
-            output_conn = block_value.get("connection", {}).get("output", {})
-            # ch順でラベルを並べる
-            ch_label_pairs = sorted(
-                ((v.get("ch", 0), k) for k, v in output_conn.items()),
-                key=lambda x: x[0]
-            )
-            labels = [label for ch, label in ch_label_pairs]
+        # --- ブロックの読み込み ---
+        for name, block in layout_data.get("block", {}).items():
+            btype = block.get("info", {}).get("type")
+            filename = block.get("info", {}).get("filename", "")
+            id = block.get("info", {}).get("id", 0)
+            x = block.get("place", {}).get("x", 0)
+            y = block.get("place", {}).get("y", 0)
 
-            if block_type == "frame":
-                item = FrameBlockItem(block_id, block_filename)
-            elif block_type == "if":
-                item = IfBlockItem(block_id, block_filename)
-            elif block_type == "switch":
-                case_num = len(labels)
-                item = SwitchBlockItem(block_id, block_filename, case_num)
-            elif block_type == "start":
-                item = StartBlockItem(block_id)
+            if btype == "frame":
+                item = FrameBlockItem(id, filename)
+            elif btype == "if":
+                item = IfBlockItem(id, filename)
+            elif btype == "switch":
+                labels = list(block.get("connection", {}).get("output", {}).keys())
+                item = SwitchBlockItem(id, filename, case_num=len(labels))
+            elif btype == "start":
+                item = StartBlockItem(id)
             else:
                 continue
 
@@ -468,69 +460,55 @@ class AnimationEditorWidget(QGraphicsScene):
             self.addItem(item)
             self.block_objects[item.name] = item
 
-        # --- 2. 矢印作成 ---
-        for arrow_key, arrow_value in layout_data.get("arrow", {}).items():
-            arrow_id = arrow_value.get("info", {}).get("id")
-            waypoints = arrow_value.get("waypoints", [])
+        # --- 矢印の読み込み ---
+        for name, arrow in layout_data.get("arrow", {}).items():
+            arrow_id = arrow.get("info", {}).get("id")
+            waypoints = arrow.get("waypoints", [])
 
-            arrow = ArrowItem(arrow_id)
-            self.addItem(arrow)
-            self.arrow_objects[arrow.name] = arrow
+            item = ArrowItem(arrow_id)
+            self.addItem(item)
+            self.arrow_objects[item.name] = item
 
             for pos in waypoints:
-                arrow.insert_waypoint(len(arrow.waypoints), QPointF(pos[0], pos[1]))
+                item.insert_waypoint(len(item.waypoints), QPointF(pos[0], pos[1]))
 
-        # --- 3. 接続処理 ---
-        for block_key, block_value in layout_data.get("block", {}).items():
-            block = self.block_objects.get(block_key)
-            if not block:
+        # --- 接続構築 ---
+        for block_name, block in layout_data.get("block", {}).items():
+            source_block = self.block_objects.get(block_name)
+            if not source_block:
                 continue
 
-            output_conns = block_value.get("connection", {}).get("output", {})
-            # ch順にソートして処理
-            sorted_conns = sorted(
-                output_conns.items(),
-                key=lambda x: x[1].get("ch", 0)
-            )
+            conns = block.get("connection", {}).get("output", {})
+            sorted_items = sorted(conns.items(), key=lambda x: x[1].get("ch", 0))
 
-            for conn_idx, (output_pin, conn) in enumerate(sorted_conns):
-                target_block_key = conn.get("target")
-                arrow_key = conn.get("arrow")
+            for idx, (label, conn) in enumerate(sorted_items):
+                arrow_name = conn.get("arrow")
+                target_name = conn.get("target")
 
-                if not arrow_key or arrow_key not in self.arrow_objects:
+                if arrow_name not in self.arrow_objects:
                     continue
+                arrow = self.arrow_objects[arrow_name]
 
-                arrow = self.arrow_objects[arrow_key]
-
-                # 出力ブロック決定
-                if isinstance(block, (IfBlockItem, SwitchBlockItem)):
-                    labels = list(block.output_sub_blocks.keys())
-                    output_pin = labels[conn_idx] if conn_idx < len(labels) else output_pin
-                    output_block = block.output_sub_blocks.get(output_pin)
+                # start_item
+                if isinstance(source_block, (IfBlockItem, SwitchBlockItem)):
+                    labels = list(source_block.output_sub_blocks.keys())
+                    output_block = source_block.output_sub_blocks.get(labels[idx])
                 else:
-                    output_block = block
+                    output_block = source_block
 
-                # 接続設定
                 arrow.start_item = output_block
                 output_block.output_arrows.append(arrow)
 
-                if target_block_key in self.block_objects:
-                    target_block = self.block_objects[target_block_key]
-                    arrow.end_item = target_block
-                    target_block.input_arrows.append(arrow)
+                if target_name in self.block_objects:
+                    target = self.block_objects[target_name]
+                    arrow.end_item = target
+                    target.input_arrows.append(arrow)
 
-                # Update arrow direction
-                if arrow.start_item:
-                    start_center = arrow.start_item.sceneBoundingRect().center()
-                    arrow.start_handle.setPos(start_center)
-                if arrow.end_item:
-                    end_center = arrow.end_item.sceneBoundingRect().center()
-                    arrow.end_handle.setPos(end_center)
                 arrow._force_snap_start = True
                 arrow._force_snap_end = True
                 arrow.update_path()
+
         self.update_scene_rect()
-        return True
 
     def update_switch_block(self, condition_name, new_num_cases):
         target_block = None
