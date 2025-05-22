@@ -58,11 +58,7 @@ class OffsetEditorDialog(QDialog):
 
         content_layout.addLayout(top_row)
 
-        if self.joint_names:
-            max_label = QLabel(max(self.joint_names, key=len))
-        else:
-            max_label = QLabel("Joint")
-            rospy.logwarn("No joints available.")
+        max_label = QLabel(max(self.joint_names, key=len)) if self.joint_names else QLabel("Joint")
         max_label_width = max_label.sizeHint().width()
 
         for joint in self.joint_names:
@@ -132,7 +128,7 @@ class OffsetEditorDialog(QDialog):
             cb.blockSignals(False)
 
     def reset_all_angles(self):
-        for name, (slider, spin) in self.joint_widgets.items():
+        for name, (_, spin) in self.joint_widgets.items():
             spin.setValue(0.0)
 
     def load_pose_from_file(self, yaml_path):
@@ -171,14 +167,10 @@ class OffsetEditorDialog(QDialog):
 
     def on_accept(self):
         if self.offset_path:
-            data = self.get_joint_data()
+            joint_data = self.get_joint_data()
             InitialPoseFileManager.save_dict(
                 os.path.dirname(self.offset_path),
-                joint_names=list(data.keys()),
-                positions=[v["position"] for v in data.values()],
-                enabled={k: v["enable"] for k, v in data.items()},
-                pid_config={k: v["pid"] for k, v in data.items()},
-                feedback_exprs={k: v["feedback"] for k, v in data.items()},
+                joint_data,
                 filename=os.path.basename(self.offset_path)
             )
             rospy.loginfo(f"Offset saved to {self.offset_path}")
@@ -189,17 +181,11 @@ class OffsetEditorDialog(QDialog):
         dialog = PIDGainEditorDialog(joint_name, current, parent=self)
         if dialog.exec_() and dialog.result:
             self.pid_config[joint_name] = dialog.result
-            if any(val != 0.0 for val in dialog.result):
-                button.setStyleSheet("background-color: lightblue")
-            else:
-                button.setStyleSheet("")
+            button.setStyleSheet("background-color: lightblue" if any(dialog.result) else "")
 
     def open_feedback_dialog(self, joint_name, button):
         current = self.feedback_expressions.get(joint_name, "")
-        dialog = FeedbackExpressionDialog(
-            joint_name, current, self.available_variables, parent=self
-        )
+        dialog = FeedbackExpressionDialog(joint_name, current, self.available_variables, parent=self)
         if dialog.exec_() and dialog.result is not None:
             self.feedback_expressions[joint_name] = dialog.result
-            expr = dialog.result.strip()
-            button.setStyleSheet("background-color: lightblue" if expr else "")
+            button.setStyleSheet("background-color: lightblue" if dialog.result.strip() else "")
