@@ -23,7 +23,9 @@ class TrajectoryCommander:
         self.mode = mode.lower()
         self.rate = rate
         self._last_goal_state = None
-        self._enabled = True
+
+        self._enabled = False
+        self._torque_on = False
 
         self._playback_thread = None
         self._playback_lock = threading.Lock()
@@ -56,6 +58,17 @@ class TrajectoryCommander:
         """Check if publishing is currently enabled."""
         return self._enabled
 
+    def torque_on(self):
+        self._torque_on = True
+        rospy.loginfo("[TrajectoryCommander] Torque ON")
+
+    def torque_off(self):
+        self._torque_on = False
+        rospy.loginfo("[TrajectoryCommander] Torque OFF")
+
+    def is_torque_on(self) -> bool:
+        return self._torque_on
+
     def send_joint_state(self, joint_state: JointState, duration: float = 1.0):
         """
         Send a single JointState as target position.
@@ -64,7 +77,7 @@ class TrajectoryCommander:
             joint_state: Target joint state
             duration: Motion duration (used only in trajectory mode)
         """
-        if not self._enabled:
+        if not self._enabled or not self._torque_on:
             # rospy.logwarn("[TrajectoryCommander] Command ignored: commander is disabled.")
             return
 
@@ -91,7 +104,7 @@ class TrajectoryCommander:
         Args:
             trajectory: JointTrajectory message
         """
-        if not self._enabled:
+        if not self._enabled or not self._torque_on:
             # rospy.logwarn("[TrajectoryCommander] Trajectory ignored: commander is disabled.")
             return
 
@@ -138,7 +151,7 @@ class TrajectoryCommander:
             steps = max(1, int(duration * self.rate))
 
             for s in range(steps):
-                if self._playback_cancel_event.is_set():
+                if self._playback_cancel_event.is_set() or not self._torque_on:
                     return
 
                 t = (s + 1) / steps

@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import QTabWidget
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
+from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..urdf_interface.urdf_joint_extractor import get_joint_limit
 from ..urdf_interface.urdf_joint_extractor import get_transmission_joints
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
@@ -32,8 +33,10 @@ class MainWindow(QWidget):
         }
         self.variable_names = self.generate_variable_names()
 
-        # Initialize the trajectory visualizer
+        # Initialize visualizer and commander
         self.trajectory_visualizer = TrajectoryVisualizer(visualize_as_state=True, rate=30.0)
+        self.trajectory_commander = TrajectoryCommander("my_robot", self.joint_names, mode="position")
+
         self.init_ui()
 
     def generate_variable_names(self):
@@ -67,15 +70,24 @@ class MainWindow(QWidget):
         layout = QVBoxLayout()
 
         self.torque_checkbox = QCheckBox("Torque ON")
+        self.torque_checkbox.setChecked(False)
+        self.torque_checkbox.stateChanged.connect(
+            lambda state: self.trajectory_commander.torque_on() if state else self.trajectory_commander.torque_off()
+        )
+
         self.init_pose_button = QPushButton("Move to Initial Pose")
-        self.hardware_checkbox = QCheckBox("Use Real Robot")
+
         self.preview_checkbox = QCheckBox("Preview")
         self.preview_checkbox.setChecked(True)
         self.preview_checkbox.stateChanged.connect(
             lambda state: self.trajectory_visualizer.enable() if state else self.trajectory_visualizer.disable()
         )
 
-        self.variable_names = self.generate_variable_names()
+        self.hardware_checkbox = QCheckBox("Use Real Robot")
+        self.hardware_checkbox.setChecked(False)
+        self.hardware_checkbox.stateChanged.connect(
+            lambda state: self.trajectory_commander.enable() if state else self.trajectory_commander.disable()
+        )
 
         checkbox_row = QHBoxLayout()
         checkbox_row.addWidget(self.preview_checkbox)
@@ -121,7 +133,8 @@ class MainWindow(QWidget):
             self.joint_limits,
             available_variables=self.variable_names,
             motion_directory="motion_directory",
-            trajectory_visualizer=self.trajectory_visualizer)
+            trajectory_visualizer=self.trajectory_visualizer
+        )
         self.tabs.addTab(self.initial_pose_editor, "Initial Pose")
 
         self.animation_widget = AnimaitonWidget(
