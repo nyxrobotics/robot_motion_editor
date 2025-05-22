@@ -2,6 +2,8 @@ import threading
 import time
 
 import rospy
+from trajectory_msgs.msg import JointTrajectory
+from trajectory_msgs.msg import JointTrajectoryPoint
 
 from ..gui.animation_editor_widget import FrameBlockItem
 from ..gui.animation_editor_widget import IfBlockItem
@@ -101,7 +103,24 @@ class AnimationCommander:
             if previous_joint_state is None:
                 previous_joint_state = target_joint_state
 
-            self.trajectory_commander.send_joint_state(target_joint_state, duration=move_duration)
+            # Send trajectory instead of just target pose
+            traj = JointTrajectory()
+            traj.joint_names = target_joint_state.name
+
+            point_start = JointTrajectoryPoint()
+            point_start.time_from_start = rospy.Duration(0.0)
+            point_start.positions = previous_joint_state.position
+            point_start.velocities = [
+                (b - a) / move_duration for a, b in zip(previous_joint_state.position, target_joint_state.position)
+            ]
+
+            point_end = JointTrajectoryPoint()
+            point_end.time_from_start = rospy.Duration(move_duration)
+            point_end.positions = target_joint_state.position
+            point_end.velocities = [0.0] * len(target_joint_state.position)
+
+            traj.points = [point_start, point_end]
+            self.trajectory_commander.send_trajectory(traj)
 
             total_duration = move_duration + wait_duration
             elapsed = 0.0
