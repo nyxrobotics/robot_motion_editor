@@ -11,6 +11,9 @@ from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QTreeWidget
 from PyQt5.QtWidgets import QTreeWidgetItem
 
+from ..logic.animation_file_manager import AnimationData
+from ..logic.animation_file_manager import AnimationFileManager
+
 
 class AnimationFileWidget(QTreeWidget):
     def __init__(self, motion_directory, parent=None):
@@ -32,7 +35,6 @@ class AnimationFileWidget(QTreeWidget):
         menu = QMenu(self)
 
         if item.parent() is None:
-            # アニメーション名ノード（ルート）
             rename_action = menu.addAction("Rename Animation")
             action = menu.exec_(self.viewport().mapToGlobal(pos))
             if action == rename_action:
@@ -74,23 +76,17 @@ class AnimationFileWidget(QTreeWidget):
             QMessageBox.critical(self, "Rename Failed", str(e))
             return
 
-        # ツリー表示を更新
         item.setText(0, new_name)
-
-        # 現在編集中のアニメーション名も更新（AnimaitonWidget から取得）
         if hasattr(self.parent(), "current_animation_name") and self.parent().current_animation_name == old_name:
             self.parent().current_animation_name = new_name
 
     def rename_yaml_file(self, category, old_name, new_name, item_widget):
-        # アニメーション名（ルートノード）
         animation_item = item_widget
         while animation_item.parent():
             animation_item = animation_item.parent()
         animation_name = animation_item.text(0)
 
         base_dir = self.motion_directory
-
-        # 対象ディレクトリ決定
         if category == "frames":
             dir_path = os.path.join(base_dir, animation_name, "frames")
         elif category == "if":
@@ -113,34 +109,30 @@ class AnimationFileWidget(QTreeWidget):
             QMessageBox.critical(self, "Rename Failed", str(e))
             return False
 
-        # AnimaitonWidget を取得
         editor = self
         while editor and not hasattr(editor, "scene"):
             editor = editor.parent()
         if not editor:
-            QMessageBox.critical(self, "Error", "AnimaitonWidget not found.")
+            QMessageBox.critical(self, "Error", "AnimationWidget not found.")
             return False
 
-        # layout 修正処理
-        layout = editor.scene.save_layout_yaml()
-        singular_type = category.rstrip("s")
+        anim_data = editor.scene.get_animation_data()
+        anim_data_dict = anim_data.get_dict()
+        block_dict = anim_data_dict.get("block", {})
         updated = False
 
-        # 新しい block を格納する dict
+        singular_type = category.rstrip("s")
         new_block = {}
         rename_map = {}
 
-        for block_key, block_data in layout.get("block", {}).items():
+        for block_key, block_data in block_dict.items():
             info = block_data.get("info", {})
             block_type = info.get("type")
             block_filename = info.get("filename")
             block_id = info.get("id")
 
             if block_type == singular_type and block_filename == old_name:
-                # info.filename 修正
                 info["filename"] = new_name
-
-                # block名を修正（例: frame_1_oldname → frame_1_newname）
                 parts = block_key.split("_")
                 if len(parts) >= 3 and parts[0] == singular_type and parts[2] == old_name:
                     new_key = f"{parts[0]}_{parts[1]}_{new_name}"
@@ -152,10 +144,9 @@ class AnimationFileWidget(QTreeWidget):
             else:
                 new_block[block_key] = block_data
 
-        layout["block"] = new_block
+        anim_data_dict["block"] = new_block
 
-        # target 修正（target: frame_1_oldname → frame_1_newname）
-        for block_data in layout["block"].values():
+        for block_data in anim_data_dict["block"].values():
             output = block_data.get("connection", {}).get("output", {})
             for conn in output.values():
                 if isinstance(conn, dict) and "target" in conn:
@@ -165,7 +156,9 @@ class AnimationFileWidget(QTreeWidget):
                         updated = True
 
         if updated:
-            editor.scene.load_layout_yaml(layout)
+            new_anim_data = AnimationData()
+            new_anim_data.set_dict(anim_data_dict)
+            editor.scene.set_animation_data(new_anim_data)
             editor.save_current_animation()
 
         return True

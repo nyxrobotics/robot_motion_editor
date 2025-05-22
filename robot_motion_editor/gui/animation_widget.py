@@ -18,8 +18,12 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 from sensor_msgs.msg import JointState
 
-from ..logic.animation_file_manager import load_animation_file
-from ..logic.animation_file_manager import save_animation_file
+from ..logic.animation_file_manager import AnimationData
+from ..logic.animation_file_manager import AnimationFileManager
+from ..logic.frame_file_manager import FrameData
+from ..logic.frame_file_manager import FrameFileManager
+from ..logic.initial_pose_file_manager import InitialPoseData
+from ..logic.initial_pose_file_manager import InitialPoseFileManager
 from ..visualizer.animation_visualizer import AnimationVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .animation_editor_widget import AnimationEditorWidget
@@ -70,23 +74,6 @@ class AnimaitonWidget(QWidget):
             "frames",
             f"{frame_name}.yaml"
         )
-
-    def load_animation_by_name(self, animation_name):
-        if not self.confirm_save_if_unsaved_changes():
-            return
-        self.current_animation_name = animation_name
-        layout = load_animation_file(self.motion_directory, animation_name)
-        self.scene.load_layout_yaml(layout)
-        self.scene.highlight_preview_path()
-
-        # 初期姿勢読み込み（initial_frame）
-        try:
-            self.initial_joint_state, _, _ = self.load_joint_state_and_durations(
-                self.resolve_frame_path("initial_frame")
-            )
-            self.preview_controller.initial_joint_state = self.initial_joint_state
-        except Exception as e:
-            rospy.logwarn(f"[MotionEditor] Failed to load initial_frame: {e}")
 
     def init_ui(self):
         splitter = QSplitter(Qt.Horizontal)
@@ -274,21 +261,55 @@ class AnimaitonWidget(QWidget):
                         QTreeWidgetItem(switch_item, [fname[:-5]])
 
     def load_animation_by_name(self, animation_name):
-        if animation_name == self.current_animation_name:
-            return
         if not self.confirm_save_if_unsaved_changes():
             return
         self.current_animation_name = animation_name
-        layout = load_animation_file(self.motion_directory, animation_name)
-        self.scene.load_layout_yaml(layout)
+
+        raw = AnimationFileManager.load_dict(self.motion_directory, animation_name)
+        anim_data = AnimationData()
+        anim_data.set_dict(raw)
+        self.scene.set_animation_data(anim_data)
         self.scene.highlight_preview_path()
+
+        try:
+            self.initial_joint_state, _, _ = self.load_joint_state_and_durations(
+                self.resolve_frame_path("initial_frame")
+            )
+            self.preview_controller.initial_joint_state = self.initial_joint_state
+        except Exception as e:
+            rospy.logwarn(f"[MotionEditor] Failed to load initial_frame: {e}")
 
     def save_current_animation(self):
         if not self.current_animation_name:
             QMessageBox.information(self, "Save", "No animation selected to save.")
             return
-        layout = self.scene.save_layout_yaml()
-        save_animation_file(self.motion_directory, self.current_animation_name, layout)
+        anim_data = self.scene.get_animation_data()
+        AnimationFileManager.save_dict(self.motion_directory, self.current_animation_name, anim_data.get_dict())
+
+    def confirm_save_if_unsaved_changes(self):
+        if not self.current_animation_name:
+            return True
+
+        current_data = self.scene.get_animation_data().get_dict()
+        saved_data = AnimationFileManager.load_dict(self.motion_directory, self.current_animation_name)
+
+        if current_data == saved_data:
+            return True
+
+        reply = QMessageBox.question(
+            self,
+            "Unsaved Changes",
+            f"Animation '{self.current_animation_name}' has unsaved changes.\nDo you want to save them?",
+            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
+        )
+
+        if reply == QMessageBox.Save:
+            self.save_current_animation()
+            return True
+        elif reply == QMessageBox.Discard:
+            return True
+        else:
+            return False
 
     def create_new_animation(self):
         name, ok = QInputDialog.getText(self, "New Animation", "Enter animation name:")
@@ -308,26 +329,32 @@ class AnimaitonWidget(QWidget):
         self.load_animation_by_name(name)
 
     def create_new_frame(self):
-        # ...省略（通常のframe追加処理）...
-        if not current_item:
+        item = self.animation_tree.currentItem()
+        if not item:
             QMessageBox.information(self, "Selection Error", "Please select an animation.")
             return
 
-        animation_item = current_item.parent() if current_item.parent() else current_item
+        # アニメーション名を取得
+        animation_item = item
+        while animation_item.parent():
+            animation_item = animation_item.parent()
         animation_name = animation_item.text(0)
+
         frames_dir = os.path.join(self.motion_directory, animation_name, "frames")
+        os.makedirs(frames_dir, exist_ok=True)
 
         name, ok = QInputDialog.getText(self, "New Frame", "Enter frame name:")
         if not ok or not name.strip():
             return
         name = name.strip()
+
         frame_path = os.path.join(frames_dir, f"{name}.yaml")
         if os.path.exists(frame_path):
             QMessageBox.warning(self, "Name Conflict", f"Frame '{name}' already exists.")
             return
 
-        with open(frame_path, "w") as f:
-            f.write("  # frame content\n")
+        default_frame_data = FrameData().get_dict()
+        FrameFileManager.save_dict(frames_dir, default_frame_data, f"{name}.yaml")
 
         self.load_animation_list()
         self.load_animation_by_name(animation_name)
@@ -370,26 +397,19 @@ class AnimaitonWidget(QWidget):
             self.load_animation_by_name(anim_name)
 
     def open_offset_editor(self):
-        offset_path = os.path.join(self.motion_directory, self.current_animation_name, "offset.yaml")
+        offset_dir = os.path.join(self.motion_directory, self.current_animation_name)
+        offset_filename = "offset.yaml"
 
         dlg = OffsetEditorDialog(
             joint_names=self.joint_names,
             joint_limits=self.joint_limits,
             available_variables=self.available_variables,
-            offset_path=offset_path
+            offset_path=os.path.join(offset_dir, offset_filename)
         )
 
         if dlg.exec_():
-            updated_data = dlg.get_joint_data()
-            save_initial_pose(
-                os.path.join(self.motion_directory, self.current_animation_name),
-                joint_names=list(updated_data.keys()),
-                positions=[v["position"] for v in updated_data.values()],
-                enabled={k: v["enable"] for k, v in updated_data.items()},
-                pid_config={k: v["pid"] for k, v in updated_data.items()},
-                feedback_exprs={k: v["feedback"] for k, v in updated_data.items()},
-                filename="offset.yaml"
-            )
+            joint_data = dlg.get_joint_data()  # {joint_name: {position, enable, pid, feedback}}
+            InitialPoseFileManager.save_dict(offset_dir, joint_data, filename=offset_filename)
 
     def load_joint_state_and_durations(self, path):
         move_duration = 1.0
@@ -519,8 +539,8 @@ class AnimaitonWidget(QWidget):
         if not self.current_animation_name:
             return True
 
-        current_layout = self.scene.save_layout_yaml()
-        saved_layout = load_animation_file(self.motion_directory, self.current_animation_name)
+        current_layout = self.scene.get_animation_data()
+        saved_layout = AnimationFileManager.load_dict(self.motion_directory, self.current_animation_name)
 
         if current_layout == saved_layout:
             return True
