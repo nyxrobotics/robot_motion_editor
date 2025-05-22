@@ -418,7 +418,7 @@ class AnimaitonWidget(QWidget):
             joint_names=self.joint_names,
             joint_limits=self.joint_limits,
             available_variables=self.available_variables,
-            initial_frame_path=os.path.join(initial_frame_dir, initial_frame_filename)
+            frame_path=os.path.join(initial_frame_dir, initial_frame_filename)
         )
 
         if dlg.exec_():

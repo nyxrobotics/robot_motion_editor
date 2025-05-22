@@ -48,10 +48,6 @@ class FrameEditorDialog(QDialog):
         self.frame_data = FrameData()
         self.frame_data.set_joint_names(joint_names)
 
-        if frame_path and os.path.exists(frame_path):
-            raw = FrameFileManager.load_dict(os.path.dirname(frame_path), os.path.basename(frame_path))
-            self.frame_data.set_dict(raw)
-
         self.joint_widgets = {}
         self.enable_checkbox_widgets = {}
 
@@ -263,7 +259,6 @@ class FrameEditorDialog(QDialog):
             self.frame_data.get_dict(),
             os.path.basename(self.frame_path)
         )
-        print(f"[INFO] Frame saved to {self.frame_path}")
         self.accept()
 
     def handle_play_button(self):
