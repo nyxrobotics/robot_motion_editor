@@ -35,7 +35,7 @@ class MainWindow(QWidget):
 
         # Initialize visualizer and commander
         self.trajectory_visualizer = TrajectoryVisualizer(visualize_as_state=True, rate=30.0)
-        self.trajectory_commander = TrajectoryCommander("my_robot", self.joint_names, mode="position")
+        self.trajectory_commander = TrajectoryCommander("kuroko", self.joint_names, mode="position")
 
         self.init_ui()
 
@@ -133,7 +133,8 @@ class MainWindow(QWidget):
             self.joint_limits,
             available_variables=self.variable_names,
             motion_directory="motion_directory",
-            trajectory_visualizer=self.trajectory_visualizer
+            trajectory_visualizer=self.trajectory_visualizer,
+            trajectory_commander=self.trajectory_commander
         )
         self.tabs.addTab(self.initial_pose_editor, "Initial Pose")
 

@@ -17,6 +17,7 @@ from sensor_msgs.msg import JointState
 
 from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.initial_pose_file_manager import InitialPoseFileManager
+from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.initial_pose_visualizer import InitialPoseVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .feedback_expression_dialog import FeedbackExpressionDialog
@@ -27,7 +28,9 @@ class InitialPoseEditor(QWidget):
     pose_updated = pyqtSignal()
 
     def __init__(self, joint_names, joint_limits, available_variables,
-                 motion_directory=None, trajectory_visualizer: TrajectoryVisualizer = None):
+                 motion_directory=None,
+                 trajectory_visualizer: TrajectoryVisualizer = None,
+                 trajectory_commander: TrajectoryCommander = None):
         super().__init__()
         self.joint_limits = joint_limits
         self.available_variables = available_variables
@@ -35,6 +38,7 @@ class InitialPoseEditor(QWidget):
         self.initial_pose_data = InitialPoseData()
         self.initial_pose_data.set_joint_names(joint_names)
         self.initial_pose_visualizer = InitialPoseVisualizer(joint_names, trajectory_visualizer)
+        self.trajectory_commander = trajectory_commander
 
         self.enable_checkboxes = {}
         self.joint_widgets = {}
@@ -169,7 +173,10 @@ class InitialPoseEditor(QWidget):
         next_goal_pose = self.get_gui_joints()
         if next_goal_pose != self.goal_pose:
             self.goal_pose = next_goal_pose
-            self.initial_pose_visualizer.set_goal_pose(self.goal_pose)
+            if self.initial_pose_visualizer:
+                self.initial_pose_visualizer.set_goal_pose(self.goal_pose)
+            if self.trajectory_commander:
+                self.trajectory_commander.send_joint_state(self.goal_pose, duration=1.0)
 
     def update_all_enable_checkbox(self):
         checked = [cb.isChecked() for cb in self.enable_checkboxes.values()]
