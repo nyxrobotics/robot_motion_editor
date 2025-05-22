@@ -14,6 +14,10 @@ from PyQt5.QtWidgets import QMessageBox
 
 from ..logic.animation_file_manager import AnimationData
 from ..logic.animation_file_manager import AnimationFileManager
+from ..logic.animation_file_manager import ArrowData
+from ..logic.animation_file_manager import BlockConnection
+from ..logic.animation_file_manager import BlockData
+from ..logic.animation_file_manager import BlockInfo
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
 from ..logic.if_condition_file_manager import IfConditionData
@@ -386,25 +390,33 @@ class AnimationEditorWidget(QGraphicsScene):
 
         for item in self.items():
             if isinstance(item, (FrameBlockItem, IfBlockItem, SwitchBlockItem, StartBlockItem)):
-                info = {
-                    "type": item.type,
-                    "filename": getattr(item, "filename", ""),
-                    "id": item.id,
-                }
-                place = {"x": item.pos().x(), "y": item.pos().y()}
-                output = {}
+                # BlockInfo
+                info = BlockInfo(
+                    type=item.type,
+                    filename=getattr(item, "filename", ""),
+                    id=item.id
+                )
 
-                output_labels = []
+                # 位置
+                place = {
+                    "x": item.pos().x(),
+                    "y": item.pos().y()
+                }
+
+                # 出力接続情報
+                output = {}
                 if isinstance(item, FrameBlockItem):
                     output_labels = ["out_0"]
                 elif isinstance(item, (IfBlockItem, SwitchBlockItem)):
                     output_labels = list(item.output_sub_blocks.keys())
                 elif isinstance(item, StartBlockItem):
                     output_labels = ["out_0"]
+                else:
+                    output_labels = []
 
-                for label in output_labels:
+                for idx, label in enumerate(output_labels):
                     subblock = item.output_sub_blocks.get(label) if hasattr(item, 'output_sub_blocks') else item
-                    connection = {"ch": output_labels.index(label)}
+                    connection = {"ch": idx}
                     if subblock.output_arrows:
                         arrow = subblock.output_arrows[0]
                         if arrow.end_item:
@@ -414,18 +426,19 @@ class AnimationEditorWidget(QGraphicsScene):
                             })
                     output[label] = connection
 
-                anim_data.block[item.name] = anim_data.block.get(item.name)
-                anim_data.block[item.name] = {
-                    "info": info,
-                    "place": place,
-                    "connection": {"output": output}
-                }
+                # BlockData にまとめて登録
+                anim_data.block[item.name] = BlockData(
+                    info=info,
+                    place=place,
+                    connection=BlockConnection(output=output)
+                )
 
             elif isinstance(item, ArrowItem):
-                anim_data.arrow[item.name] = {
-                    "info": {"id": item.id},
-                    "waypoints": [[wp.pos().x(), wp.pos().y()] for wp in item.waypoints]
-                }
+                waypoints = [[wp.pos().x(), wp.pos().y()] for wp in item.waypoints]
+                anim_data.arrow[item.name] = ArrowData(
+                    info={"id": item.id},
+                    waypoints=waypoints
+                )
 
         return anim_data
 
@@ -450,7 +463,7 @@ class AnimationEditorWidget(QGraphicsScene):
                 item = IfBlockItem(id, filename)
             elif btype == "switch":
                 labels = list(block.get("connection", {}).get("output", {}).keys())
-                item = SwitchBlockItem(id, filename, case_num=len(labels))
+                item = SwitchBlockItem(id, filename, num_cases=len(labels))
             elif btype == "start":
                 item = StartBlockItem(id)
             else:

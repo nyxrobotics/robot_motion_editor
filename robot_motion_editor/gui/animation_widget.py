@@ -534,28 +534,3 @@ class AnimaitonWidget(QWidget):
                 new_num_cases = dlg.result.get("num_cases", 2)
                 # フローチャート上のブロックを更新
                 self.scene.update_switch_block(condition_name, new_num_cases)
-
-    def confirm_save_if_unsaved_changes(self):
-        if not self.current_animation_name:
-            return True
-
-        current_layout = self.scene.get_animation_data()
-        saved_layout = AnimationFileManager.load_dict(self.motion_directory, self.current_animation_name)
-
-        if current_layout == saved_layout:
-            return True
-
-        reply = QMessageBox.question(
-            self,
-            "Unsaved Changes",
-            f"Animation '{self.current_animation_name}' has unsaved changes.\nDo you want to save them?",
-            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
-        )
-
-        if reply == QMessageBox.Save:
-            self.save_current_animation()
-            return True
-        elif reply == QMessageBox.Discard:
-            return True
-        else:
-            return False
