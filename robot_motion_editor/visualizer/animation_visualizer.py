@@ -26,7 +26,7 @@ class AnimationVisualizer:
 
         self._pause_event.set()
 
-    def start(self):
+    def start(self, start_block=None):
         self.visualizer.enable_loop(False)
         with self._lock:
             if self._thread and self._thread.is_alive():
@@ -35,7 +35,7 @@ class AnimationVisualizer:
             self._pause_event.set()
             self.state = 'playing'
             self._prev_snapshot = self._get_scene_snapshot()
-            self._thread = threading.Thread(target=self._run)
+            self._thread = threading.Thread(target=self._run, args=(start_block,))
             self._thread.start()
 
     def pause(self):
@@ -108,17 +108,27 @@ class AnimationVisualizer:
             return block.output_arrows[0].end_item if block.output_arrows else None
         return None
 
-    def _run(self):
-        self.current_block = self._get_start_block()
+    def _run(self, start_block=None):
+        self.current_block = start_block or self._get_start_block()
         previous_joint_state = self.initial_joint_state
 
         while self.current_block and not self._stop_event.is_set():
             self._pause_event.wait()
 
+            # シーン変更検出
             if self._scene_changed():
                 print("[AnimationVisualizer] Scene changed. Stopping.")
                 self.stop()
                 return
+
+            # 🔽 再生中のブロックだけを選択表示
+            if self.scene is not None:
+                selected = self.scene.selectedItems()
+                if self.current_block not in selected:
+                    for item in selected:
+                        item.setSelected(False)
+                    if hasattr(self.current_block, 'setSelected'):
+                        self.current_block.setSelected(True)
 
             if not isinstance(self.current_block, FrameBlockItem):
                 self.current_block = self._get_next_block(self.current_block)

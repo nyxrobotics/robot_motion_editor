@@ -26,7 +26,12 @@ class AnimationPreviewButtonWidget(QWidget):
         if self.controller.state == 'paused':
             self.controller.resume()
         else:
-            self.controller.start()
+            selected_block = None
+            for item in self.controller.scene.selectedItems():
+                if hasattr(item, "output_arrows"):
+                    selected_block = item
+                    break
+            self.controller.start(start_block=selected_block)
 
     def pause(self):
         self.controller.pause()
