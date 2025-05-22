@@ -8,8 +8,8 @@ from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtWidgets import QVBoxLayout
 
-from ..logic.if_condition_file_manager import load_if_condition
-from ..logic.if_condition_file_manager import save_if_condition
+from ..logic.if_condition_file_manager import IfConditionData
+from ..logic.if_condition_file_manager import IfConditionFileManager
 
 
 class IfConditionEditorDialog(QDialog):
@@ -38,7 +38,7 @@ class IfConditionEditorDialog(QDialog):
 
         layout.addWidget(QLabel("Condition:"))
         self.condition_edit = QTextEdit()
-        layout.addWidget(self.condition_edit, stretch=1)  # expressionの1/3の高さ
+        layout.addWidget(self.condition_edit, stretch=1)
 
         btn_row = QHBoxLayout()
         self.show_vars_btn = QPushButton("Show Variables")
@@ -60,10 +60,12 @@ class IfConditionEditorDialog(QDialog):
         QMessageBox.information(self, "Available Variables", "\n".join(self.available_variables))
 
     def load_condition(self):
-        data = load_if_condition(self.motion_directory, self.animation_name, self.condition_name)
-        if data:
-            self.expression_edit.setPlainText(data.get('expression', ''))
-            self.condition_edit.setPlainText(data.get('condition', ''))
+        data_dict = IfConditionFileManager.load_dict(self.motion_directory, f"{self.condition_name}.yaml")
+        if data_dict:
+            cond_data = IfConditionData()
+            cond_data.set_dict(data_dict)
+            self.expression_edit.setPlainText(cond_data.expression)
+            self.condition_edit.setPlainText(cond_data.condition)
 
     def accept_and_store(self):
         expression = self.expression_edit.toPlainText().strip()
@@ -75,7 +77,6 @@ class IfConditionEditorDialog(QDialog):
 
         local_vars = {}
 
-        # Expression があれば先に実行（変数を定義）
         if expression:
             try:
                 exec(expression, {}, local_vars)
@@ -98,7 +99,6 @@ class IfConditionEditorDialog(QDialog):
                 QMessageBox.critical(self, "Syntax Error in Condition", str(e))
                 return
 
-        # 評価結果が falsy（0, "", [], None など）の場合に警告だけ出す（保存は許可）
         if not bool(result):
             QMessageBox.warning(
                 self,
@@ -106,12 +106,11 @@ class IfConditionEditorDialog(QDialog):
                 f"The condition evaluates to a falsy value: {result}"
             )
 
-        # 保存処理
-        save_if_condition(
-            self.motion_directory,
-            self.animation_name,
-            self.condition_name,
-            {"expression": expression, "condition": condition}
+        cond_data = IfConditionData(expression=expression, condition=condition)
+        IfConditionFileManager.save_dict(
+            os.path.join(self.motion_directory, self.animation_name, "conditions", "if"),
+            cond_data.get_dict(),
+            f"{self.condition_name}.yaml"
         )
 
         self.accept()

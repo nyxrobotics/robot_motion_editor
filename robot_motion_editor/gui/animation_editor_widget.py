@@ -14,7 +14,8 @@ from PyQt5.QtWidgets import QMessageBox
 
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
-from ..logic.if_condition_file_manager import save_if_condition
+from ..logic.if_condition_file_manager import IfConditionData
+from ..logic.if_condition_file_manager import IfConditionFileManager
 from ..logic.switch_condition_file_manager import save_switch_condition
 from .animation_editor_items import ArrowItem
 from .animation_editor_items import FrameBlockItem
@@ -244,12 +245,12 @@ class AnimationEditorWidget(QGraphicsScene):
                         return
 
                     os.makedirs(conditions_dir, exist_ok=True)
-                    default_if_data = {"expression": "", "condition": ""}
-                    save_if_condition(
-                        self.editor_widget.motion_directory,
-                        self.editor_widget.current_animation_name,
-                        name,
-                        default_if_data)
+                    default_if_data = IfConditionData(expression="", condition="")
+                    IfConditionFileManager.save_dict(
+                        conditions_dir,
+                        default_if_data.get_dict(),
+                        f"{name}.yaml"
+                    )
 
                     id = self._generate_block_id()
                     block = IfBlockItem(id, name)
