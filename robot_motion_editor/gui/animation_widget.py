@@ -30,7 +30,7 @@ from .animation_graphics_view import AnimatioGraphicsView
 from .animation_preview_button_widget import AnimationPreviewButtonWidget
 from .frame_editor import FrameEditorDialog
 from .if_condition_editor import IfConditionEditorDialog
-from .offset_editor import OffsetEditorDialog
+from .initial_frame_editor import InitialFrameEditorDialog
 from .switch_condition_editor import SwitchConditionEditorDialog
 
 
@@ -149,12 +149,12 @@ class AnimaitonWidget(QWidget):
         self.load_animation_by_name(name)
 
     def on_tree_item_double_clicked(self, item):
-        if item.text(0) == "offset":
+        if item.text(0) == "initial_frame":
             animation_item = item
             while animation_item.parent() is not None:
                 animation_item = animation_item.parent()
             animation_name = animation_item.text(0)
-            self.open_offset_editor()
+            self.open_initial_frame_editor()
 
         elif item.parent() and item.parent().text(0) == "frames":
             animation_item = item
@@ -243,8 +243,8 @@ class AnimaitonWidget(QWidget):
             anim_item = QTreeWidgetItem([animation_name])
             self.animation_tree.addTopLevelItem(anim_item)
 
-            # Edit initial offset for the frames
-            QTreeWidgetItem(anim_item, ["offset"])
+            # Edit initial_frame
+            QTreeWidgetItem(anim_item, ["initial_frame"])
 
             # frames
             frames_dir = os.path.join(animation_dir, "frames")
@@ -287,7 +287,7 @@ class AnimaitonWidget(QWidget):
 
         try:
             self.initial_joint_state, _, _ = self.load_joint_state_and_durations(
-                self.resolve_frame_path("initial_frame")
+                os.path.join(self.motion_directory, self.current_animation_name, "initial_frame.yaml")
             )
             self.animation_visualizer.initial_joint_state = self.initial_joint_state
         except Exception as e:
@@ -337,8 +337,8 @@ class AnimaitonWidget(QWidget):
         os.makedirs(os.path.join(animation_path, "frames"), exist_ok=True)
         with open(os.path.join(animation_path, f"{name}.yaml"), "w") as f:
             f.write("  # animation flowchart")
-        with open(os.path.join(animation_path, "offset.yaml"), "w") as f:
-            f.write("  # initial frame offset")
+        with open(os.path.join(animation_path, "initial_frame.yaml"), "w") as f:
+            f.write("  # initial frame")
         self.load_animation_list()
         self.load_animation_by_name(name)
 
@@ -410,20 +410,20 @@ class AnimaitonWidget(QWidget):
             self.load_animation_list()
             self.load_animation_by_name(anim_name)
 
-    def open_offset_editor(self):
-        offset_dir = os.path.join(self.motion_directory, self.current_animation_name)
-        offset_filename = "offset.yaml"
+    def open_initial_frame_editor(self):
+        initial_frame_dir = os.path.join(self.motion_directory, self.current_animation_name)
+        initial_frame_filename = "initial_frame.yaml"
 
-        dlg = OffsetEditorDialog(
+        dlg = InitialFrameEditorDialog(
             joint_names=self.joint_names,
             joint_limits=self.joint_limits,
             available_variables=self.available_variables,
-            offset_path=os.path.join(offset_dir, offset_filename)
+            initial_frame_path=os.path.join(initial_frame_dir, initial_frame_filename)
         )
 
         if dlg.exec_():
             joint_data = dlg.get_joint_data()  # {joint_name: {position, enable, pid, feedback}}
-            InitialPoseFileManager.save_dict(offset_dir, joint_data, filename=offset_filename)
+            InitialPoseFileManager.save_dict(initial_frame_dir, joint_data, filename=initial_frame_filename)
 
     def load_joint_state_and_durations(self, path):
         move_duration = 1.0

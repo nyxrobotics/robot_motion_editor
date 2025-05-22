@@ -64,7 +64,7 @@ class StartBlockItem(QGraphicsRectItem):
 
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
-        self.scene().editor_widget.open_offset_editor()
+        self.scene().editor_widget.open_initial_frame_editor()
 
 
 class FrameBlockItem(QGraphicsRectItem):

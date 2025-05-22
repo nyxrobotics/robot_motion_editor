@@ -168,7 +168,7 @@ class AnimationFileWidget(QTreeWidget):
         if item is None:
             event.ignore()
             return
-        elif item.text(0) == "offset" and item.parent():
+        elif item.text(0) == "initial_frame" and item.parent():
             item_type = "start"
         elif item and item.parent():
             parent_text = item.parent().text(0)

@@ -115,7 +115,7 @@ joints:
 ```
 <motion_dir>/<animation_name>/
 ├── animation.yaml            # 全体レイアウト・接続情報
-├── offset.yaml               # 初期姿勢との差分
+├── initial_frame.yaml               # 初期姿勢との差分
 ├── frames/
 │   ├── pose0.yaml            # フレーム個別定義
 │   └── pose2.yaml
@@ -166,7 +166,7 @@ layout:
         - [200, 200]
 ```
 
-### 7.3 offset.yaml
+### 7.3 initial_frame.yaml
 - `initial_pose.yaml` と同形式で各アニメーションの初期姿勢を設定
 - `initial_pose.yaml` と差分がない場合、`initial_pose.yaml`の変更と同時に`initial_pose.yaml`と同じ内容で上書き
 
