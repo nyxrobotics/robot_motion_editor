@@ -24,6 +24,7 @@ from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
 from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.initial_pose_file_manager import InitialPoseFileManager
+from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.animation_visualizer import AnimationVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .animation_editor_widget import AnimationEditorWidget
@@ -38,14 +39,21 @@ from .switch_condition_editor import SwitchConditionEditorDialog
 
 
 class AnimaitonWidget(QWidget):
-    def __init__(self, motion_directory=".", joint_names=None, joint_limits=None,
-                 available_variables=None, trajectory_visualizer: TrajectoryVisualizer = None):
+    def __init__(
+            self,
+            motion_directory=".",
+            joint_names=None,
+            joint_limits=None,
+            available_variables=None,
+            trajectory_visualizer: TrajectoryVisualizer = None,
+            trajectory_commander: TrajectoryCommander = None):
         super().__init__()
         self.motion_directory = motion_directory
         self.joint_names = joint_names or []
         self.joint_limits = joint_limits or {}
         self.available_variables = available_variables or []
         self.trajectory_visualizer = trajectory_visualizer
+        self.trajectory_commander = trajectory_commander
         self.current_animation_name = None
         self.initial_joint_state = None
 
@@ -160,7 +168,8 @@ class AnimaitonWidget(QWidget):
                 joint_limits=self.joint_limits,
                 available_variables=self.available_variables,
                 frame_path=frame_path,
-                trajectory_visualizer=self.trajectory_visualizer
+                trajectory_visualizer=self.trajectory_visualizer,
+                trajectory_commander=self.trajectory_commander
             )
             current_state, move, wait = self.load_joint_state_and_durations(frame_path)
             dlg.frame_visualizer.set_current_frame(current_state, move, wait)
@@ -450,7 +459,9 @@ class AnimaitonWidget(QWidget):
             joint_names=self.joint_names,
             joint_limits=self.joint_limits,
             available_variables=self.available_variables,
-            frame_path=frame_path
+            frame_path=frame_path,
+            trajectory_visualizer=self.trajectory_visualizer,
+            trajectory_commander=self.trajectory_commander
         )
         dlg.exec_()
 
@@ -471,7 +482,8 @@ class AnimaitonWidget(QWidget):
             available_variables=self.available_variables,
             frame_path=frame_path,
             parent=self,
-            trajectory_visualizer=self.trajectory_visualizer
+            trajectory_visualizer=self.trajectory_visualizer,
+            trajectory_commander=self.trajectory_commander
         )
 
         if hasattr(dlg, "frame_visualizer"):

@@ -1,6 +1,7 @@
 import math
 import os
 
+import rospy
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtWidgets import QDialog
@@ -18,6 +19,7 @@ from PyQt5.QtWidgets import QWidget
 
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
+from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.frame_visualizer import FrameVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .feedback_expression_dialog import FeedbackExpressionDialog
@@ -32,7 +34,8 @@ class FrameEditorDialog(QDialog):
         available_variables,
         frame_path=None,
         parent=None,
-        trajectory_visualizer: TrajectoryVisualizer = None
+        trajectory_visualizer: TrajectoryVisualizer = None,
+        trajectory_commander: TrajectoryCommander = None
     ):
         super().__init__(parent)
         self.setWindowTitle("Edit Frame")
@@ -53,6 +56,8 @@ class FrameEditorDialog(QDialog):
         self.enable_checkbox_widgets = {}
 
         self.trajectory_visualizer = trajectory_visualizer
+        self.trajectory_commander = trajectory_commander
+
         self.frame_visualizer = FrameVisualizer(trajectory_visualizer)
 
         self.init_ui()
@@ -295,13 +300,15 @@ class FrameEditorDialog(QDialog):
                 btn.setChecked(False)
 
     def publish_goal_state_from_gui(self):
-        import rospy
-        from sensor_msgs.msg import JointState
-
         for joint_name in self.joint_names:
             _, spin, _ = self.joint_widgets[joint_name]
             self.frame_data.set_pose(joint_name, math.radians(spin.value()))
 
         msg = self.frame_data.get_joint_state()
         msg.header.stamp = rospy.Time.now()
-        self.trajectory_visualizer.publish_goal_state(msg)
+
+        if self.trajectory_visualizer:
+            self.trajectory_visualizer.publish_goal_state(msg)
+
+        if self.trajectory_commander:
+            self.trajectory_commander.send_joint_state(msg, duration=1.0)
