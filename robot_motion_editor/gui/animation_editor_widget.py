@@ -16,7 +16,8 @@ from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
 from ..logic.if_condition_file_manager import IfConditionData
 from ..logic.if_condition_file_manager import IfConditionFileManager
-from ..logic.switch_condition_file_manager import save_switch_condition
+from ..logic.switch_condition_file_manager import SwitchConditionData
+from ..logic.switch_condition_file_manager import SwitchConditionFileManager
 from .animation_editor_items import ArrowItem
 from .animation_editor_items import FrameBlockItem
 from .animation_editor_items import IfBlockItem
@@ -276,12 +277,16 @@ class AnimationEditorWidget(QGraphicsScene):
                         return
 
                     os.makedirs(conditions_dir, exist_ok=True)
-                    default_switch_data = {"expression": "", "condition": "", "case": [0]}
-                    save_switch_condition(
-                        self.editor_widget.motion_directory,
-                        self.editor_widget.current_animation_name,
-                        name,
-                        default_switch_data)
+                    default_switch_data = SwitchConditionData(
+                        expression="",
+                        condition="",
+                        case={"case_0": {"value": 0}}
+                    )
+                    SwitchConditionFileManager.save_dict(
+                        conditions_dir,
+                        default_switch_data.get_dict(),
+                        f"{name}.yaml"
+                    )
 
                     id = self._generate_block_id()
                     block = SwitchBlockItem(id, name, num_cases=2)

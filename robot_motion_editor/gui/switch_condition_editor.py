@@ -9,8 +9,8 @@ from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtWidgets import QVBoxLayout
 
-from ..logic.switch_condition_file_manager import load_switch_condition
-from ..logic.switch_condition_file_manager import save_switch_condition
+from ..logic.switch_condition_file_manager import SwitchConditionData
+from ..logic.switch_condition_file_manager import SwitchConditionFileManager
 
 
 class SwitchConditionEditorDialog(QDialog):
@@ -80,21 +80,27 @@ class SwitchConditionEditorDialog(QDialog):
             QMessageBox.information(self, "Available Variables", "\n".join(self.available_variables))
 
     def load_condition(self):
-        data = load_switch_condition(self.motion_directory, self.animation_name, self.condition_name)
+        data_dict = SwitchConditionFileManager.load_dict(
+            os.path.join(self.motion_directory, self.animation_name, "conditions", "switch"),
+            f"{self.condition_name}.yaml"
+        )
         self.case_list.clear()
-        self.expression_edit.setPlainText(data.get("expression", ""))
-        self.condition_edit.setPlainText(data.get("condition", ""))
 
-        case_section = data.get("case", {})
+        if data_dict:
+            cond_data = SwitchConditionData()
+            cond_data.set_dict(data_dict)
 
-        if isinstance(case_section, dict):
-            sorted_keys = sorted(case_section.keys(), key=lambda k: int(k.split("_")[1]))
-            for key in sorted_keys:
-                self.case_list.addItem(key)
-        else:
-            # 旧形式の int list などにも一応対応
-            for i, val in enumerate(case_section):
-                self.case_list.addItem(f"case_{i}")
+            self.expression_edit.setPlainText(cond_data.expression)
+            self.condition_edit.setPlainText(cond_data.condition)
+
+            case_section = cond_data.case
+            if isinstance(case_section, dict):
+                sorted_keys = sorted(case_section.keys(), key=lambda k: int(k.split("_")[1]))
+                for key in sorted_keys:
+                    self.case_list.addItem(key)
+            else:
+                for i, val in enumerate(case_section):
+                    self.case_list.addItem(f"case_{i}")
 
     def add_case(self):
         current_count = self.case_list.count()
@@ -140,21 +146,22 @@ class SwitchConditionEditorDialog(QDialog):
                 "This may not match any case."
             )
 
-        # 保存形式の構造を作成
+        # 保存構造の生成
         case_dict = {}
         for i in range(case_count):
             case_dict[f"case_{i}"] = {"value": i}
 
-        save_switch_condition(
-            self.motion_directory,
-            self.animation_name,
-            self.condition_name,
-            {
-                "expression": expression,
-                "condition": condition,
-                "case": case_dict
-            }
+        cond_data = SwitchConditionData(
+            expression=expression,
+            condition=condition,
+            case=case_dict
         )
 
-        self.result = {"num_cases": case_count + 1}  # default含む
+        SwitchConditionFileManager.save_dict(
+            os.path.join(self.motion_directory, self.animation_name, "conditions", "switch"),
+            cond_data.get_dict(),
+            f"{self.condition_name}.yaml"
+        )
+
+        self.result = {"num_cases": case_count + 1}  # default 含む
         self.accept()
