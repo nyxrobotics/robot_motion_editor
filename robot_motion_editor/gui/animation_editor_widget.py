@@ -12,8 +12,8 @@ from PyQt5.QtWidgets import QInputDialog
 from PyQt5.QtWidgets import QMenu
 from PyQt5.QtWidgets import QMessageBox
 
-from ..logic.frame_file_manager import create_default_frame
-from ..logic.frame_file_manager import save_frame_file
+from ..logic.frame_file_manager import FrameData
+from ..logic.frame_file_manager import FrameFileManager
 from ..logic.if_condition_file_manager import save_if_condition
 from ..logic.switch_condition_file_manager import save_switch_condition
 from .animation_editor_items import ArrowItem
@@ -214,8 +214,11 @@ class AnimationEditorWidget(QGraphicsScene):
                         return
 
                     os.makedirs(frames_dir, exist_ok=True)
-                    default_frame_data = create_default_frame()
-                    save_frame_file(frame_path, default_frame_data)
+                    default_frame_data = FrameData().get_dict()
+                    FrameFileManager.save_dict(
+                        os.path.dirname(frame_path),
+                        default_frame_data,
+                        os.path.basename(frame_path))
 
                     id = self._generate_block_id()
                     block = FrameBlockItem(id, name)

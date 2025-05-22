@@ -1,11 +1,6 @@
 import math
 import os
-from dataclasses import dataclass
-from dataclasses import field
-from typing import Dict
-from typing import List
 
-import yaml
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtWidgets import QDialog
@@ -21,106 +16,12 @@ from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
+from ..logic.frame_file_manager import FrameData
+from ..logic.frame_file_manager import FrameFileManager
 from ..visualizer.frame_visualizer import FrameVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .feedback_expression_dialog import FeedbackExpressionDialog
 from .pid_gain_editor import PIDGainEditorDialog
-
-
-@dataclass
-class JointCommand:
-    position: float = 0.0  # in radians
-    velocity_scale: float = 1.0
-    enable: bool = True
-    pid: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
-    feedback: str = ""
-
-
-@dataclass
-class FrameData:
-    move_duration: float = 2.0
-    wait_duration: float = 0.0
-    joints: Dict[str, JointCommand] = field(default_factory=dict)
-
-    def to_dict(self):
-        joints_dict = {}
-        velocity_scale_dict = {}
-
-        for name, cmd in self.joints.items():
-            joints_dict[name] = {
-                "position": cmd.position,
-                "pid": list(cmd.pid),
-                "enable": cmd.enable,
-                "feedback": cmd.feedback
-            }
-            velocity_scale_dict[name] = cmd.velocity_scale
-
-        return {
-            "joints": joints_dict,
-            "time": {
-                "move_duration": self.move_duration,
-                "wait_duration": self.wait_duration
-            },
-            "velocity_scale": velocity_scale_dict
-        }
-
-
-class FrameFileManager:
-    @staticmethod
-    def load(path: str, joint_names: List[str]) -> FrameData:
-        try:
-            with open(path, "r") as f:
-                raw = yaml.safe_load(f) or {}
-        except Exception as e:
-            print(f"[FrameFileManager] Failed to load: {e}")
-            return FrameData()
-
-        joints_raw = raw.get("joints", {})
-        velocity_raw = raw.get("velocity_scale", {})
-
-        frame = FrameData(
-            move_duration=raw.get("time", {}).get("move_duration", 2.0),
-            wait_duration=raw.get("time", {}).get("wait_duration", 0.0),
-        )
-
-        for joint_name in joint_names:
-            j = joints_raw.get(joint_name, {})
-            vscale = velocity_raw.get(joint_name, 1.0)
-            frame.joints[joint_name] = JointCommand(
-                position=j.get("position", 0.0),
-                velocity_scale=vscale,
-                enable=j.get("enable", True),
-                pid=j.get("pid", [0.0, 0.0, 0.0]),
-                feedback=j.get("feedback", "")
-            )
-
-        return frame
-
-    @staticmethod
-    def save(path: str, frame_data: FrameData) -> None:
-        output = {
-            "time": {
-                "move_duration": frame_data.move_duration,
-                "wait_duration": frame_data.wait_duration
-            },
-            "velocity_scale": {},
-            "joints": {}
-        }
-
-        for joint_name, cmd in frame_data.joints.items():
-            output["velocity_scale"][joint_name] = cmd.velocity_scale
-            output["joints"][joint_name] = {
-                "position": cmd.position,
-                "enable": cmd.enable,
-                "pid": cmd.pid,
-                "feedback": cmd.feedback
-            }
-
-        try:
-            with open(path, "w") as f:
-                yaml.safe_dump(output, f, allow_unicode=True)
-        except Exception as e:
-            print(f"[FrameFileManager] Failed to save: {e}")
 
 
 class FrameEditorDialog(QDialog):
@@ -141,20 +42,12 @@ class FrameEditorDialog(QDialog):
         self.available_variables = available_variables
         self.frame_path = frame_path
 
-        self.frame_data = FrameData(
-            move_duration=2.0,
-            wait_duration=0.0,
-            joints={name: JointCommand() for name in joint_names}
-        )
+        self.frame_data = FrameData()
+        self.frame_data.set_joint_names(joint_names)
 
         if frame_path and os.path.exists(frame_path):
-            loaded = FrameFileManager.load(frame_path, joint_names)
-            if not joint_names and loaded and loaded.joints:
-                joint_names = list(loaded.joints.keys())
-            elif loaded and loaded.joints:
-                for name in loaded.joints:
-                    if name not in joint_names:
-                        joint_names.append(name)
+            raw = FrameFileManager.load_dict(os.path.dirname(frame_path), os.path.basename(frame_path))
+            self.frame_data.set_dict(raw)
 
         self.joint_widgets = {}
         self.enable_checkbox_widgets = {}
@@ -169,7 +62,6 @@ class FrameEditorDialog(QDialog):
 
     def init_ui(self):
         layout = QVBoxLayout()
-
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
@@ -219,11 +111,12 @@ class FrameEditorDialog(QDialog):
 
         for joint_name in self.joint_names:
             row = QHBoxLayout()
-            cmd = self.frame_data.joints[joint_name]
 
             enable_cb = QCheckBox()
-            enable_cb.setChecked(cmd.enable)
-            enable_cb.stateChanged.connect(lambda state, j=joint_name: self.update_enable(j, state))
+            enable_cb.setChecked(self.frame_data.get_enable(joint_name))
+            enable_cb.stateChanged.connect(
+                lambda state, j=joint_name: self.frame_data.set_enable(
+                    j, state == Qt.Checked))
             self.enable_checkbox_widgets[joint_name] = enable_cb
 
             label = QLabel(joint_name)
@@ -255,10 +148,8 @@ class FrameEditorDialog(QDialog):
             vel_spin.setDecimals(2)
             vel_spin.setSingleStep(0.1)
             vel_spin.setRange(0.0, 5.0)
-            vel_spin.setValue(cmd.velocity_scale)
-            vel_spin.valueChanged.connect(
-                lambda val, j=joint_name: self.frame_data.joints[j].__setattr__(
-                    "velocity_scale", val))
+            vel_spin.setValue(self.frame_data.get_velocity_scale(joint_name))
+            vel_spin.valueChanged.connect(lambda val, j=joint_name: self.frame_data.set_velocity_scale(j, val))
 
             pid_btn = QPushButton("PID")
             pid_btn.setFixedWidth(50)
@@ -290,15 +181,12 @@ class FrameEditorDialog(QDialog):
 
         self.setLayout(layout)
 
-    def update_enable(self, joint_name, state):
-        self.frame_data.joints[joint_name].enable = (state == Qt.Checked)
-
     def set_all_enable_checkboxes(self, state):
         checked = (state == Qt.Checked)
         for joint_name, cb in self.enable_checkbox_widgets.items():
             cb.blockSignals(True)
             cb.setChecked(checked)
-            self.frame_data.joints[joint_name].enable = checked
+            self.frame_data.set_enable(joint_name, checked)
             cb.blockSignals(False)
 
     def reset_all_positions(self):
@@ -311,44 +199,44 @@ class FrameEditorDialog(QDialog):
             spin.blockSignals(False)
 
     def open_pid_dialog(self, joint_name, button):
-        current = self.frame_data.joints[joint_name].pid
+        current = self.frame_data.get_pid(joint_name)
         dialog = PIDGainEditorDialog(joint_name, current, parent=self)
         if dialog.exec_() and dialog.result:
-            self.frame_data.joints[joint_name].pid = dialog.result
+            self.frame_data.set_pid(joint_name, dialog.result)
             button.setStyleSheet("background-color: lightblue;" if any(v != 0.0 for v in dialog.result) else "")
 
     def open_feedback_dialog(self, joint_name, button):
-        current = self.frame_data.joints[joint_name].feedback
+        current = self.frame_data.get_feedback(joint_name)
         dialog = FeedbackExpressionDialog(joint_name, current, self.available_variables, parent=self)
         if dialog.exec_() and dialog.result is not None:
-            self.frame_data.joints[joint_name].feedback = dialog.result
+            self.frame_data.set_feedback(joint_name, dialog.result)
             button.setStyleSheet("background-color: lightblue;" if dialog.result.strip() else "")
 
     def load_frame_from_file(self, path):
-        self.frame_data = FrameFileManager.load(path, self.joint_names)
+        raw = FrameFileManager.load_dict(os.path.dirname(path), os.path.basename(path))
+        self.frame_data.set_dict(raw)
+
         self.duration_spin.setValue(self.frame_data.move_duration)
         self.wait_spin.setValue(self.frame_data.wait_duration)
 
-        for joint_name, cmd in self.frame_data.joints.items():
+        for joint_name in self.frame_data.get_joint_names():
             if joint_name not in self.joint_widgets:
                 print(f"[WARNING] Joint {joint_name} not found in joint widgets.")
-                print(f"[WARNING] Available joints: {self.joint_names}")
                 continue
 
             _, spin, vel_spin = self.joint_widgets[joint_name]
-
-            # Block signals to prevent .setValue() from triggering .valueChanged
             spin.blockSignals(True)
-            spin.setValue(math.degrees(cmd.position))
+            spin.setValue(math.degrees(self.frame_data.get_pose(joint_name)))
             spin.blockSignals(False)
 
             vel_spin.blockSignals(True)
-            vel_spin.setValue(cmd.velocity_scale)
+            vel_spin.setValue(self.frame_data.get_velocity_scale(joint_name))
             vel_spin.blockSignals(False)
 
             self.enable_checkbox_widgets[joint_name].blockSignals(True)
-            self.enable_checkbox_widgets[joint_name].setChecked(cmd.enable)
+            self.enable_checkbox_widgets[joint_name].setChecked(self.frame_data.get_enable(joint_name))
             self.enable_checkbox_widgets[joint_name].blockSignals(False)
+
         print(f"[INFO] Loaded frame data from file: {path}")
 
     def save_frame(self):
@@ -360,16 +248,16 @@ class FrameEditorDialog(QDialog):
         self.frame_data.wait_duration = self.wait_spin.value()
 
         for joint_name in self.joint_names:
-            if joint_name not in self.frame_data.joints:
-                self.frame_data.joints[joint_name] = JointCommand()
-
-        for joint_name in self.joint_names:
             _, spin, vel_spin = self.joint_widgets[joint_name]
-            self.frame_data.joints[joint_name].position = math.radians(spin.value())
-            self.frame_data.joints[joint_name].velocity_scale = vel_spin.value()
-            self.frame_data.joints[joint_name].enable = self.enable_checkbox_widgets[joint_name].isChecked()
+            self.frame_data.set_pose(joint_name, math.radians(spin.value()))
+            self.frame_data.set_velocity_scale(joint_name, vel_spin.value())
+            self.frame_data.set_enable(joint_name, self.enable_checkbox_widgets[joint_name].isChecked())
 
-        FrameFileManager.save(self.frame_path, self.frame_data)
+        FrameFileManager.save_dict(
+            os.path.dirname(self.frame_path),
+            self.frame_data.get_dict(),
+            os.path.basename(self.frame_path)
+        )
         print(f"[INFO] Frame saved to {self.frame_path}")
         self.accept()
 
@@ -383,15 +271,8 @@ class FrameEditorDialog(QDialog):
 
         import rospy
         from sensor_msgs.msg import JointState
-        msg = JointState()
-        msg.name = []
-        msg.position = []
-        for joint_name in self.joint_names:
-            cmd = self.frame_data.joints[joint_name]
-            if cmd.enable:
-                msg.name.append(joint_name)
-                msg.position.append(cmd.position)
 
+        msg = self.frame_data.get_joint_state()
         msg.header.stamp = rospy.Time.now()
 
         if self.trajectory_visualizer is None or self.frame_visualizer is None:
@@ -416,21 +297,11 @@ class FrameEditorDialog(QDialog):
     def publish_goal_state_from_gui(self):
         import rospy
         from sensor_msgs.msg import JointState
-        msg = JointState()
-        msg.name = []
-        msg.position = []
+
         for joint_name in self.joint_names:
-            cmd = self.frame_data.joints[joint_name]
-            if cmd.enable:
-                _, spin, _ = self.joint_widgets[joint_name]
-                cmd.position = math.radians(spin.value())
-                msg.name.append(joint_name)
-                msg.position.append(cmd.position)
+            _, spin, _ = self.joint_widgets[joint_name]
+            self.frame_data.set_pose(joint_name, math.radians(spin.value()))
+
+        msg = self.frame_data.get_joint_state()
         msg.header.stamp = rospy.Time.now()
         self.trajectory_visualizer.publish_goal_state(msg)
-
-    def accept(self):
-        with open(self.frame_path, "w") as f:
-            yaml.dump(self.frame_data.to_dict(), f)
-
-        super().accept()
