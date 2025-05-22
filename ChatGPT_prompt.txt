@@ -229,25 +229,29 @@ case:
 
 ---
 
-## 9. ハードウェア連携（`robot_interface/`）
-- `joint_command_publisher.py`：角度コマンド送信
-- `joint_state_listener.py`：/joint_states 受信
-- `imu_listener.py`：IMU値受信
+## 9. URDF連携（`urdf_interface/`）
 - `urdf_joint_extractor.py`：URDFからジョイント抽出
 
 ---
 
-## 10. ロジック層（`logic/`）
+## 10. ハードウェア連携（`robot_interface/`）
+- `joint_command_publisher.py`：角度コマンド送信
+- `joint_state_listener.py`：/joint_states 受信
+- `imu_listener.py`：IMU値受信
+
+---
+
+## 11. ロジック層（`logic/`）
 - `*_file_manager.py`：各種YAMLの読み書き
 
 ---
 
-## 11. RViz連携層（`visualizer/`）
+## 12. RViz連携層（`visualizer/`）
 - `trajectory_visualizer.py`：RVizへのTrajectory送信
 
 ---
 
-## 12. 起動構成
+## 13. 起動構成
 - launch/animation_widget.launch
   - GUIおよびインタフェースノードを一括起動
 - main.py
@@ -271,8 +275,10 @@ robot_motion_editor/
 │   ├── __init__.py
 │   ├── gui/
 │   │   └── [各編集画面・UI構成要素]
+│   ├── urdf_interface/
+│   │   └── [URDF]
 │   ├── robot_interface/
-│   │   └── [joint送信/受信/IMU/URDF]
+│   │   └── [joint送信/受信/IMU]
 │   ├── logic/
 │   │   └── [保存・計算・解析ロジック]
 │   ├── visualizer/

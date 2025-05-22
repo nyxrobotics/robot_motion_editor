@@ -12,8 +12,8 @@ from PyQt5.QtWidgets import QTabWidget
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
-from ..robot_interface.urdf_joint_extractor import get_joint_limit
-from ..robot_interface.urdf_joint_extractor import get_transmission_joints
+from ..urdf_interface.urdf_joint_extractor import get_joint_limit
+from ..urdf_interface.urdf_joint_extractor import get_transmission_joints
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .animation_widget import AnimaitonWidget
 from .initial_pose_editor import InitialPoseEditor
