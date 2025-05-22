@@ -1,6 +1,12 @@
+import os
+
 from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
+
+from ..logic.frame_file_manager import FrameData
+from ..logic.frame_file_manager import FrameFileManager
+from .animation_editor_widget import FrameBlockItem
 
 
 class AnimationPreviewButtonWidget(QWidget):
@@ -34,7 +40,13 @@ class AnimationPreviewButtonWidget(QWidget):
             self.controller.start(start_block=selected_block)
 
     def pause(self):
-        self.controller.pause()
+        if self.controller.state == 'playing':
+            self.controller.pause()
+
+        elif self.controller.state == 'stopped':
+            selected = self.controller.scene.selectedItems()
+            if len(selected) == 1 and isinstance(selected[0], FrameBlockItem):
+                self.controller.play_single_block(selected[0])
 
     def stop(self):
         self.controller.stop()
