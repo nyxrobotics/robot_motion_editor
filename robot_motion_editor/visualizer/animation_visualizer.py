@@ -1,6 +1,10 @@
 import threading
 import time
 
+import rospy
+
+from robot_motion_editor.logic.frame_file_manager import JointData
+
 from ..gui.animation_editor_widget import FrameBlockItem
 from ..gui.animation_editor_widget import IfBlockItem
 from ..gui.animation_editor_widget import StartBlockItem
@@ -117,7 +121,7 @@ class AnimationVisualizer:
 
             # シーン変更検出
             if self._scene_changed():
-                print("[AnimationVisualizer] Scene changed. Stopping.")
+                rospy.logwarn("[AnimationVisualizer] Scene changed. Stopping.")
                 self.stop()
                 return
 
@@ -138,7 +142,7 @@ class AnimationVisualizer:
             try:
                 target_joint_state, move_duration, wait_duration = self.load_frame(frame_name)
             except Exception as e:
-                print(f"[Visualizer] Failed to load frame {frame_name}: {e}")
+                rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
                 self.stop()
                 return
 
@@ -163,3 +167,9 @@ class AnimationVisualizer:
 
             previous_joint_state = target_joint_state
             self.current_block = self._get_next_block(self.current_block)
+
+            if self.scene is not None:
+                for item in self.scene.selectedItems():
+                    item.setSelected(False)
+
+            self.state = 'stopped'
