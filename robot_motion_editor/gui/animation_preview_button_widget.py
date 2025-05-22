@@ -4,16 +4,17 @@ from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
-from ..logic.frame_file_manager import FrameData
-from ..logic.frame_file_manager import FrameFileManager
+from ..robot_interface.animation_commander import AnimationCommander
 from ..visualizer.animation_visualizer import AnimationVisualizer
 from .animation_editor_widget import FrameBlockItem
 
 
 class AnimationPreviewButtonWidget(QWidget):
-    def __init__(self, animation_visualizer: AnimationVisualizer = None, parent=None):
+    def __init__(self, animation_visualizer: AnimationVisualizer = None,
+                 animation_commander: AnimationCommander = None, parent=None):
         super().__init__(parent)
         self.animation_visualizer = animation_visualizer
+        self.animation_commander = animation_commander
 
         self.play_btn = QPushButton("▶ Play")
         self.pause_btn = QPushButton("❚❚ Pause")
