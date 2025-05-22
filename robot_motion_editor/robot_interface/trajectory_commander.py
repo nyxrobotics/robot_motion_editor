@@ -23,6 +23,7 @@ class TrajectoryCommander:
         self.mode = mode.lower()
         self.rate = rate
         self._last_goal_state = None
+        self._enabled = True
 
         self._playback_thread = None
         self._playback_lock = threading.Lock()
@@ -43,6 +44,18 @@ class TrajectoryCommander:
         else:
             raise ValueError(f"Invalid mode '{mode}'. Use 'trajectory' or 'position'.")
 
+    def enable(self):
+        """Enable command publishing."""
+        self._enabled = True
+
+    def disable(self):
+        """Disable command publishing."""
+        self._enabled = False
+
+    def is_enabled(self) -> bool:
+        """Check if publishing is currently enabled."""
+        return self._enabled
+
     def send_joint_state(self, joint_state: JointState, duration: float = 1.0):
         """
         Send a single JointState as target position.
@@ -51,6 +64,10 @@ class TrajectoryCommander:
             joint_state: Target joint state
             duration: Motion duration (used only in trajectory mode)
         """
+        if not self._enabled:
+            # rospy.logwarn("[TrajectoryCommander] Command ignored: commander is disabled.")
+            return
+
         if self.mode == 'trajectory':
             traj = JointTrajectory()
             traj.joint_names = joint_state.name
@@ -74,6 +91,10 @@ class TrajectoryCommander:
         Args:
             trajectory: JointTrajectory message
         """
+        if not self._enabled:
+            # rospy.logwarn("[TrajectoryCommander] Trajectory ignored: commander is disabled.")
+            return
+
         if self.mode == 'trajectory':
             self.trajectory_publisher.publish(trajectory)
             if trajectory.points:
@@ -129,7 +150,6 @@ class TrajectoryCommander:
 
                 rate.sleep()
 
-        # Store final goal state
         self._last_goal_state = JointState(
             name=joint_names[:], position=trajectory.points[-1].positions[:]
         )

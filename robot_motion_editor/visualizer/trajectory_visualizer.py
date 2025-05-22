@@ -18,6 +18,7 @@ class TrajectoryVisualizer:
 
         self._lock = threading.Lock()
         self._trajectory = None
+        self._enabled = True
 
         if self.visualize_as_state:
             self.pub = rospy.Publisher("/display_planned_state", DisplayRobotState, queue_size=1)
@@ -31,7 +32,20 @@ class TrajectoryVisualizer:
 
         self.goal_state_pub = rospy.Publisher("/display_robot_state", DisplayRobotState, queue_size=1)
 
+    def enable(self):
+        self._enabled = True
+
+    def disable(self):
+        self._enabled = False
+
+    def is_enabled(self) -> bool:
+        return self._enabled
+
     def visualize_current2target(self, current: JointState, target: JointState, duration: float = 1.0):
+        if not self._enabled:
+            # rospy.logwarn("[TrajectoryVisualizer] Ignored visualize_current2target(): visualizer is disabled.")
+            return
+
         start_state = JointState(
             name=target.name,
             position=self._get_aligned_joint_positions(current, target)
@@ -56,6 +70,10 @@ class TrajectoryVisualizer:
         self.visualize_joint_trajectory(traj)
 
     def visualize_joint_trajectory(self, trajectory: JointTrajectory):
+        if not self._enabled:
+            # rospy.logwarn("[TrajectoryVisualizer] Ignored visualize_joint_trajectory(): visualizer is disabled.")
+            return
+
         interpolated = self._interpolate_joint_trajectory(trajectory, self.rate)
 
         with self._lock:
@@ -69,6 +87,10 @@ class TrajectoryVisualizer:
             self.pub.publish(traj_msg)
 
     def publish_goal_state(self, joint_state: JointState):
+        if not self._enabled:
+            # rospy.logwarn("[TrajectoryVisualizer] Ignored publish_goal_state(): visualizer is disabled.")
+            return
+
         robot_state = RobotState()
         robot_state.joint_state = joint_state
         self.goal_state_pub.publish(DisplayRobotState(state=robot_state))
@@ -82,6 +104,10 @@ class TrajectoryVisualizer:
             rospy.logwarn("Looping is only supported in state visualization mode.")
 
     def _publish_trajectory_once(self, current, target, duration):
+        if not self._enabled:
+            # rospy.logwarn("[TrajectoryVisualizer] Ignored _publish_trajectory_once(): visualizer is disabled.")
+            return
+
         if current is None or target is None:
             return
 
@@ -120,6 +146,10 @@ class TrajectoryVisualizer:
             while not rospy.is_shutdown():
                 with self._lock:
                     trajectory = self._trajectory
+
+                if not self._enabled:
+                    rospy.sleep(1.0 / self.rate)
+                    continue
 
                 if trajectory and trajectory.points:
                     for point in trajectory.points:

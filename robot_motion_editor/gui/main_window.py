@@ -69,13 +69,19 @@ class MainWindow(QWidget):
         self.torque_checkbox = QCheckBox("Torque ON")
         self.init_pose_button = QPushButton("Move to Initial Pose")
         self.hardware_checkbox = QCheckBox("Use Real Robot")
+        self.preview_checkbox = QCheckBox("Preview")
+        self.preview_checkbox.setChecked(True)
+        self.preview_checkbox.stateChanged.connect(
+            lambda state: self.trajectory_visualizer.enable() if state else self.trajectory_visualizer.disable()
+        )
 
         self.variable_names = self.generate_variable_names()
 
         checkbox_row = QHBoxLayout()
-        checkbox_row.addWidget(self.torque_checkbox)
-        checkbox_row.addStretch()
+        checkbox_row.addWidget(self.preview_checkbox)
         checkbox_row.addWidget(self.hardware_checkbox)
+        checkbox_row.addStretch()
+        checkbox_row.addWidget(self.torque_checkbox)
 
         com_layout = QHBoxLayout()
         self.com_port_box = QComboBox()
