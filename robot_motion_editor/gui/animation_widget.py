@@ -61,7 +61,7 @@ class AnimaitonWidget(QWidget):
         self.scene = AnimationEditorWidget(editor_widget=self)
         self.view = AnimatioGraphicsView(self.scene)
 
-        self.preview_controller = AnimationVisualizer(
+        self.animation_visualizer = AnimationVisualizer(
             scene=self.scene,
             trajectory_visualizer=self.trajectory_visualizer,
             frame_loader=lambda name: self.load_joint_state_and_durations(self.resolve_frame_path(name)),
@@ -90,7 +90,7 @@ class AnimaitonWidget(QWidget):
         left_layout = QVBoxLayout(left_widget)
 
         # プレビューボタンを縦に並べて配置
-        self.preview_buttons = AnimationPreviewButtonWidget(self.preview_controller)
+        self.preview_buttons = AnimationPreviewButtonWidget(self.animation_visualizer)
         preview_layout = QVBoxLayout()
         preview_layout.addWidget(self.preview_buttons.play_btn)
         preview_layout.addWidget(self.preview_buttons.pause_btn)
@@ -284,7 +284,7 @@ class AnimaitonWidget(QWidget):
             self.initial_joint_state, _, _ = self.load_joint_state_and_durations(
                 self.resolve_frame_path("initial_frame")
             )
-            self.preview_controller.initial_joint_state = self.initial_joint_state
+            self.animation_visualizer.initial_joint_state = self.initial_joint_state
         except Exception as e:
             rospy.logwarn(f"[MotionEditor] Failed to load initial_frame: {e}")
 
