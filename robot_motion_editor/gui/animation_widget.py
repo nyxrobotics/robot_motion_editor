@@ -5,9 +5,6 @@ import rospy
 import yaml
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import QFileDialog
-from PyQt5.QtWidgets import QGraphicsView
-from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QInputDialog
 from PyQt5.QtWidgets import QLabel
 from PyQt5.QtWidgets import QMessageBox
@@ -22,13 +19,12 @@ from ..logic.animation_file_manager import AnimationData
 from ..logic.animation_file_manager import AnimationFileManager
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
-from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.initial_pose_file_manager import InitialPoseFileManager
+from ..robot_interface.animation_commander import AnimationCommander
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.animation_visualizer import AnimationVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .animation_editor_widget import AnimationEditorWidget
-from .animation_editor_widget import FrameBlockItem
 from .animation_file_widget import AnimationFileWidget
 from .animation_graphics_view import AnimatioGraphicsView
 from .animation_preview_button_widget import AnimationPreviewButtonWidget
@@ -67,6 +63,12 @@ class AnimaitonWidget(QWidget):
             frame_loader=lambda name: self.load_joint_state_and_durations(self.resolve_frame_path(name)),
             initial_joint_state=self.initial_joint_state
         )
+        self.animation_commander = AnimationCommander(
+            trajectory_commander=self.trajectory_commander,
+            scene=self.scene,
+            frame_loader=lambda name: self.load_joint_state_and_durations(self.resolve_frame_path(name)),
+            initial_joint_state=self.initial_joint_state
+        )
 
         self.init_ui()
         self.load_animation_list()
@@ -90,7 +92,10 @@ class AnimaitonWidget(QWidget):
         left_layout = QVBoxLayout(left_widget)
 
         # プレビューボタンを縦に並べて配置
-        self.preview_buttons = AnimationPreviewButtonWidget(self.animation_visualizer)
+        self.preview_buttons = AnimationPreviewButtonWidget(
+            animation_visualizer=self.animation_visualizer,
+            animation_commander=self.animation_commander,
+        )
         preview_layout = QVBoxLayout()
         preview_layout.addWidget(self.preview_buttons.play_btn)
         preview_layout.addWidget(self.preview_buttons.pause_btn)
