@@ -142,7 +142,7 @@ class AnimationVisualizer:
                 self.stop()
                 return
 
-            if self.scene is not None:
+            if self.animation_flow_scene is not None:
                 selected = self.animation_flow_scene.selectedItems()
                 if self.current_block not in selected:
                     for item in selected:
@@ -190,7 +190,7 @@ class AnimationVisualizer:
             previous_joint_state = target_joint_state
             self.current_block = self._get_next_block(self.current_block)
 
-            if self.scene is not None:
+            if self.animation_flow_scene is not None:
                 for item in self.animation_flow_scene.selectedItems():
                     item.setSelected(False)
 

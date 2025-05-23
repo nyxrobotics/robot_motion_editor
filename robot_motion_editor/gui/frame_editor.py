@@ -324,7 +324,7 @@ class FrameEditorDialog(QDialog):
                 btn.setChecked(False)
 
     def publish_goal_state_from_gui(self):
-        for joint_name in self.joint_names:
+        for joint_name in self.joint_data_manager.get_joint_names():
             _, spin, _ = self.joint_widgets[joint_name]
             self.frame_data.set_pose(joint_name, math.radians(spin.value()))
 

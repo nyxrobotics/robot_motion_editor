@@ -32,7 +32,7 @@ class AnimationPreviewButtonWidget(QWidget):
 
     def play(self):
         selected_block = None
-        for item in self.animation_visualizer.scene.selectedItems():
+        for item in self.animation_visualizer.animation_flow_scene.selectedItems():
             if hasattr(item, "output_arrows"):
                 selected_block = item
                 break
@@ -52,7 +52,7 @@ class AnimationPreviewButtonWidget(QWidget):
         if self.animation_visualizer.state == 'playing':
             self.animation_visualizer.pause()
         elif self.animation_visualizer.state == 'stopped':
-            selected = self.animation_visualizer.scene.selectedItems()
+            selected = self.animation_visualizer.animation_flow_scene.selectedItems()
             if len(selected) == 1:
                 block = selected[0]
                 self.animation_visualizer.play_single_block(block)
