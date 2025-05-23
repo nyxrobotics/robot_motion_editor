@@ -16,9 +16,11 @@ from PyQt5.QtWidgets import QSizePolicy
 from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
+from sensor_msgs.msg import JointState
 
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
+from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.frame_visualizer import FrameVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
@@ -32,18 +34,19 @@ class FrameEditorDialog(QDialog):
         joint_names,
         joint_limits,
         available_variables,
-        frame_path=None,
-        parent=None,
+        motion_directory_manager: MotionDirectoryManager,
+        frame_name=None,
         trajectory_visualizer: TrajectoryVisualizer = None,
         trajectory_commander: TrajectoryCommander = None
     ):
-        super().__init__(parent)
+        super().__init__()
         self.setWindowTitle("Edit Frame")
 
         self.joint_names = joint_names
         self.joint_limits = joint_limits
         self.available_variables = available_variables
-        self.frame_path = frame_path
+        self.motion_directory_manager = motion_directory_manager
+        self.frame_name = frame_name
 
         self.frame_data = FrameData()
         self.frame_data.set_joint_names(joint_names)
@@ -58,8 +61,15 @@ class FrameEditorDialog(QDialog):
 
         self.init_ui()
 
-        if frame_path and os.path.exists(frame_path):
-            self.load_frame_from_file(frame_path)
+        if frame_name:
+            path = self.motion_directory_manager.resolve_frame_path(frame_name)
+            if os.path.exists(path):
+                self.load_frame_from_file(path)
+                self.frame_path = path
+            else:
+                self.frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
+        else:
+            self.frame_path = None
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -214,7 +224,7 @@ class FrameEditorDialog(QDialog):
             button.setStyleSheet("background-color: lightblue;" if dialog.result.strip() else "")
 
     def load_frame_from_file(self, path):
-        raw = FrameFileManager.load_dict(os.path.dirname(frame_path), os.path.basename(frame_path))
+        raw = FrameFileManager.load_dict(self.frame_path)
         self.frame_data.set_dict(raw)
 
         self.duration_spin.setValue(self.frame_data.move_duration)
@@ -268,9 +278,6 @@ class FrameEditorDialog(QDialog):
                 btn.setChecked(False)
         if not self.loop_checkbox.isChecked():
             sender.setChecked(False)
-
-        import rospy
-        from sensor_msgs.msg import JointState
 
         msg = self.frame_data.get_joint_state()
         msg.header.stamp = rospy.Time.now()

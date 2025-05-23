@@ -29,7 +29,7 @@ class InitialPoseEditor(QWidget):
     pose_updated = pyqtSignal()
 
     def __init__(self, joint_names, joint_limits, available_variables,
-                 motion_directory_manager: MotionDirectoryManager = None,
+                 motion_directory_manager: MotionDirectoryManager,
                  trajectory_visualizer: TrajectoryVisualizer = None,
                  trajectory_commander: TrajectoryCommander = None):
         super().__init__()
@@ -47,6 +47,10 @@ class InitialPoseEditor(QWidget):
         self.goal_pose = JointState()
 
         self.init_ui()
+
+        self.pose_path = self.motion_directory_manager.resolve_initial_pose_path()
+        if os.path.exists(self.pose_path):
+            self.load_pose()
 
     def init_ui(self):
         main_layout = QVBoxLayout()
@@ -123,19 +127,14 @@ class InitialPoseEditor(QWidget):
         main_layout.addWidget(scroll)
         self.setLayout(main_layout)
 
-    def load_pose(self, filename="initial_pose.yaml"):
-        if not self.motion_directory:
-            rospy.logwarn("No path specified for loading pose.")
-            return
-
-        joint_data = InitialPoseFileManager.load_dict(self.motion_directory, filename)
+    def load_pose(self):
+        joint_data = self.motion_directory_manager.load_initial_pose_dict()
         self.initial_pose_data.set_dict(joint_data)
 
         for joint_name in self.initial_pose_data.get_joint_names():
             if joint_name not in self.joint_widgets:
                 continue
 
-            # Apply values to widgets
             pos_deg = math.degrees(self.initial_pose_data.get_pose(joint_name))
             _, spin = self.joint_widgets[joint_name]
             spin.setValue(pos_deg)
@@ -143,18 +142,14 @@ class InitialPoseEditor(QWidget):
 
         self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
 
-    def save_pose(self, filename="initial_pose.yaml"):
-        if not self.motion_directory:
-            rospy.logwarn("No path specified for saving pose.")
-            return
-
+    def save_pose(self):
         for joint_name in self.initial_pose_data.get_joint_names():
             _, spin = self.joint_widgets[joint_name]
             position_rad = math.radians(spin.value())
             self.initial_pose_data.set_pose(joint_name, position_rad)
             self.initial_pose_data.set_enable(joint_name, self.enable_checkboxes[joint_name].isChecked())
 
-        InitialPoseFileManager.save_dict(self.motion_directory, self.initial_pose_data.get_dict(), filename)
+        self.motion_directory_manager.save_initial_pose_dict(self.initial_pose_data.get_dict())
         self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
 
     def get_gui_joints(self):

@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import QSizePolicy
 from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
+from sensor_msgs.msg import JointState
 
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
@@ -268,9 +269,6 @@ class InitialFrameEditorDialog(QDialog):
                 btn.setChecked(False)
         if not self.loop_checkbox.isChecked():
             sender.setChecked(False)
-
-        import rospy
-        from sensor_msgs.msg import JointState
 
         msg = self.frame_data.get_joint_state()
         msg.header.stamp = rospy.Time.now()
