@@ -38,6 +38,9 @@ class AnimationData:
     arrow: Dict[str, ArrowData] = field(default_factory=dict)
 
     def set_dict(self, data: dict):
+        """
+        Populate internal structures from a dictionary.
+        """
         self.block.clear()
         self.arrow.clear()
         raw_block = data.get("block", {})
@@ -69,6 +72,9 @@ class AnimationData:
             )
 
     def get_dict(self) -> dict:
+        """
+        Generate dictionary representation of the animation data.
+        """
         block_dict = {}
         for name, b in self.block.items():
             block_dict[name] = {
@@ -92,20 +98,54 @@ class AnimationData:
 
         return {"block": block_dict, "arrow": arrow_dict}
 
+    def save_to_file(self, filepath: str):
+        """
+        Save the animation data to a YAML file via AnimationFileManager.
+        """
+        AnimationFileManager.save_dict(filepath, self.get_dict())
+
+    def load_from_file(self, filepath: str):
+        """
+        Load the animation data from a YAML file using AnimationFileManager.
+        """
+        data = AnimationFileManager.load_dict(filepath)
+        self.set_dict(data)
+
 
 class AnimationFileManager:
     @staticmethod
-    def get_file_path(motion_directory: str, animation_name: str) -> str:
-        return os.path.join(motion_directory, animation_name, "animation.yaml")
+    def save_dict(filepath: str, layout_data: dict):
+        """
+        Save animation layout data to a YAML file.
+
+        Parameters:
+        - filepath (str): Full path to YAML file.
+        - layout_data (dict): The animation layout as a dictionary.
+        """
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        try:
+            with open(filepath, 'w') as f:
+                yaml.safe_dump({"layout": layout_data}, f, allow_unicode=True)
+            print(f"[INFO] Animation saved to: {filepath}")
+        except Exception as e:
+            print(f"[ERROR] Failed to save animation to {filepath}: {e}")
 
     @staticmethod
-    def load_dict(motion_directory: str, animation_name: str) -> dict:
-        path = AnimationFileManager.get_file_path(motion_directory, animation_name)
-        if not os.path.isfile(path):
-            print(f"[WARN] Animation file not found: {path}")
+    def load_dict(filepath: str) -> dict:
+        """
+        Load animation layout data from a YAML file.
+
+        Parameters:
+        - filepath (str): Full path to YAML file.
+
+        Returns:
+        - dict: Layout dictionary with keys 'block' and 'arrow'
+        """
+        if not os.path.isfile(filepath):
+            print(f"[WARN] Animation file not found: {filepath}")
             return {"block": {}, "arrow": {}}
         try:
-            with open(path, 'r') as f:
+            with open(filepath, 'r') as f:
                 raw = yaml.safe_load(f)
                 return raw.get(
                     "layout", {
@@ -115,14 +155,3 @@ class AnimationFileManager:
         except Exception as e:
             print(f"[ERROR] Failed to load animation: {e}")
             return {"block": {}, "arrow": {}}
-
-    @staticmethod
-    def save_dict(motion_directory: str, animation_name: str, layout_data: dict):
-        path = AnimationFileManager.get_file_path(motion_directory, animation_name)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        try:
-            with open(path, 'w') as f:
-                yaml.safe_dump({"layout": layout_data}, f, allow_unicode=True)
-            print(f"[INFO] Animation saved to: {path}")
-        except Exception as e:
-            print(f"[ERROR] Failed to save animation to {path}: {e}")
