@@ -9,25 +9,19 @@ from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtWidgets import QVBoxLayout
 
 from ..logic.if_condition_file_manager import IfConditionData
-from ..logic.if_condition_file_manager import IfConditionFileManager
+from ..logic.motion_directory_manager import MotionDirectoryManager
 
 
 class IfConditionEditorDialog(QDialog):
-    def __init__(self, condition_path, available_variables=None, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(f"If Condition Editor: {os.path.basename(condition_path)}")
+    def __init__(self, motion_directory_manager: MotionDirectoryManager, condition_name, available_variables=None):
+        super().__init__()
+        self.setWindowTitle(f"If Condition Editor: {condition_name}")
         self.available_variables = available_variables or []
-        self.condition_path = condition_path
-        self.motion_directory, self.animation_name, self.condition_name = self.parse_path(condition_path)
+        self.motion_directory_manager = motion_directory_manager
+        self.condition_name = condition_name
+        self.condition_data = IfConditionData()
         self.init_ui()
         self.load_condition()
-
-    def parse_path(self, path):
-        condition_name = os.path.splitext(os.path.basename(path))[0]
-        conditions_dir = os.path.dirname(os.path.dirname(path))
-        animation_name = os.path.basename(os.path.dirname(conditions_dir))
-        motion_directory = os.path.dirname(os.path.dirname(conditions_dir))
-        return motion_directory, animation_name, condition_name
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -60,12 +54,10 @@ class IfConditionEditorDialog(QDialog):
         QMessageBox.information(self, "Available Variables", "\n".join(self.available_variables))
 
     def load_condition(self):
-        data_dict = IfConditionFileManager.load_dict(self.motion_directory, f"{self.condition_name}.yaml")
-        if data_dict:
-            cond_data = IfConditionData()
-            cond_data.set_dict(data_dict)
-            self.expression_edit.setPlainText(cond_data.expression)
-            self.condition_edit.setPlainText(cond_data.condition)
+        file_path = self.motion_directory_manager.resolve_if_condition_path(self.condition_name)
+        self.condition_data.load_from_file(file_path)
+        self.expression_edit.setPlainText(self.condition_data.expression)
+        self.condition_edit.setPlainText(self.condition_data.condition)
 
     def accept_and_store(self):
         expression = self.expression_edit.toPlainText().strip()
@@ -106,11 +98,9 @@ class IfConditionEditorDialog(QDialog):
                 f"The condition evaluates to a falsy value: {result}"
             )
 
-        cond_data = IfConditionData(expression=expression, condition=condition)
-        IfConditionFileManager.save_dict(
-            os.path.join(self.motion_directory, self.animation_name, "conditions", "if"),
-            cond_data.get_dict(),
-            f"{self.condition_name}.yaml"
-        )
+        self.condition_data.expression = expression
+        self.condition_data.condition = condition
+        file_path = self.motion_directory_manager.resolve_if_condition_path(self.condition_name)
+        self.condition_data.save_to_file(file_path)
 
         self.accept()
