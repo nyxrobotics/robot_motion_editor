@@ -51,17 +51,17 @@ class AnimaitonWidget(QWidget):
         self.trajectory_commander = trajectory_commander
 
         self.animation_tree = AnimationFileWidget(motion_directory_manager=self.motion_directory_manager, parent=self)
-        self.scene = AnimationEditorWidget(motion_directory_manager=self.motion_directory_manager)
-        self.view = AnimatioGraphicsView(self.scene)
+        self.animation_flow_scene = AnimationEditorWidget(motion_directory_manager=self.motion_directory_manager)
+        self.view = AnimatioGraphicsView(self.animation_flow_scene)
 
         self.animation_visualizer = AnimationVisualizer(
-            scene=self.scene,
+            scene=self.animation_flow_scene,
             trajectory_visualizer=self.trajectory_visualizer,
             motion_directory_manager=self.motion_directory_manager,
             joint_data_manager=self.joint_data_manager)
         self.animation_commander = AnimationCommander(
             trajectory_commander=self.trajectory_commander,
-            scene=self.scene,
+            scene=self.animation_flow_scene,
             motion_directory_manager=self.motion_directory_manager,
             joint_data_manager=self.joint_data_manager)
         self.init_ui()
@@ -154,8 +154,8 @@ class AnimaitonWidget(QWidget):
 
         anim_data = AnimationData()
         anim_data.load_from_file(self.motion_directory_manager.resolve_animation_yaml_path())
-        self.scene.set_animation_data(anim_data)
-        self.scene.highlight_preview_path()
+        self.animation_flow_scene.set_animation_data(anim_data)
+        self.animation_flow_scene.highlight_preview_path()
 
         try:
             frame_data = FrameData(joint_names=self.joint_data_manager.get_joint_names())
@@ -170,7 +170,7 @@ class AnimaitonWidget(QWidget):
         if not anim_name:
             QMessageBox.information(self, "Save", "No animation selected to save.")
             return
-        anim_data = self.scene.get_animation_data()
+        anim_data = self.animation_flow_scene.get_animation_data()
         anim_data.save_to_file(self.motion_directory_manager.resolve_animation_yaml_path())
 
     def confirm_save_if_unsaved_changes(self):
@@ -178,7 +178,7 @@ class AnimaitonWidget(QWidget):
         if not anim_name:
             return True
 
-        current_data = self.scene.get_animation_data().get_dict()
+        current_data = self.animation_flow_scene.get_animation_data().get_dict()
         tmp_data = AnimationData()
         tmp_data.load_from_file(self.motion_directory_manager.resolve_animation_yaml_path())
         saved_data = tmp_data.get_dict()
@@ -382,4 +382,4 @@ class AnimaitonWidget(QWidget):
             if dlg.exec_():
                 if dlg.result:
                     new_num_cases = dlg.result.get("num_cases", 2)
-                    self.scene.update_switch_block(condition_name, new_num_cases)
+                    self.animation_flow_scene.update_switch_block(condition_name, new_num_cases)
