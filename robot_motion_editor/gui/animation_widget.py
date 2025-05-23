@@ -162,10 +162,7 @@ class AnimaitonWidget(QWidget):
         try:
             frame_data = FrameData()
             frame_data.set_joint_names(self.joint_names)
-            frame_data.set_dict(FrameFileManager.load_dict(
-                os.path.dirname(self.motion_directory_manager.resolve_initial_frame_path()),
-                os.path.basename(self.motion_directory_manager.resolve_initial_frame_path())
-            ))
+            frame_data.load_from_file(self.motion_directory_manager.resolve_initial_frame_path())
             self.initial_joint_state = frame_data.get_joint_state()
             self.animation_visualizer.initial_joint_state = self.initial_joint_state
         except Exception as e:
@@ -177,10 +174,7 @@ class AnimaitonWidget(QWidget):
             QMessageBox.information(self, "Save", "No animation selected to save.")
             return
         anim_data = self.scene.get_animation_data()
-        AnimationFileManager.save_dict(
-            self.motion_directory_manager.get_motion_directory(),
-            anim_name,
-            anim_data.get_dict())
+        anim_data.save_to_file(self.motion_directory_manager.resolve_animation_yaml_path())
 
     def confirm_save_if_unsaved_changes(self):
         anim_name = self.motion_directory_manager.get_current_animation()
@@ -188,7 +182,9 @@ class AnimaitonWidget(QWidget):
             return True
 
         current_data = self.scene.get_animation_data().get_dict()
-        saved_data = AnimationFileManager.load_dict(self.motion_directory_manager.get_motion_directory(), anim_name)
+        tmp_data = AnimationData()
+        tmp_data.load_from_file(self.motion_directory_manager.resolve_animation_yaml_path())
+        saved_data = tmp_data.get_dict()
 
         if current_data == saved_data:
             return True

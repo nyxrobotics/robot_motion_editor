@@ -552,3 +552,48 @@ class AnimationEditorWidget(QGraphicsScene):
                 if self._is_reachable_from_start(arrow.start_item, visited):
                     return True
         return False
+
+    def highlight_preview_path(self):
+        for arrow in self.arrow_objects.values():
+            arrow.is_preview_path = False
+            arrow.update_path()
+
+        visited_ids = set()
+
+        def dfs(block):
+            if not hasattr(block, 'id'):
+                return
+            if block.id in visited_ids:
+                return
+            visited_ids.add(block.id)
+
+            if isinstance(block, (IfBlockItem, SwitchBlockItem)):
+                outputs = list(block.output_sub_blocks.values())
+                if outputs:
+                    idx = block.preview_output_index
+                    if idx < len(outputs):
+                        sub = outputs[idx]
+                        if sub.output_arrows:
+                            arrow = sub.output_arrows[0]
+                            arrow.is_preview_path = True
+                            arrow.update_path()
+                            dfs(arrow.end_item)
+                return
+
+            if hasattr(block, "output_arrows"):
+                for arrow in block.output_arrows:
+                    arrow.is_preview_path = True
+                    arrow.update_path()
+                    dfs(arrow.end_item)
+
+        for block in self.block_objects.values():
+            if isinstance(block, StartBlockItem):
+                dfs(block)
+                break
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasText():
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):
+        event.acceptProposedAction()
