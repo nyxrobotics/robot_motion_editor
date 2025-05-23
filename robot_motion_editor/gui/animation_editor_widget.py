@@ -12,6 +12,10 @@ from PyQt5.QtWidgets import QMenu
 from PyQt5.QtWidgets import QMessageBox
 
 from ..logic.animation_file_manager import AnimationData
+from ..logic.animation_file_manager import ArrowData
+from ..logic.animation_file_manager import BlockConnection
+from ..logic.animation_file_manager import BlockData
+from ..logic.animation_file_manager import BlockInfo
 from ..logic.frame_file_manager import FrameData
 from ..logic.if_condition_file_manager import IfConditionData
 from ..logic.motion_directory_manager import MotionDirectoryManager
@@ -26,51 +30,14 @@ from .animation_editor_items import WaypointItem
 
 
 class AnimationEditorWidget(QGraphicsScene):
-    def __init__(self, editor_widget, parent=None):
+    def __init__(self, motion_directory_manager: MotionDirectoryManager, parent=None):
         super().__init__(parent)
-        self.editor_widget = editor_widget
+
+        self.motion_directory_manager = motion_directory_manager
         self.setBackgroundBrush(QColor("#111111"))
         self.block_objects = {}
         self.arrow_objects = {}
         self.setSceneRect(0, 0, 1000, 1000)
-
-    def highlight_preview_path(self):
-        for arrow in self.arrow_objects.values():
-            arrow.is_preview_path = False
-            arrow.update_path()
-
-        visited_ids = set()
-
-        def dfs(block):
-            if not hasattr(block, 'id'):
-                return
-            if block.id in visited_ids:
-                return
-            visited_ids.add(block.id)
-
-            if isinstance(block, (IfBlockItem, SwitchBlockItem)):
-                outputs = list(block.output_sub_blocks.values())
-                if outputs:
-                    idx = block.preview_output_index
-                    if idx < len(outputs):
-                        sub = outputs[idx]
-                        if sub.output_arrows:
-                            arrow = sub.output_arrows[0]
-                            arrow.is_preview_path = True
-                            arrow.update_path()
-                            dfs(arrow.end_item)
-                return
-
-            if hasattr(block, "output_arrows"):
-                for arrow in block.output_arrows:
-                    arrow.is_preview_path = True
-                    arrow.update_path()
-                    dfs(arrow.end_item)
-
-        for block in self.block_objects.values():
-            if isinstance(block, StartBlockItem):
-                dfs(block)
-                break
 
     def _generate_block_id(self):
         used_ids = {block.id for block in self.block_objects.values()}
@@ -85,13 +52,6 @@ class AnimationEditorWidget(QGraphicsScene):
         while i in used_ids:
             i += 1
         return i
-
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasText():
-            event.acceptProposedAction()
-
-    def dragMoveEvent(self, event):
-        event.acceptProposedAction()
 
     def dropEvent(self, event):
         data = event.mimeData().text()
@@ -108,21 +68,12 @@ class AnimationEditorWidget(QGraphicsScene):
         elif item_type == "if":
             item = IfBlockItem(id, name)
         elif item_type == "switch":
-            # switchのcase数をyamlから取得して反映（オプション）
-            switch_path = os.path.join(
-                self.editor_widget.motion_directory,
-                self.editor_widget.current_animation_name,
-                "conditions", "switch", f"{name}.yaml"
-            )
-            if os.path.exists(switch_path):
-                with open(switch_path, "r") as f:
-                    switch_data = yaml.safe_load(f)
-                    num_cases = len(switch_data.get("case", [])) + 1  # default含む
-            else:
-                num_cases = 2
+            path = self.motion_directory_manager.resolve_switch_condition_path(name)
+            switch_data = SwitchConditionData()
+            switch_data.load_from_file(path)
+            num_cases = len(switch_data.case) + 1 if switch_data.case else 2
             item = SwitchBlockItem(id, name, num_cases=num_cases)
         elif item_type == "start":
-            # 既にStartBlockが存在するかチェック
             if any(isinstance(b, StartBlockItem) for b in self.block_objects.values()):
                 QMessageBox.warning(None, "Start Block Exists", "This animation already has a Start block.")
                 return
@@ -204,7 +155,7 @@ class AnimationEditorWidget(QGraphicsScene):
                 if ok and name.strip():
                     name = name.strip()
                     frame_data = FrameData()
-                    frame_path = self.editor_widget.motion_directory_manager.resolve_frame_path(name)
+                    frame_path = self.motion_directory_manager.resolve_frame_path(name)
                     frame_data.save_to_file(frame_path)
 
                     id = self._generate_block_id()
@@ -213,14 +164,14 @@ class AnimationEditorWidget(QGraphicsScene):
                     self.addItem(block)
                     self.block_objects[block.name] = block
 
-                    self.editor_widget.load_animation_list()
+                    self.motion_directory_manager.list_animation()
 
             elif selected_action == new_if_action:
                 name, ok = QInputDialog.getText(None, "New If Condition", "Enter condition name:")
                 if ok and name.strip():
                     name = name.strip()
                     condition_data = IfConditionData(expression="", condition="")
-                    condition_path = self.editor_widget.motion_directory_manager.resolve_if_condition_path(name)
+                    condition_path = self.motion_directory_manager.resolve_if_condition_path(name)
                     condition_data.save_to_file(condition_path)
 
                     id = self._generate_block_id()
@@ -229,14 +180,14 @@ class AnimationEditorWidget(QGraphicsScene):
                     self.addItem(block)
                     self.block_objects[block.name] = block
 
-                    self.editor_widget.load_animation_list()
+                    self.motion_directory_manager.list_animation()
 
             elif selected_action == new_switch_action:
                 name, ok = QInputDialog.getText(None, "New Switch Condition", "Enter condition name:")
                 if ok and name.strip():
                     name = name.strip()
                     condition_data = SwitchConditionData(expression="", condition="", case={"case_0": {"value": 0}})
-                    condition_path = self.editor_widget.motion_directory_manager.resolve_switch_condition_path(name)
+                    condition_path = self.motion_directory_manager.resolve_switch_condition_path(name)
                     condition_data.save_to_file(condition_path)
 
                     id = self._generate_block_id()
@@ -245,7 +196,7 @@ class AnimationEditorWidget(QGraphicsScene):
                     self.addItem(block)
                     self.block_objects[block.name] = block
 
-                    self.editor_widget.load_animation_list()
+                    self.motion_directory_manager.list_animation()
 
             elif selected_action == new_arrow_action:
                 id = self._generate_arrow_id()

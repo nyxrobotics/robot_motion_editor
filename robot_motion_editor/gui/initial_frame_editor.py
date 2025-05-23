@@ -20,6 +20,7 @@ from sensor_msgs.msg import JointState
 
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
+from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.frame_visualizer import FrameVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
@@ -33,18 +34,17 @@ class InitialFrameEditorDialog(QDialog):
         joint_names,
         joint_limits,
         available_variables,
-        frame_path=None,
-        parent=None,
+        motion_directory_manager: MotionDirectoryManager,
         trajectory_visualizer: TrajectoryVisualizer = None,
         trajectory_commander: TrajectoryCommander = None
     ):
-        super().__init__(parent)
+        super().__init__()
         self.setWindowTitle("Edit Initial Frame")
 
         self.joint_names = joint_names
         self.joint_limits = joint_limits
         self.available_variables = available_variables
-        self.frame_path = frame_path
+        self.motion_directory_manager = motion_directory_manager
 
         self.frame_data = FrameData()
         self.frame_data.set_joint_names(joint_names)
@@ -59,8 +59,12 @@ class InitialFrameEditorDialog(QDialog):
 
         self.init_ui()
 
-        if frame_path and os.path.exists(frame_path):
-            self.load_frame_from_file(frame_path)
+        path = self.motion_directory_manager.resolve_initial_frame_path()
+        if os.path.exists(path):
+            self.load_frame_from_file(path)
+            self.frame_path = path
+        else:
+            self.frame_path = path
 
     def init_ui(self):
         layout = QVBoxLayout()
