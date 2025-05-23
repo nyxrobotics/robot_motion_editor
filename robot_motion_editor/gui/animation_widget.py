@@ -21,6 +21,7 @@ from ..logic.animation_file_manager import AnimationFileManager
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
 from ..logic.initial_pose_file_manager import InitialPoseFileManager
+from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.animation_commander import AnimationCommander
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.animation_visualizer import AnimationVisualizer
@@ -38,14 +39,14 @@ from .switch_condition_editor import SwitchConditionEditorDialog
 class AnimaitonWidget(QWidget):
     def __init__(
             self,
-            motion_directory=".",
+            motion_directory_manager: MotionDirectoryManager,
             joint_names=None,
             joint_limits=None,
             available_variables=None,
             trajectory_visualizer: TrajectoryVisualizer = None,
             trajectory_commander: TrajectoryCommander = None):
         super().__init__()
-        self.motion_directory = motion_directory
+        self.motion_directory_manager = motion_directory_manager
         self.joint_names = joint_names or []
         self.joint_limits = joint_limits or {}
         self.available_variables = available_variables or []
@@ -54,22 +55,23 @@ class AnimaitonWidget(QWidget):
         self.current_animation_name = None
         self.initial_joint_state = None
 
-        self.animation_tree = AnimationFileWidget(motion_directory=self.motion_directory, parent=self)
-        self.scene = AnimationEditorWidget(editor_widget=self)
+        self.animation_tree = AnimationFileWidget(
+            motion_directory=self.motion_directory_manager.get_motion_directory(), parent=self)
+        self.scene = AnimationEditorWidget(motion_directory_manager=self.motion_directory_manager)
         self.view = AnimatioGraphicsView(self.scene)
 
         self.animation_visualizer = AnimationVisualizer(
             scene=self.scene,
             trajectory_visualizer=self.trajectory_visualizer,
             initial_joint_state=self.initial_joint_state,
-            motion_directory=self.motion_directory,
+            motion_directory=self.motion_directory_manager.get_motion_directory(),
             current_animation_name=self.current_animation_name
         )
         self.animation_commander = AnimationCommander(
             trajectory_commander=self.trajectory_commander,
             scene=self.scene,
             initial_joint_state=self.initial_joint_state,
-            motion_directory=self.motion_directory,
+            motion_directory=self.motion_directory_manager.get_motion_directory(),
             current_animation_name=self.current_animation_name
         )
 
@@ -144,17 +146,17 @@ class AnimaitonWidget(QWidget):
             animation_item = item
             while animation_item.parent() is not None:
                 animation_item = animation_item.parent()
-            animation_name = animation_item.text(0)
+
+            self.motion_directory_manager.set_current_animation(animation_item.text(0))
             self.open_initial_frame_editor()
 
         elif item.parent() and item.parent().text(0) == "frames":
             animation_item = item
             while animation_item.parent() is not None:
                 animation_item = animation_item.parent()
-            animation_name = animation_item.text(0)
-            frame_name = item.text(0)
 
-            frame_path = os.path.join(self.motion_directory, animation_name, "frames", f"{frame_name}.yaml")
+            self.motion_directory_manager.set_current_animation(animation_item.text(0))
+            frame_path = self.motion_directory_manager.resolve_frame_path(item.text(0))
             if not os.path.exists(frame_path):
                 QMessageBox.warning(self, "Missing File", f"{frame_path} not found.")
                 return
@@ -178,19 +180,16 @@ class AnimaitonWidget(QWidget):
                 dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
 
                 # in/out は接続されていないため current をそのまま使用
-                dlg.frame_visualizer.set_in_frame(current_state, move, wait)
-                dlg.frame_visualizer.set_out_frame(current_state, move, wait)
+                dlg.frame_visualizer.set_in_frame(current_state, current_move, current_wait)
+                dlg.frame_visualizer.set_out_frame(current_state, current_move, current_wait)
                 dlg.exec_()
 
         elif item.parent() and item.parent().text(0) == "if":
             animation_item = item
             while animation_item.parent() is not None:
                 animation_item = animation_item.parent()
-                animation_name = animation_item.text(0)
-                condition_name = item.text(0)
-
-                condition_path = os.path.join(self.motion_directory, animation_name,
-                                              "conditions", "if", f"{condition_name}.yaml")
+                self.motion_directory_manager.set_current_animation(animation_item.text(0))
+                condition_path = self.motion_directory_manager.resolve_if_condition_path(item.text(0))
             if not os.path.exists(condition_path):
                 QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
                 return
@@ -202,15 +201,8 @@ class AnimaitonWidget(QWidget):
             animation_item = item
             while animation_item.parent() is not None:
                 animation_item = animation_item.parent()
-                animation_name = animation_item.text(0)
-                condition_name = item.text(0)
-
-                condition_path = os.path.join(
-                    self.motion_directory,
-                    animation_name,
-                    "conditions",
-                    "switch",
-                    f"{condition_name}.yaml")
+                self.motion_directory_manager.set_current_animation(animation_item.text(0))
+                condition_path = self.motion_directory_manager.resolve_switch_condition_path(item.text(0))
             if not os.path.exists(condition_path):
                 QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
                 return
