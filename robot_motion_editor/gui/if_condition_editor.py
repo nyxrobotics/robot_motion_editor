@@ -9,14 +9,19 @@ from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtWidgets import QVBoxLayout
 
 from ..logic.if_condition_file_manager import IfConditionData
+from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 
 
 class IfConditionEditorDialog(QDialog):
-    def __init__(self, motion_directory_manager: MotionDirectoryManager, condition_name, available_variables=None):
+    def __init__(
+            self,
+            joint_data_manager: JointDataManager,
+            motion_directory_manager: MotionDirectoryManager,
+            condition_name):
         super().__init__()
         self.setWindowTitle(f"If Condition Editor: {condition_name}")
-        self.available_variables = available_variables or []
+        self.joint_data_manager = joint_data_manager
         self.motion_directory_manager = motion_directory_manager
         self.condition_name = condition_name
         self.condition_data = IfConditionData()
@@ -51,7 +56,9 @@ class IfConditionEditorDialog(QDialog):
         self.setLayout(layout)
 
     def show_variables(self):
-        QMessageBox.information(self, "Available Variables", "\n".join(self.available_variables))
+        QMessageBox.information(
+            self, "Available Variables", "\n".join(
+                self.joint_data_manager.get_available_variables()))
 
     def load_condition(self):
         file_path = self.motion_directory_manager.resolve_if_condition_path(self.condition_name)

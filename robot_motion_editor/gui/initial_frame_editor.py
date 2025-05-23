@@ -20,6 +20,7 @@ from sensor_msgs.msg import JointState
 
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
+from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.frame_visualizer import FrameVisualizer
@@ -31,9 +32,7 @@ from .pid_gain_editor import PIDGainEditorDialog
 class InitialFrameEditorDialog(QDialog):
     def __init__(
         self,
-        joint_names,
-        joint_limits,
-        available_variables,
+        joint_data_manager: JointDataManager,
         motion_directory_manager: MotionDirectoryManager,
         trajectory_visualizer: TrajectoryVisualizer = None,
         trajectory_commander: TrajectoryCommander = None
@@ -41,13 +40,11 @@ class InitialFrameEditorDialog(QDialog):
         super().__init__()
         self.setWindowTitle("Edit Initial Frame")
 
-        self.joint_names = joint_names
-        self.joint_limits = joint_limits
-        self.available_variables = available_variables
+        self.joint_data_manager = joint_data_manager
         self.motion_directory_manager = motion_directory_manager
 
         self.frame_data = FrameData()
-        self.frame_data.set_joint_names(joint_names)
+        self.frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
 
         self.joint_widgets = {}
         self.enable_checkbox_widgets = {}
@@ -59,12 +56,10 @@ class InitialFrameEditorDialog(QDialog):
 
         self.init_ui()
 
-        path = self.motion_directory_manager.resolve_initial_frame_path()
-        if os.path.exists(path):
-            self.load_frame_from_file(path)
-            self.frame_path = path
-        else:
-            self.frame_path = path
+        self.frame_path = self.motion_directory_manager.resolve_initial_frame_path()
+        if os.path.exists(self.frame_path):
+            self.frame_data.load_from_file(self.frame_path)
+            self.set_frame_to_ui()
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -218,49 +213,6 @@ class InitialFrameEditorDialog(QDialog):
             self.frame_data.set_feedback(joint_name, dialog.result)
             button.setStyleSheet("background-color: lightblue;" if dialog.result.strip() else "")
 
-    def load_frame_from_file(self, path):
-        self.frame_data.load_from_file(path)
-
-        self.duration_spin.setValue(self.frame_data.move_duration)
-        self.wait_spin.setValue(self.frame_data.wait_duration)
-
-        for joint_name in self.frame_data.get_joint_names():
-            if joint_name not in self.joint_widgets:
-                print(f"[WARNING] Joint {joint_name} not found in joint widgets.")
-                continue
-
-            _, spin, vel_spin = self.joint_widgets[joint_name]
-            spin.blockSignals(True)
-            spin.setValue(math.degrees(self.frame_data.get_pose(joint_name)))
-            spin.blockSignals(False)
-
-            vel_spin.blockSignals(True)
-            vel_spin.setValue(self.frame_data.get_velocity_scale(joint_name))
-            vel_spin.blockSignals(False)
-
-            self.enable_checkbox_widgets[joint_name].blockSignals(True)
-            self.enable_checkbox_widgets[joint_name].setChecked(self.frame_data.get_enable(joint_name))
-            self.enable_checkbox_widgets[joint_name].blockSignals(False)
-
-        print(f"[INFO] Loaded initial frame data from file: {path}")
-
-    def save_frame(self):
-        if not self.frame_path:
-            self.reject()
-            return
-
-        self.frame_data.move_duration = self.duration_spin.value()
-        self.frame_data.wait_duration = self.wait_spin.value()
-
-        for joint_name in self.joint_names:
-            _, spin, vel_spin = self.joint_widgets[joint_name]
-            self.frame_data.set_pose(joint_name, math.radians(spin.value()))
-            self.frame_data.set_velocity_scale(joint_name, vel_spin.value())
-            self.frame_data.set_enable(joint_name, self.enable_checkbox_widgets[joint_name].isChecked())
-
-        self.frame_data.save_to_file(self.frame_path)
-        self.accept()
-
     def handle_play_button(self):
         sender = self.sender()
         for btn in [self.play_in_current_btn, self.play_in_current_out_btn, self.play_current_out_btn]:
@@ -304,6 +256,30 @@ class InitialFrameEditorDialog(QDialog):
 
         if self.trajectory_commander:
             self.trajectory_commander.send_joint_state(msg, duration=1.0)
+
+    def set_frame_to_ui(self):
+        self.duration_spin.setValue(self.frame_data.move_duration)
+        self.wait_spin.setValue(self.frame_data.wait_duration)
+        for joint_name in self.frame_data.get_joint_names():
+            if joint_name not in self.joint_widgets:
+                continue
+            _, spin, vel_spin = self.joint_widgets[joint_name]
+            spin.setValue(math.degrees(self.frame_data.get_pose(joint_name)))
+            vel_spin.setValue(self.frame_data.get_velocity_scale(joint_name))
+            self.enable_checkbox_widgets[joint_name].setChecked(self.frame_data.get_enable(joint_name))
+
+    def accept(self):
+        self.frame_data.move_duration = self.duration_spin.value()
+        self.frame_data.wait_duration = self.wait_spin.value()
+
+        for joint_name in self.joint_data_manager.get_joint_names():
+            _, spin, vel_spin = self.joint_widgets[joint_name]
+            self.frame_data.set_pose(joint_name, math.radians(spin.value()))
+            self.frame_data.set_velocity_scale(joint_name, vel_spin.value())
+            self.frame_data.set_enable(joint_name, self.enable_checkbox_widgets[joint_name].isChecked())
+
+        self.frame_data.save_to_file(self.frame_path)
+        super().accept()
 
     def get_joint_data(self):
         return self.frame_data.get_dict()

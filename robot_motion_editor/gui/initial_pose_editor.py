@@ -18,6 +18,7 @@ from sensor_msgs.msg import JointState
 
 from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.initial_pose_file_manager import InitialPoseFileManager
+from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.initial_pose_visualizer import InitialPoseVisualizer
@@ -29,17 +30,21 @@ from .pid_gain_editor import PIDGainEditorDialog
 class InitialPoseEditor(QWidget):
     pose_updated = pyqtSignal()
 
-    def __init__(self, joint_names, joint_limits, available_variables,
+    def __init__(self,
+                 joint_data_manager: JointDataManager,
                  motion_directory_manager: MotionDirectoryManager,
                  trajectory_visualizer: TrajectoryVisualizer = None,
                  trajectory_commander: TrajectoryCommander = None):
         super().__init__()
-        self.joint_limits = joint_limits
-        self.available_variables = available_variables
+
+        self.joint_data_manager = joint_data_manager
         self.motion_directory_manager = motion_directory_manager
+
         self.initial_pose_data = InitialPoseData()
-        self.initial_pose_data.set_joint_names(joint_names)
-        self.initial_pose_visualizer = InitialPoseVisualizer(joint_names, trajectory_visualizer)
+        self.initial_pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
+
+        self.initial_pose_visualizer = InitialPoseVisualizer(
+            self.joint_data_manager.get_joint_names(), trajectory_visualizer)
         self.trajectory_commander = trajectory_commander
 
         self.enable_checkboxes = {}
@@ -65,11 +70,11 @@ class InitialPoseEditor(QWidget):
         header_layout.addWidget(self.all_enable_checkbox)
 
         reload_button = QPushButton("Reload")
-        reload_button.clicked.connect(lambda: self.load_pose())
+        reload_button.clicked.connect(self.load_pose)
         header_layout.addWidget(reload_button)
 
         save_button = QPushButton("Save")
-        save_button.clicked.connect(lambda: self.save_pose())
+        save_button.clicked.connect(self.save_pose)
         header_layout.addWidget(save_button)
 
         layout.addLayout(header_layout)
@@ -95,7 +100,7 @@ class InitialPoseEditor(QWidget):
             spin.setDecimals(1)
             spin.setSingleStep(1.0)
 
-            lower, upper = self.joint_limits.get(joint_name, (-math.pi, math.pi))
+            lower, upper = self.joint_data_manager.get_joint_limit(joint_name)
             lower_deg, upper_deg = math.degrees(lower), math.degrees(upper)
 
             slider.setRange(int(lower_deg), int(upper_deg))
@@ -201,7 +206,11 @@ class InitialPoseEditor(QWidget):
 
     def open_feedback_dialog(self, joint_name: str, button):
         current = self.initial_pose_data.get_feedback(joint_name)
-        dialog = FeedbackExpressionDialog(joint_name, current, self.available_variables, parent=self)
+        dialog = FeedbackExpressionDialog(
+            joint_name,
+            current,
+            self.joint_data_manager.get_available_variables(),
+            parent=self)
         if dialog.exec_() and dialog.result is not None:
             expr = dialog.result.strip()
             self.initial_pose_data.set_feedback(joint_name, expr)

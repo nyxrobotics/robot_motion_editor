@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtWidgets import QVBoxLayout
 
+from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..logic.switch_condition_file_manager import SwitchConditionData
 
@@ -16,12 +17,12 @@ from ..logic.switch_condition_file_manager import SwitchConditionData
 class SwitchConditionEditorDialog(QDialog):
     def __init__(
             self,
+            joint_data_manager: JointDataManager,
             motion_directory_manager: MotionDirectoryManager,
-            condition_name: str,
-            available_variables=None):
+            condition_name: str):
         super().__init__()
         self.setWindowTitle(f"Switch Condition Editor: {condition_name}")
-        self.available_variables = available_variables or []
+        self.joint_data_manager = joint_data_manager
         self.motion_directory_manager = motion_directory_manager
         self.condition_name = condition_name
         self.condition_data = SwitchConditionData()
@@ -72,10 +73,9 @@ class SwitchConditionEditorDialog(QDialog):
         self.setLayout(layout)
 
     def show_variables(self):
-        if not self.available_variables:
-            QMessageBox.information(self, "Variables", "No available variables.")
-        else:
-            QMessageBox.information(self, "Available Variables", "\n".join(self.available_variables))
+        QMessageBox.information(
+            self, "Available Variables", "\n".join(
+                self.joint_data_manager.get_available_variables()))
 
     def load_condition(self):
         file_path = self.motion_directory_manager.resolve_switch_condition_path(self.condition_name)
