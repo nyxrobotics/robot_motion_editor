@@ -32,7 +32,7 @@ class AnimationVisualizer:
             if os.path.exists(pose_path):
                 pose_data = InitialPoseData()
                 pose_data.load_from_file(pose_path)
-                self.initial_joint_state = pose_data.to_joint_state()
+                self.initial_joint_state = pose_data.get_joint_state()
         except Exception as e:
             rospy.logwarn(f"Failed to load initial pose: {e}")
 

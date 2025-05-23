@@ -1,4 +1,3 @@
-import math
 import os
 import shutil
 
@@ -20,6 +19,7 @@ from ..logic.animation_file_manager import AnimationData
 from ..logic.animation_file_manager import AnimationFileManager
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
+from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.initial_pose_file_manager import InitialPoseFileManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.animation_commander import AnimationCommander
@@ -52,28 +52,19 @@ class AnimaitonWidget(QWidget):
         self.available_variables = available_variables or []
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
-        self.current_animation_name = None
-        self.initial_joint_state = None
 
-        self.animation_tree = AnimationFileWidget(
-            motion_directory=self.motion_directory_manager.get_motion_directory(), parent=self)
+        self.animation_tree = AnimationFileWidget(motion_directory_manager=self.motion_directory_manager, parent=self)
         self.scene = AnimationEditorWidget(motion_directory_manager=self.motion_directory_manager)
         self.view = AnimatioGraphicsView(self.scene)
 
         self.animation_visualizer = AnimationVisualizer(
             scene=self.scene,
             trajectory_visualizer=self.trajectory_visualizer,
-            initial_joint_state=self.initial_joint_state,
-            motion_directory=self.motion_directory_manager.get_motion_directory(),
-            current_animation_name=self.current_animation_name
-        )
+            motion_directory_manager=self.motion_directory_manager)
         self.animation_commander = AnimationCommander(
             trajectory_commander=self.trajectory_commander,
             scene=self.scene,
-            initial_joint_state=self.initial_joint_state,
-            motion_directory=self.motion_directory_manager.get_motion_directory(),
-            current_animation_name=self.current_animation_name
-        )
+            motion_directory_manager=self.motion_directory_manager)
 
         self.init_ui()
         self.load_animation_list()
@@ -84,11 +75,9 @@ class AnimaitonWidget(QWidget):
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
 
-        # プレビューボタンを縦に並べて配置
         self.preview_buttons = AnimationPreviewButtonWidget(
             animation_visualizer=self.animation_visualizer,
-            animation_commander=self.animation_commander,
-        )
+            animation_commander=self.animation_commander)
         preview_layout = QVBoxLayout()
         preview_layout.addWidget(self.preview_buttons.play_btn)
         preview_layout.addWidget(self.preview_buttons.pause_btn)
@@ -101,8 +90,12 @@ class AnimaitonWidget(QWidget):
         self.delete_anim_btn = QPushButton("Delete Animation")
         self.delete_frame_btn = QPushButton("Delete Frame")
 
-        for btn in [self.save_anim_btn, self.new_anim_btn, self.new_frame_btn,
-                    self.delete_anim_btn, self.delete_frame_btn]:
+        for btn in [
+                self.save_anim_btn,
+                self.new_anim_btn,
+                self.new_frame_btn,
+                self.delete_anim_btn,
+                self.delete_frame_btn]:
             left_layout.addWidget(btn)
 
         left_layout.addWidget(QLabel("Animation List"))
@@ -114,7 +107,6 @@ class AnimaitonWidget(QWidget):
         self.delete_anim_btn.clicked.connect(self.delete_animation)
         self.delete_frame_btn.clicked.connect(self.delete_frame)
         self.animation_tree.itemClicked.connect(self.on_tree_item_clicked)
-        self.animation_tree.itemDoubleClicked.connect(self.on_tree_item_double_clicked)
 
         self.view.setAcceptDrops(True)
         self.view.setRenderHints(self.view.renderHints() | QPainter.Antialiasing)
@@ -128,180 +120,75 @@ class AnimaitonWidget(QWidget):
         layout.addWidget(splitter)
         self.setLayout(layout)
 
-    def on_tree_item_clicked(self, item):
-        # Get the top animation name from any hierarchy
-        animation_item = item
-        while animation_item.parent() is not None:
-            animation_item = animation_item.parent()
-
-        name = animation_item.text(0)
-        # Do nothing if the animation is already selected
-        if name == self.current_animation_name:
-            return
-
-        self.load_animation_by_name(name)
-
-    def on_tree_item_double_clicked(self, item):
-        if item.text(0) == "initial_frame":
-            animation_item = item
-            while animation_item.parent() is not None:
-                animation_item = animation_item.parent()
-
-            self.motion_directory_manager.set_current_animation(animation_item.text(0))
-            self.open_initial_frame_editor()
-
-        elif item.parent() and item.parent().text(0) == "frames":
-            animation_item = item
-            while animation_item.parent() is not None:
-                animation_item = animation_item.parent()
-
-            self.motion_directory_manager.set_current_animation(animation_item.text(0))
-            frame_path = self.motion_directory_manager.resolve_frame_path(item.text(0))
-            if not os.path.exists(frame_path):
-                QMessageBox.warning(self, "Missing File", f"{frame_path} not found.")
-                return
-
-            dlg = FrameEditorDialog(
-                joint_names=self.joint_names,
-                joint_limits=self.joint_limits,
-                available_variables=self.available_variables,
-                frame_path=frame_path,
-                trajectory_visualizer=self.trajectory_visualizer,
-                trajectory_commander=self.trajectory_commander
-            )
-            frame_data = FrameData()
-            frame_data.set_joint_names(self.joint_names)
-            frame_data.set_dict(FrameFileManager.load_dict(os.path.dirname(frame_path), os.path.basename(frame_path)))
-            current_state = frame_data.get_joint_state()
-            current_move = frame_data.move_duration
-            current_wait = frame_data.wait_duration
-
-            if hasattr(self, "initial_joint_state"):
-                dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
-
-                # in/out は接続されていないため current をそのまま使用
-                dlg.frame_visualizer.set_in_frame(current_state, current_move, current_wait)
-                dlg.frame_visualizer.set_out_frame(current_state, current_move, current_wait)
-                dlg.exec_()
-
-        elif item.parent() and item.parent().text(0) == "if":
-            animation_item = item
-            while animation_item.parent() is not None:
-                animation_item = animation_item.parent()
-                self.motion_directory_manager.set_current_animation(animation_item.text(0))
-                condition_path = self.motion_directory_manager.resolve_if_condition_path(item.text(0))
-            if not os.path.exists(condition_path):
-                QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
-                return
-
-            dlg = IfConditionEditorDialog(available_variables=self.available_variables, condition_path=condition_path)
-            dlg.exec_()
-
-        elif item.parent() and item.parent().text(0) == "switch":
-            animation_item = item
-            while animation_item.parent() is not None:
-                animation_item = animation_item.parent()
-                self.motion_directory_manager.set_current_animation(animation_item.text(0))
-                condition_path = self.motion_directory_manager.resolve_switch_condition_path(item.text(0))
-            if not os.path.exists(condition_path):
-                QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
-                return
-
-            dlg = SwitchConditionEditorDialog(
-                condition_path=condition_path,
-                available_variables=self.available_variables)
-            if dlg.exec_():
-                if dlg.result:
-                    new_num_cases = dlg.result.get("num_cases", 2)
-                    self.scene.update_switch_block(condition_name, new_num_cases)
-
     def load_animation_list(self):
         self.animation_tree.clear()
-        if not os.path.isdir(self.motion_directory):
+        base_dir = self.motion_directory_manager.get_motion_directory()
+        if not os.path.isdir(base_dir):
             return
 
-        for animation_name in sorted(os.listdir(self.motion_directory)):
-            animation_dir = os.path.join(self.motion_directory, animation_name)
-            if not os.path.isdir(animation_dir):
+        for animation_name in sorted(os.listdir(base_dir)):
+            animation_path = os.path.join(base_dir, animation_name)
+            if not os.path.isdir(animation_path):
                 continue
-
             anim_item = QTreeWidgetItem([animation_name])
             self.animation_tree.addTopLevelItem(anim_item)
 
-            # Edit initial_frame
             QTreeWidgetItem(anim_item, ["initial_frame"])
 
-            # frames
-            frames_dir = os.path.join(animation_dir, "frames")
             frames_item = QTreeWidgetItem(anim_item, ["frames"])
-            if os.path.isdir(frames_dir):
-                for fname in sorted(os.listdir(frames_dir)):
-                    if fname.lower().endswith(".yaml"):
-                        QTreeWidgetItem(frames_item, [fname[:-5]])
+            self.motion_directory_manager.set_current_animation(animation_name)
+            for frame in self.motion_directory_manager.list_frame_files():
+                QTreeWidgetItem(frames_item, [frame])
 
-            # conditions
-            conditions_dir = os.path.join(animation_dir, "conditions")
             conditions_item = QTreeWidgetItem(anim_item, ["conditions"])
-
-            # if
-            if_dir = os.path.join(conditions_dir, "if")
             if_item = QTreeWidgetItem(conditions_item, ["if"])
-            if os.path.isdir(if_dir):
-                for fname in sorted(os.listdir(if_dir)):
-                    if fname.lower().endswith(".yaml"):
-                        QTreeWidgetItem(if_item, [fname[:-5]])
-
-            # switch
-            switch_dir = os.path.join(conditions_dir, "switch")
+            for cond in self.motion_directory_manager.list_if_condition_files():
+                QTreeWidgetItem(if_item, [cond])
             switch_item = QTreeWidgetItem(conditions_item, ["switch"])
-            if os.path.isdir(switch_dir):
-                for fname in sorted(os.listdir(switch_dir)):
-                    if fname.lower().endswith(".yaml"):
-                        QTreeWidgetItem(switch_item, [fname[:-5]])
+            for cond in self.motion_directory_manager.list_switch_condition_files():
+                QTreeWidgetItem(switch_item, [cond])
 
     def load_animation_by_name(self, animation_name):
         if not self.confirm_save_if_unsaved_changes():
             return
-        self.current_animation_name = animation_name
-        self.animation_visualizer.current_animation_name = animation_name
-        self.animation_commander.current_animation_name = animation_name
 
-        raw = AnimationFileManager.load_dict(self.motion_directory, animation_name)
+        self.motion_directory_manager.set_current_animation(animation_name)
+
         anim_data = AnimationData()
-        anim_data.set_dict(raw)
+        anim_data.load_from_file(self.motion_directory_manager.resolve_animation_yaml_path())
         self.scene.set_animation_data(anim_data)
         self.scene.highlight_preview_path()
 
         try:
             frame_data = FrameData()
             frame_data.set_joint_names(self.joint_names)
-            frame_data.set_dict(
-                FrameFileManager.load_dict(
-                    os.path.join(
-                        self.motion_directory,
-                        self.current_animation_name),
-                    "initial_frame.yaml"))
+            frame_data.set_dict(FrameFileManager.load_dict(
+                os.path.dirname(self.motion_directory_manager.resolve_initial_frame_path()),
+                os.path.basename(self.motion_directory_manager.resolve_initial_frame_path())
+            ))
             self.initial_joint_state = frame_data.get_joint_state()
             self.animation_visualizer.initial_joint_state = self.initial_joint_state
         except Exception as e:
             rospy.logwarn(f"[MotionEditor] Failed to load initial_frame: {e}")
 
     def save_current_animation(self):
-        if not self.current_animation_name:
+        anim_name = self.motion_directory_manager.get_current_animation()
+        if not anim_name:
             QMessageBox.information(self, "Save", "No animation selected to save.")
             return
         anim_data = self.scene.get_animation_data()
         AnimationFileManager.save_dict(
-            self.motion_directory,
-            self.current_animation_name,
+            self.motion_directory_manager.get_motion_directory(),
+            anim_name,
             anim_data.get_dict())
 
     def confirm_save_if_unsaved_changes(self):
-        if not self.current_animation_name:
+        anim_name = self.motion_directory_manager.get_current_animation()
+        if not anim_name:
             return True
 
         current_data = self.scene.get_animation_data().get_dict()
-        saved_data = AnimationFileManager.load_dict(self.motion_directory, self.current_animation_name)
+        saved_data = AnimationFileManager.load_dict(self.motion_directory_manager.get_motion_directory(), anim_name)
 
         if current_data == saved_data:
             return True
@@ -309,7 +196,7 @@ class AnimaitonWidget(QWidget):
         reply = QMessageBox.question(
             self,
             "Unsaved Changes",
-            f"Animation '{self.current_animation_name}' has unsaved changes.\nDo you want to save them?",
+            f"Animation '{anim_name}' has unsaved changes.\nDo you want to save them?",
             QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
 
         if reply == QMessageBox.Save:
@@ -325,15 +212,22 @@ class AnimaitonWidget(QWidget):
         if not ok or not name.strip():
             return
         name = name.strip()
-        animation_path = os.path.join(self.motion_directory, name)
+
+        base_dir = self.motion_directory_manager.get_motion_directory()
+        animation_path = os.path.join(base_dir, name)
         if os.path.exists(animation_path):
             QMessageBox.warning(self, "Name Conflict", f"Animation '{name}' already exists.")
             return
+
         os.makedirs(os.path.join(animation_path, "frames"), exist_ok=True)
+        os.makedirs(os.path.join(animation_path, "conditions", "if"), exist_ok=True)
+        os.makedirs(os.path.join(animation_path, "conditions", "switch"), exist_ok=True)
+
         with open(os.path.join(animation_path, f"{name}.yaml"), "w") as f:
-            f.write("  # animation flowchart")
+            f.write("# animation flowchart")
         with open(os.path.join(animation_path, "initial_frame.yaml"), "w") as f:
-            f.write("  # initial frame")
+            f.write("# initial frame")
+
         self.load_animation_list()
         self.load_animation_by_name(name)
 
@@ -343,27 +237,25 @@ class AnimaitonWidget(QWidget):
             QMessageBox.information(self, "Selection Error", "Please select an animation.")
             return
 
-        # アニメーション名を取得
         animation_item = item
         while animation_item.parent():
             animation_item = animation_item.parent()
         animation_name = animation_item.text(0)
 
-        frames_dir = os.path.join(self.motion_directory, animation_name, "frames")
-        os.makedirs(frames_dir, exist_ok=True)
+        self.motion_directory_manager.set_current_animation(animation_name)
 
         name, ok = QInputDialog.getText(self, "New Frame", "Enter frame name:")
         if not ok or not name.strip():
             return
         name = name.strip()
 
-        frame_path = os.path.join(frames_dir, f"{name}.yaml")
+        frame_path = self.motion_directory_manager.resolve_frame_path(name)
         if os.path.exists(frame_path):
             QMessageBox.warning(self, "Name Conflict", f"Frame '{name}' already exists.")
             return
 
         default_frame_data = FrameData().get_dict()
-        FrameFileManager.save_dict(frames_dir, default_frame_data, f"{name}.yaml")
+        FrameFileManager.save_dict(os.path.dirname(frame_path), default_frame_data, os.path.basename(frame_path))
 
         self.load_animation_list()
         self.load_animation_by_name(animation_name)
@@ -374,15 +266,17 @@ class AnimaitonWidget(QWidget):
             QMessageBox.warning(self, "Selection Error", "Please select an animation to delete.")
             return
         name = item.text(0)
-        path = os.path.join(self.motion_directory, name)
+        path = os.path.join(self.motion_directory_manager.get_motion_directory(), name)
 
-        reply = QMessageBox.question(self, "Delete Animation",
-                                     f"Are you sure you want to delete animation '{name}'?",
-                                     QMessageBox.Yes | QMessageBox.No)
+        reply = QMessageBox.question(
+            self,
+            "Delete Animation",
+            f"Are you sure you want to delete animation '{name}'?",
+            QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
             shutil.rmtree(path, ignore_errors=True)
             self.load_animation_list()
-            self.current_animation_name = None
+            self.motion_directory_manager.set_current_animation(None)
 
     def delete_frame(self):
         item = self.animation_tree.currentItem()
@@ -391,140 +285,107 @@ class AnimaitonWidget(QWidget):
             QMessageBox.warning(self, "Selection Error", "Please select a frame to delete.")
             return
 
-        anim_name = parent.text(0)
+        animation_item = item
+        while animation_item.parent():
+            animation_item = animation_item.parent()
+        animation_name = animation_item.text(0)
+
+        self.motion_directory_manager.set_current_animation(animation_name)
+
         frame_name = item.text(0)
-        path = os.path.join(self.motion_directory, anim_name, "frames", f"{frame_name}.yaml")
+        frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
 
-        reply = QMessageBox.question(self, "Delete Frame",
-                                     f"Are you sure you want to delete frame '{frame_name}'?",
-                                     QMessageBox.Yes | QMessageBox.No)
-        if reply == QMessageBox.Yes:
-            if os.path.exists(path):
-                os.remove(path)
+        reply = QMessageBox.question(
+            self,
+            "Delete Frame",
+            f"Are you sure you want to delete frame '{frame_name}'?",
+            QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes and os.path.exists(frame_path):
+            os.remove(frame_path)
             self.load_animation_list()
-            self.load_animation_by_name(anim_name)
+            self.load_animation_by_name(animation_name)
 
-    def open_initial_frame_editor(self):
-        initial_frame_dir = os.path.join(self.motion_directory, self.current_animation_name)
-        initial_frame_filename = "initial_frame.yaml"
-
-        dlg = InitialFrameEditorDialog(
-            joint_names=self.joint_names,
-            joint_limits=self.joint_limits,
-            available_variables=self.available_variables,
-            frame_path=os.path.join(initial_frame_dir, initial_frame_filename)
-        )
-
-        if dlg.exec_():
-            joint_data = dlg.get_joint_data()  # {joint_name: {position, enable, pid, feedback}}
-            InitialPoseFileManager.save_dict(initial_frame_dir, joint_data, filename=initial_frame_filename)
-
-    def open_frame_file_editor(self, frame_name):
-        frame_path = os.path.join(
-            self.motion_directory,
-            self.current_animation_name,
-            "frames",
-            f"{frame_name}.yaml")
-        dlg = FrameEditorDialog(
-            joint_names=self.joint_names,
-            joint_limits=self.joint_limits,
-            available_variables=self.available_variables,
-            frame_path=frame_path,
-            trajectory_visualizer=self.trajectory_visualizer,
-            trajectory_commander=self.trajectory_commander
-        )
-        dlg.exec_()
-
-    def open_frame_block_editor(self, block_id: str):
-        block = self.scene.block_objects.get(block_id)
-        if not block:
-            print(f"[WARN] No block found for id: {block_id}")
+    def on_tree_item_clicked(self, item):
+        animation_item = item
+        while animation_item.parent():
+            animation_item = animation_item.parent()
+        name = animation_item.text(0)
+        if name == self.motion_directory_manager.get_current_animation():
             return
+        self.load_animation_by_name(name)
 
-        frame_path = os.path.join(
-            self.motion_directory,
-            self.current_animation_name,
-            "frames",
-            f"{block.filename}.yaml")
-        dlg = FrameEditorDialog(
-            joint_names=self.joint_names,
-            joint_limits=self.joint_limits,
-            available_variables=self.available_variables,
-            frame_path=frame_path,
-            parent=self,
-            trajectory_visualizer=self.trajectory_visualizer,
-            trajectory_commander=self.trajectory_commander
-        )
+    def on_tree_item_double_clicked(self, item):
+        animation_item = item
+        while animation_item.parent():
+            animation_item = animation_item.parent()
+        animation_name = animation_item.text(0)
+        self.motion_directory_manager.set_current_animation(animation_name)
 
-        if hasattr(dlg, "frame_visualizer"):
-            if hasattr(self, "initial_joint_state"):
-                dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
+        if item.text(0) == "initial_frame":
+            dlg = InitialFrameEditorDialog(
+                joint_names=self.joint_names,
+                joint_limits=self.joint_limits,
+                available_variables=self.available_variables,
+                frame_path=self.motion_directory_manager.resolve_initial_frame_path()
+            )
+            if dlg.exec_():
+                joint_data = dlg.get_joint_data()
+                InitialPoseFileManager.save_dict(
+                    os.path.dirname(self.motion_directory_manager.resolve_initial_frame_path()),
+                    joint_data,
+                    filename="initial_frame.yaml"
+                )
+
+        elif item.parent() and item.parent().text(0) == "frames":
+            frame_name = item.text(0)
+            frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
+            if not os.path.exists(frame_path):
+                QMessageBox.warning(self, "Missing File", f"{frame_path} not found.")
+                return
+
+            dlg = FrameEditorDialog(
+                joint_names=self.joint_names,
+                joint_limits=self.joint_limits,
+                available_variables=self.available_variables,
+                motion_directory_manager=self.motion_directory_manager,
+                frame_name=frame_name,
+                trajectory_visualizer=self.trajectory_visualizer,
+                trajectory_commander=self.trajectory_commander
+            )
 
             frame_data = FrameData()
             frame_data.set_joint_names(self.joint_names)
-
             frame_data.set_dict(FrameFileManager.load_dict(os.path.dirname(frame_path), os.path.basename(frame_path)))
             current_state = frame_data.get_joint_state()
             current_move = frame_data.move_duration
             current_wait = frame_data.wait_duration
-            dlg.frame_visualizer.set_current_frame(current_state, current_move, current_wait)
 
-            in_block = self.scene.find_previous_frame_block(block)
-            if in_block and in_block.filename:
-                in_path = os.path.join(
-                    self.motion_directory,
-                    self.current_animation_name,
-                    "frames",
-                    f"{in_block.filename}.yaml"
-                )
-                frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(in_path)))
-                in_state = frame_data.get_joint_state()
-                in_move = frame_data.move_duration
-                in_wait = frame_data.wait_duration
-                dlg.frame_visualizer.set_in_frame(in_state, in_move, in_wait)
-
-            out_block = self.scene.find_next_frame_block(block)
-            if out_block and out_block.filename:
-                out_path = os.path.join(
-                    self.motion_directory,
-                    self.current_animation_name,
-                    "frames",
-                    f"{out_block.filename}.yaml"
-                )
-                frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(out_path)))
-                out_state = frame_data.get_joint_state()
-                out_move = frame_data.move_duration
-                out_wait = frame_data.wait_duration
-                dlg.frame_visualizer.set_out_frame(out_state, out_move, out_wait)
+            if hasattr(self, "initial_joint_state"):
+                dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
+                dlg.frame_visualizer.set_in_frame(current_state, current_move, current_wait)
+                dlg.frame_visualizer.set_out_frame(current_state, current_move, current_wait)
 
             dlg.exec_()
 
-    def open_if_condition_editor(self, condition_name):
-        condition_path = os.path.join(
-            self.motion_directory,
-            self.current_animation_name,
-            "conditions",
-            "if",
-            f"{condition_name}.yaml")
-        dlg = IfConditionEditorDialog(
-            available_variables=self.available_variables,
-            condition_path=condition_path
-        )
-        dlg.exec_()
+        elif item.parent() and item.parent().text(0) == "if":
+            condition_name = item.text(0)
+            condition_path = self.motion_directory_manager.resolve_if_condition_path(condition_name)
+            if not os.path.exists(condition_path):
+                QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
+                return
+            dlg = IfConditionEditorDialog(available_variables=self.available_variables, condition_path=condition_path)
+            dlg.exec_()
 
-    def open_switch_condition_editor(self, condition_name):
-        condition_path = os.path.join(
-            self.motion_directory,
-            self.current_animation_name,
-            "conditions", "switch", f"{condition_name}.yaml"
-        )
-        dlg = SwitchConditionEditorDialog(
-            condition_path=condition_path,
-            available_variables=self.available_variables
-        )
-
-        if dlg.exec_():
-            if dlg.result:
-                new_num_cases = dlg.result.get("num_cases", 2)
-                # フローチャート上のブロックを更新
-                self.scene.update_switch_block(condition_name, new_num_cases)
+        elif item.parent() and item.parent().text(0) == "switch":
+            condition_name = item.text(0)
+            condition_path = self.motion_directory_manager.resolve_switch_condition_path(condition_name)
+            if not os.path.exists(condition_path):
+                QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
+                return
+            dlg = SwitchConditionEditorDialog(
+                condition_path=condition_path,
+                available_variables=self.available_variables)
+            if dlg.exec_():
+                if dlg.result:
+                    new_num_cases = dlg.result.get("num_cases", 2)
+                    self.scene.update_switch_block(condition_name, new_num_cases)

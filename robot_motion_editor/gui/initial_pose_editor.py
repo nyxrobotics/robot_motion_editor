@@ -49,8 +49,7 @@ class InitialPoseEditor(QWidget):
 
         self.init_ui()
 
-        self.pose_path = self.motion_directory_manager.resolve_initial_pose_path()
-        if os.path.exists(self.pose_path):
+        if os.path.exists(self.motion_directory_manager.resolve_initial_pose_path()):
             self.load_pose()
 
     def init_ui(self):
@@ -129,8 +128,7 @@ class InitialPoseEditor(QWidget):
         self.setLayout(main_layout)
 
     def load_pose(self):
-        joint_data = self.motion_directory_manager.load_initial_pose_dict()
-        self.initial_pose_data.set_dict(joint_data)
+        self.initial_pose_data.load_from_file(self.motion_directory_manager.resolve_initial_pose_path())
 
         for joint_name in self.initial_pose_data.get_joint_names():
             if joint_name not in self.joint_widgets:
@@ -150,7 +148,7 @@ class InitialPoseEditor(QWidget):
             self.initial_pose_data.set_pose(joint_name, position_rad)
             self.initial_pose_data.set_enable(joint_name, self.enable_checkboxes[joint_name].isChecked())
 
-        self.motion_directory_manager.save_initial_pose_dict(self.initial_pose_data.get_dict())
+        self.initial_pose_data.save_to_file(self.motion_directory_manager.resolve_initial_pose_path())
         self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
 
     def get_gui_joints(self):
