@@ -17,6 +17,7 @@ from sensor_msgs.msg import JointState
 
 from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.initial_pose_file_manager import InitialPoseFileManager
+from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.initial_pose_visualizer import InitialPoseVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
@@ -28,13 +29,13 @@ class InitialPoseEditor(QWidget):
     pose_updated = pyqtSignal()
 
     def __init__(self, joint_names, joint_limits, available_variables,
-                 motion_directory=None,
+                 motion_directory_manager: MotionDirectoryManager = None,
                  trajectory_visualizer: TrajectoryVisualizer = None,
                  trajectory_commander: TrajectoryCommander = None):
         super().__init__()
         self.joint_limits = joint_limits
         self.available_variables = available_variables
-        self.motion_directory = motion_directory
+        self.motion_directory_manager = motion_directory_manager
         self.initial_pose_data = InitialPoseData()
         self.initial_pose_data.set_joint_names(joint_names)
         self.initial_pose_visualizer = InitialPoseVisualizer(joint_names, trajectory_visualizer)
@@ -46,10 +47,6 @@ class InitialPoseEditor(QWidget):
         self.goal_pose = JointState()
 
         self.init_ui()
-
-    def set_motion_directory(self, directory):
-        self.motion_directory = directory
-        self.load_pose()
 
     def init_ui(self):
         main_layout = QVBoxLayout()

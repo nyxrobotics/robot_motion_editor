@@ -76,10 +76,6 @@ class AnimaitonWidget(QWidget):
         self.init_ui()
         self.load_animation_list()
 
-    def set_motion_directory(self, directory):
-        self.motion_directory = directory
-        self.load_animation_list()
-
     def init_ui(self):
         splitter = QSplitter(Qt.Horizontal)
 

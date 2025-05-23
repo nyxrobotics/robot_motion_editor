@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import QTabWidget
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
+from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..urdf_interface.urdf_joint_extractor import get_joint_limit
 from ..urdf_interface.urdf_joint_extractor import get_transmission_joints
@@ -36,6 +37,7 @@ class MainWindow(QWidget):
         # Initialize visualizer and commander
         self.trajectory_visualizer = TrajectoryVisualizer(visualize_as_state=True, rate=30.0)
         self.trajectory_commander = TrajectoryCommander("kuroko", self.joint_names, mode="position")
+        self.motion_directory_manager = MotionDirectoryManager(motion_directory=".")
 
         self.init_ui()
 
@@ -61,10 +63,12 @@ class MainWindow(QWidget):
         folder = QFileDialog.getExistingDirectory(self, "Select Motion Directory", os.getcwd())
         if folder:
             self.path_lineedit.setText(folder)
+            self.motion_directory_manager.set_motion_directory(folder)
+
             if self.initial_pose_editor:
-                self.initial_pose_editor.set_motion_directory(folder)
+                self.initial_pose_editor.load_pose
             if self.animation_widget:
-                self.animation_widget.set_motion_directory(folder)
+                self.animation_widget.load_animation_list()
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -132,14 +136,14 @@ class MainWindow(QWidget):
             self.joint_names,
             self.joint_limits,
             available_variables=self.variable_names,
-            motion_directory="motion_directory",
+            motion_directory_manager=self.motion_directory_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander
         )
         self.tabs.addTab(self.initial_pose_editor, "Initial Pose")
 
         self.animation_widget = AnimaitonWidget(
-            motion_directory="motion_directory",
+            motion_directory_manager=self.motion_directory_manager,
             joint_names=self.joint_names,
             joint_limits=self.joint_limits,
             available_variables=self.variable_names,
