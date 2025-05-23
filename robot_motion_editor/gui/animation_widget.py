@@ -1,5 +1,6 @@
 import math
 import os
+import shutil
 
 import rospy
 import yaml
@@ -60,13 +61,11 @@ class AnimaitonWidget(QWidget):
         self.animation_visualizer = AnimationVisualizer(
             scene=self.scene,
             trajectory_visualizer=self.trajectory_visualizer,
-            frame_loader=lambda name: self.load_joint_state_and_durations(self.resolve_frame_path(name)),
             initial_joint_state=self.initial_joint_state
         )
         self.animation_commander = AnimationCommander(
             trajectory_commander=self.trajectory_commander,
             scene=self.scene,
-            frame_loader=lambda name: self.load_joint_state_and_durations(self.resolve_frame_path(name)),
             initial_joint_state=self.initial_joint_state
         )
 
@@ -83,6 +82,13 @@ class AnimaitonWidget(QWidget):
             self.current_animation_name,
             "frames",
             f"{frame_name}.yaml"
+        )
+
+    def resolve_initial_frame_path(self):
+        return os.path.join(
+            self.motion_directory,
+            self.current_animation_name,
+            "initial_frame.yaml"
         )
 
     def init_ui(self):
@@ -176,55 +182,57 @@ class AnimaitonWidget(QWidget):
                 trajectory_visualizer=self.trajectory_visualizer,
                 trajectory_commander=self.trajectory_commander
             )
-            current_state, move, wait = self.load_joint_state_and_durations(frame_path)
-            dlg.frame_visualizer.set_current_frame(current_state, move, wait)
+            frame_data = FrameData()
+            frame_data.set_joint_names(self.joint_names)
+            frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(frame_path)))
+            current_state = frame_data.get_joint_state()
+            current_move = frame_data.move_duration
+            current_wait = frame_data.wait_duration
 
             if hasattr(self, "initial_joint_state"):
                 dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
 
-            # in/out は接続されていないため current をそのまま使用
-            dlg.frame_visualizer.set_in_frame(current_state, move, wait)
-            dlg.frame_visualizer.set_out_frame(current_state, move, wait)
-            dlg.exec_()
+                # in/out は接続されていないため current をそのまま使用
+                dlg.frame_visualizer.set_in_frame(current_state, move, wait)
+                dlg.frame_visualizer.set_out_frame(current_state, move, wait)
+                dlg.exec_()
 
         elif item.parent() and item.parent().text(0) == "if":
             animation_item = item
             while animation_item.parent() is not None:
                 animation_item = animation_item.parent()
-            animation_name = animation_item.text(0)
-            condition_name = item.text(0)
+                animation_name = animation_item.text(0)
+                condition_name = item.text(0)
 
-            condition_path = os.path.join(
-                self.motion_directory, animation_name, "conditions", "if", f"{condition_name}.yaml"
-            )
+                condition_path = os.path.join(self.motion_directory, animation_name,
+                                              "conditions", "if", f"{condition_name}.yaml")
             if not os.path.exists(condition_path):
                 QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
                 return
 
-            dlg = IfConditionEditorDialog(
-                available_variables=self.available_variables,
-                condition_path=condition_path
-            )
+            dlg = IfConditionEditorDialog(available_variables=self.available_variables, condition_path=condition_path)
             dlg.exec_()
 
         elif item.parent() and item.parent().text(0) == "switch":
             animation_item = item
             while animation_item.parent() is not None:
                 animation_item = animation_item.parent()
-            animation_name = animation_item.text(0)
-            condition_name = item.text(0)
+                animation_name = animation_item.text(0)
+                condition_name = item.text(0)
 
-            condition_path = os.path.join(
-                self.motion_directory, animation_name, "conditions", "switch", f"{condition_name}.yaml"
-            )
+                condition_path = os.path.join(
+                    self.motion_directory,
+                    animation_name,
+                    "conditions",
+                    "switch",
+                    f"{condition_name}.yaml")
             if not os.path.exists(condition_path):
                 QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
                 return
 
             dlg = SwitchConditionEditorDialog(
                 condition_path=condition_path,
-                available_variables=self.available_variables
-            )
+                available_variables=self.available_variables)
             if dlg.exec_():
                 if dlg.result:
                     new_num_cases = dlg.result.get("num_cases", 2)
@@ -286,9 +294,15 @@ class AnimaitonWidget(QWidget):
         self.scene.highlight_preview_path()
 
         try:
-            self.initial_joint_state, _, _ = self.load_joint_state_and_durations(
-                os.path.join(self.motion_directory, self.current_animation_name, "initial_frame.yaml")
-            )
+            frame_data = FrameData()
+            frame_data.set_joint_names(self.joint_names)
+            frame_data.set_dict(
+                FrameFileManager.load_dict(
+                    os.path.join(
+                        self.motion_directory,
+                        self.current_animation_name),
+                    "initial_frame.yaml"))
+            self.initial_joint_state = frame_data.get_joint_state()
             self.animation_visualizer.initial_joint_state = self.initial_joint_state
         except Exception as e:
             rospy.logwarn(f"[MotionEditor] Failed to load initial_frame: {e}")
@@ -298,7 +312,10 @@ class AnimaitonWidget(QWidget):
             QMessageBox.information(self, "Save", "No animation selected to save.")
             return
         anim_data = self.scene.get_animation_data()
-        AnimationFileManager.save_dict(self.motion_directory, self.current_animation_name, anim_data.get_dict())
+        AnimationFileManager.save_dict(
+            self.motion_directory,
+            self.current_animation_name,
+            anim_data.get_dict())
 
     def confirm_save_if_unsaved_changes(self):
         if not self.current_animation_name:
@@ -314,8 +331,7 @@ class AnimaitonWidget(QWidget):
             self,
             "Unsaved Changes",
             f"Animation '{self.current_animation_name}' has unsaved changes.\nDo you want to save them?",
-            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
-        )
+            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
 
         if reply == QMessageBox.Save:
             self.save_current_animation()
@@ -385,7 +401,6 @@ class AnimaitonWidget(QWidget):
                                      f"Are you sure you want to delete animation '{name}'?",
                                      QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
-            import shutil
             shutil.rmtree(path, ignore_errors=True)
             self.load_animation_list()
             self.current_animation_name = None
@@ -425,41 +440,12 @@ class AnimaitonWidget(QWidget):
             joint_data = dlg.get_joint_data()  # {joint_name: {position, enable, pid, feedback}}
             InitialPoseFileManager.save_dict(initial_frame_dir, joint_data, filename=initial_frame_filename)
 
-    def load_joint_state_and_durations(self, path):
-        move_duration = 1.0
-        wait_duration = 0.0
-        msg = JointState()
-        msg.name = []
-        msg.position = []
-
-        try:
-            with open(path, "r") as f:
-                data = yaml.safe_load(f)
-        except Exception as e:
-            print(f"[WARN] Failed to load {path}: {e}")
-            return msg, move_duration, wait_duration
-
-        if not data or not isinstance(data, dict):
-            print(f"[WARN] Empty or invalid YAML in {path}")
-            msg.name = self.joint_names[:]  # fallback to known joint names
-            msg.position = [0.0] * len(self.joint_names)
-            return msg, move_duration, wait_duration
-
-        joints_data = data.get("joints", {})
-        for name, joint_info in joints_data.items():
-            pos = joint_info.get("position") if isinstance(joint_info, dict) else joint_info
-            if pos is not None:
-                msg.name.append(name)
-                msg.position.append(pos)  # radian already assumed
-
-        msg.header.stamp = rospy.Time.now()
-        move_duration = data.get("time", {}).get("move_duration", move_duration)
-        wait_duration = data.get("time", {}).get("wait_duration", wait_duration)
-
-        return msg, move_duration, wait_duration
-
     def open_frame_file_editor(self, frame_name):
-        frame_path = os.path.join(self.motion_directory, self.current_animation_name, "frames", f"{frame_name}.yaml")
+        frame_path = os.path.join(
+            self.motion_directory,
+            self.current_animation_name,
+            "frames",
+            f"{frame_name}.yaml")
         dlg = FrameEditorDialog(
             joint_names=self.joint_names,
             joint_limits=self.joint_limits,
@@ -492,11 +478,17 @@ class AnimaitonWidget(QWidget):
         )
 
         if hasattr(dlg, "frame_visualizer"):
-            current_state, current_move, current_wait = self.load_joint_state_and_durations(frame_path)
-            dlg.frame_visualizer.set_current_frame(current_state, current_move, current_wait)
-
             if hasattr(self, "initial_joint_state"):
                 dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
+
+            frame_data = FrameData()
+            frame_data.set_joint_names(self.joint_names)
+
+            frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(frame_path)))
+            current_state = frame_data.get_joint_state()
+            current_move = frame_data.move_duration
+            current_wait = frame_data.wait_duration
+            dlg.frame_visualizer.set_current_frame(current_state, current_move, current_wait)
 
             in_block = self.scene.find_previous_frame_block(block)
             if in_block and in_block.filename:
@@ -506,7 +498,10 @@ class AnimaitonWidget(QWidget):
                     "frames",
                     f"{in_block.filename}.yaml"
                 )
-                in_state, in_move, in_wait = self.load_joint_state_and_durations(in_path)
+                frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(in_path)))
+                in_state = frame_data.get_joint_state()
+                in_move = frame_data.move_duration
+                in_wait = frame_data.wait_duration
                 dlg.frame_visualizer.set_in_frame(in_state, in_move, in_wait)
 
             out_block = self.scene.find_next_frame_block(block)
@@ -517,10 +512,13 @@ class AnimaitonWidget(QWidget):
                     "frames",
                     f"{out_block.filename}.yaml"
                 )
-                out_state, out_move, out_wait = self.load_joint_state_and_durations(out_path)
+                frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(out_path)))
+                out_state = frame_data.get_joint_state()
+                out_move = frame_data.move_duration
+                out_wait = frame_data.wait_duration
                 dlg.frame_visualizer.set_out_frame(out_state, out_move, out_wait)
 
-        dlg.exec_()
+            dlg.exec_()
 
     def open_if_condition_editor(self, condition_name):
         condition_path = os.path.join(

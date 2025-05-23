@@ -1,19 +1,22 @@
+
+import os
 import threading
 import time
 
 import rospy
 
-from ..gui.animation_editor_widget import FrameBlockItem
-from ..gui.animation_editor_widget import IfBlockItem
-from ..gui.animation_editor_widget import StartBlockItem
-from ..gui.animation_editor_widget import SwitchBlockItem
+from ..gui.animation_editor_items import FrameBlockItem
+from ..gui.animation_editor_items import IfBlockItem
+from ..gui.animation_editor_items import StartBlockItem
+from ..gui.animation_editor_items import SwitchBlockItem
+from ..logic.frame_file_manager import FrameData
+from ..logic.frame_file_manager import FrameFileManager
 
 
 class AnimationVisualizer:
-    def __init__(self, scene, trajectory_visualizer, frame_loader, initial_joint_state=None):
+    def __init__(self, scene, trajectory_visualizer, initial_joint_state=None):
         self.scene = scene
         self.visualizer = trajectory_visualizer
-        self.load_frame = frame_loader
         self.initial_joint_state = initial_joint_state
 
         self._thread = None
@@ -138,7 +141,13 @@ class AnimationVisualizer:
 
             frame_name = self.current_block.filename
             try:
-                target_joint_state, move_duration, wait_duration = self.load_frame(frame_name)
+                frame_path = self.resolve_frame_path(frame_name)
+                frame_data = FrameData()
+                frame_data.set_joint_names(self.joint_names)
+                frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(frame_path)))
+                target_joint_state = frame_data.get_joint_state()
+                move_duration = frame_data.move_duration
+                wait_duration = frame_data.wait_duration
             except Exception as e:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
                 self.stop()
@@ -176,7 +185,13 @@ class AnimationVisualizer:
         if isinstance(block, FrameBlockItem):
             frame_name = block.filename
             try:
-                target_joint_state, move_duration, wait_duration = self.load_frame(frame_name)
+                frame_path = self.resolve_frame_path(frame_name)
+                frame_data = FrameData()
+                frame_data.set_joint_names(self.joint_names)
+                frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(frame_path)))
+                target_joint_state = frame_data.get_joint_state()
+                move_duration = frame_data.move_duration
+                wait_duration = frame_data.wait_duration
             except Exception as e:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
                 return

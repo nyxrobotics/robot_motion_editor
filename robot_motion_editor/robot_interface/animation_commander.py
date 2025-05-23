@@ -9,10 +9,12 @@ from ..gui.animation_editor_widget import FrameBlockItem
 from ..gui.animation_editor_widget import IfBlockItem
 from ..gui.animation_editor_widget import StartBlockItem
 from ..gui.animation_editor_widget import SwitchBlockItem
+from ..logic.frame_file_manager import FrameData
+from ..logic.frame_file_manager import FrameFileManager
 
 
 class AnimationCommander:
-    def __init__(self, scene, frame_loader, trajectory_commander, initial_joint_state=None):
+    def __init__(self, scene, trajectory_commander, initial_joint_state=None):
         """
         Args:
             scene: Animation scene with block graph
@@ -21,7 +23,6 @@ class AnimationCommander:
             initial_joint_state: Optional initial JointState to start from
         """
         self.scene = scene
-        self.load_frame = frame_loader
         self.trajectory_commander = trajectory_commander
         self.initial_joint_state = initial_joint_state
 
@@ -94,7 +95,13 @@ class AnimationCommander:
 
             frame_name = self.current_block.filename
             try:
-                target_joint_state, move_duration, wait_duration = self.load_frame(frame_name)
+                frame_path = self.resolve_frame_path(frame_name)
+                frame_data = FrameData()
+                frame_data.set_joint_names(self.joint_names)
+                frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(frame_path)))
+                target_joint_state = frame_data.get_joint_state()
+                move_duration = frame_data.move_duration
+                wait_duration = frame_data.wait_duration
             except Exception as e:
                 rospy.logwarn(f"[AnimationCommander] Failed to load frame '{frame_name}': {e}")
                 self.stop()
