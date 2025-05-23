@@ -57,9 +57,12 @@ class TrajectoryVisualizer:
         point_start = JointTrajectoryPoint()
         point_start.time_from_start = rospy.Duration(0.0)
         point_start.positions = start_state.position
-        point_start.velocities = [
-            1000.0 if duration == 0.0 else (b - a) / duration for a, b in zip(start_state.position, target.position)
-        ]
+        if duration > 0.0:
+            point_start.velocities = [
+                (b - a) / duration for a, b in zip(start_state.position, target.position)
+            ]
+        else:
+            point_start.velocities = [0] * len(start_state.position)
 
         point_end = JointTrajectoryPoint()
         point_end.time_from_start = rospy.Duration(duration)

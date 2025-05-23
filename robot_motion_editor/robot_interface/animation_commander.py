@@ -110,9 +110,12 @@ class AnimationCommander:
             point_start = JointTrajectoryPoint()
             point_start.time_from_start = rospy.Duration(0.0)
             point_start.positions = previous_joint_state.position
-            point_start.velocities = [
-                (b - a) / move_duration for a, b in zip(previous_joint_state.position, target_joint_state.position)
-            ]
+            if move_duration > 0.0:
+                point_start.velocities = [
+                    (b - a) / move_duration for a, b in zip(previous_joint_state.position, target_joint_state.position)
+                ]
+            else:
+                point_start.velocities = [0.0] * len(previous_joint_state.position)
 
             point_end = JointTrajectoryPoint()
             point_end.time_from_start = rospy.Duration(move_duration)
