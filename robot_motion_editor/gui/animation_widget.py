@@ -13,14 +13,10 @@ from PyQt5.QtWidgets import QSplitter
 from PyQt5.QtWidgets import QTreeWidgetItem
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
-from sensor_msgs.msg import JointState
 
 from ..logic.animation_file_manager import AnimationData
-from ..logic.animation_file_manager import AnimationFileManager
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
-from ..logic.initial_pose_file_manager import InitialPoseData
-from ..logic.initial_pose_file_manager import InitialPoseFileManager
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.animation_commander import AnimationCommander
@@ -360,13 +356,7 @@ class AnimaitonWidget(QWidget):
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander
         )
-
-        if dlg.exec_():
-            joint_data = dlg.get_joint_data()
-            initial_pose_data = InitialPoseData()
-            initial_pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
-            initial_pose_data.set_dict(joint_data)
-            initial_pose_data.save_to_file(self.motion_directory_manager.resolve_initial_pose_path())
+        dlg.exec_()
 
     def open_frame_file_editor(self, frame_name):
         dlg = FrameEditorDialog(

@@ -294,6 +294,3 @@ class InitialFrameEditorDialog(QDialog):
 
         self.frame_data.save_to_file(self.frame_path)
         super().accept()
-
-    def get_joint_data(self):
-        return self.frame_data.get_dict()

@@ -17,7 +17,6 @@ from PyQt5.QtWidgets import QWidget
 from sensor_msgs.msg import JointState
 
 from ..logic.initial_pose_file_manager import InitialPoseData
-from ..logic.initial_pose_file_manager import InitialPoseFileManager
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
