@@ -215,8 +215,7 @@ class InitialFrameEditorDialog(QDialog):
             button.setStyleSheet("background-color: lightblue;" if dialog.result.strip() else "")
 
     def load_frame_from_file(self, path):
-        raw = FrameFileManager.load_dict(os.path.dirname(frame_path), os.path.basename(frame_path))
-        self.frame_data.set_dict(raw)
+        self.frame_data.load_from_file(path)
 
         self.duration_spin.setValue(self.frame_data.move_duration)
         self.wait_spin.setValue(self.frame_data.wait_duration)
@@ -255,11 +254,7 @@ class InitialFrameEditorDialog(QDialog):
             self.frame_data.set_velocity_scale(joint_name, vel_spin.value())
             self.frame_data.set_enable(joint_name, self.enable_checkbox_widgets[joint_name].isChecked())
 
-        FrameFileManager.save_dict(
-            os.path.dirname(self.frame_path),
-            self.frame_data.get_dict(),
-            os.path.basename(self.frame_path)
-        )
+        self.frame_data.save_to_file(self.frame_path)
         self.accept()
 
     def handle_play_button(self):
