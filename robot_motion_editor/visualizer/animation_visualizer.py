@@ -173,25 +173,33 @@ class AnimationVisualizer:
             self.state = 'stopped'
 
     def play_single_block(self, block):
-        if not isinstance(block, FrameBlockItem):
-            return
+        if isinstance(block, FrameBlockItem):
+            frame_name = block.filename
+            try:
+                target_joint_state, move_duration, wait_duration = self.load_frame(frame_name)
+            except Exception as e:
+                rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
+                return
 
-        frame_name = block.filename
-        try:
-            target_joint_state, move_duration, wait_duration = self.load_frame(frame_name)
-        except Exception as e:
-            rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
-            return
+            current_joint_state = self.initial_joint_state
+            if current_joint_state is None:
+                return
 
-        current_joint_state = self.initial_joint_state
-        if current_joint_state is None:
-            return
+            self.visualizer.visualize_current2target(
+                current=current_joint_state,
+                target=target_joint_state,
+                duration=move_duration
+            )
+            self.visualizer.publish_goal_state(target_joint_state)
+            self.previous_joint_state = target_joint_state
+            rospy.loginfo(f"[Visualizer] Played single frame: {frame_name}")
 
-        self.visualizer.visualize_current2target(
-            current=current_joint_state,
-            target=target_joint_state,
-            duration=move_duration
-        )
-        self.visualizer.publish_goal_state(target_joint_state)
-        self.previous_joint_state = target_joint_state
-        rospy.loginfo(f"[Visualizer] Played single frame: {frame_name}")
+        elif isinstance(block, StartBlockItem):
+            # StartBlockItemはtrajectory不要で初期状態をそのまま表示
+            current_joint_state = self.initial_joint_state
+            if current_joint_state is None:
+                rospy.logwarn("[AnimationVisualizer] No initial_joint_state set for StartBlockItem visualization.")
+                return
+
+            self.visualizer.publish_goal_state(current_joint_state)
+            rospy.loginfo("[Visualizer] Played StartBlockItem with initial_joint_state.")

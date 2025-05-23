@@ -53,8 +53,9 @@ class AnimationPreviewButtonWidget(QWidget):
             self.animation_visualizer.pause()
         elif self.animation_visualizer.state == 'stopped':
             selected = self.animation_visualizer.scene.selectedItems()
-            if len(selected) == 1 and isinstance(selected[0], FrameBlockItem):
-                self.animation_visualizer.play_single_block(selected[0])
+            if len(selected) == 1:
+                block = selected[0]
+                self.animation_visualizer.play_single_block(block)
 
         if self.animation_commander and self.animation_commander.state == 'playing':
             self.animation_commander.pause()
