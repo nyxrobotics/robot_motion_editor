@@ -12,13 +12,13 @@ from PyQt5.QtWidgets import QTreeWidget
 from PyQt5.QtWidgets import QTreeWidgetItem
 
 from ..logic.animation_file_manager import AnimationData
-from ..logic.animation_file_manager import AnimationFileManager
+from ..logic.motion_directory_manager import MotionDirectoryManager
 
 
 class AnimationFileWidget(QTreeWidget):
-    def __init__(self, motion_directory, parent=None):
+    def __init__(self, motion_directory_manager: MotionDirectoryManager, parent=None):
         super().__init__(parent)
-        self.motion_directory = motion_directory
+        self.motion_directory_manager = motion_directory_manager
         self.setHeaderLabel("Animations")
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
@@ -60,8 +60,8 @@ class AnimationFileWidget(QTreeWidget):
         if not ok or not new_name or old_name == new_name:
             return
 
-        old_path = os.path.join(self.motion_directory, old_name)
-        new_path = os.path.join(self.motion_directory, new_name)
+        old_path = self.motion_directory_manager.resolve_animation_path(old_name)
+        new_path = self.motion_directory_manager.resolve_animation_path(new_name)
 
         if os.path.exists(new_path):
             QMessageBox.warning(self, "Error", f"'{new_name}' already exists.")
@@ -83,18 +83,17 @@ class AnimationFileWidget(QTreeWidget):
             animation_item = animation_item.parent()
         animation_name = animation_item.text(0)
 
-        base_dir = self.motion_directory
         if category == "frames":
-            dir_path = os.path.join(base_dir, animation_name, "frames")
+            old_path = self.motion_directory_manager.resolve_frame_path(old_name, animation_name)
+            new_path = self.motion_directory_manager.resolve_frame_path(new_name, animation_name)
         elif category == "if":
-            dir_path = os.path.join(base_dir, animation_name, "conditions", "if")
+            old_path = self.motion_directory_manager.resolve_if_condition_path(old_name, animation_name)
+            new_path = self.motion_directory_manager.resolve_if_condition_path(new_name, animation_name)
         elif category == "switch":
-            dir_path = os.path.join(base_dir, animation_name, "conditions", "switch")
+            old_path = self.motion_directory_manager.resolve_switch_condition_path(old_name, animation_name)
+            new_path = self.motion_directory_manager.resolve_switch_condition_path(new_name, animation_name)
         else:
             return False
-
-        old_path = os.path.join(dir_path, f"{old_name}.yaml")
-        new_path = os.path.join(dir_path, f"{new_name}.yaml")
 
         if os.path.exists(new_path):
             QMessageBox.warning(self, "Error", f"'{new_name}.yaml' already exists.")
