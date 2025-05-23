@@ -108,9 +108,10 @@ class InitialFrameEditorDialog(QDialog):
         all_enable_row.addWidget(self.reset_all_button)
         form.addRow(all_enable_row)
 
-        max_label_width = max(QLabel(j).sizeHint().width() for j in self.joint_names) if self.joint_names else 100
+        max_label_width = max(QLabel(j).sizeHint().width() for j in self.joint_data_manager.get_joint_names(
+        )) if self.joint_data_manager.get_joint_names() else 100
 
-        for joint_name in self.joint_names:
+        for joint_name in self.joint_data_manager.get_joint_names():
             row = QHBoxLayout()
 
             enable_cb = QCheckBox()
@@ -123,7 +124,7 @@ class InitialFrameEditorDialog(QDialog):
             label = QLabel(joint_name)
             label.setFixedWidth(max_label_width)
 
-            lower_rad, upper_rad = self.joint_limits.get(joint_name, (-math.pi, math.pi))
+            lower_rad, upper_rad = self.joint_data_manager.get_joint_limit(joint_name)
             lower_deg, upper_deg = math.degrees(lower_rad), math.degrees(upper_rad)
 
             slider = QSlider(Qt.Horizontal)
@@ -181,6 +182,19 @@ class InitialFrameEditorDialog(QDialog):
         layout.addWidget(buttons)
 
         self.setLayout(layout)
+
+    def save_frame(self):
+        self.frame_data.move_duration = self.duration_spin.value()
+        self.frame_data.wait_duration = self.wait_spin.value()
+
+        for joint_name in self.joint_data_manager.get_joint_names():
+            _, spin, vel_spin = self.joint_widgets[joint_name]
+            self.frame_data.set_pose(joint_name, math.radians(spin.value()))
+            self.frame_data.set_velocity_scale(joint_name, vel_spin.value())
+            self.frame_data.set_enable(joint_name, self.enable_checkbox_widgets[joint_name].isChecked())
+
+        self.frame_data.save_to_file(self.frame_path)
+        super().accept()
 
     def set_all_enable_checkboxes(self, state):
         checked = (state == Qt.Checked)
@@ -244,7 +258,7 @@ class InitialFrameEditorDialog(QDialog):
                 btn.setChecked(False)
 
     def publish_goal_state_from_gui(self):
-        for joint_name in self.joint_names:
+        for joint_name in self.joint_data_manager.get_joint_names():
             _, spin, _ = self.joint_widgets[joint_name]
             self.frame_data.set_pose(joint_name, math.radians(spin.value()))
 

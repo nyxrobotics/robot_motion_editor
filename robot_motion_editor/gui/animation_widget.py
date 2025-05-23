@@ -363,11 +363,10 @@ class AnimaitonWidget(QWidget):
 
         if dlg.exec_():
             joint_data = dlg.get_joint_data()
-            InitialPoseFileManager.save_dict(
-                os.path.dirname(self.motion_directory_manager.resolve_initial_frame_path()),
-                joint_data,
-                filename="initial_frame.yaml"
-            )
+            initial_pose_data = InitialPoseData()
+            initial_pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
+            initial_pose_data.set_dict(joint_data)
+            initial_pose_data.save_to_file(self.motion_directory_manager.resolve_initial_pose_path())
 
     def open_frame_file_editor(self, frame_name):
         dlg = FrameEditorDialog(
