@@ -1,4 +1,3 @@
-
 import os
 
 import yaml
@@ -13,17 +12,10 @@ from PyQt5.QtWidgets import QMenu
 from PyQt5.QtWidgets import QMessageBox
 
 from ..logic.animation_file_manager import AnimationData
-from ..logic.animation_file_manager import AnimationFileManager
-from ..logic.animation_file_manager import ArrowData
-from ..logic.animation_file_manager import BlockConnection
-from ..logic.animation_file_manager import BlockData
-from ..logic.animation_file_manager import BlockInfo
 from ..logic.frame_file_manager import FrameData
-from ..logic.frame_file_manager import FrameFileManager
 from ..logic.if_condition_file_manager import IfConditionData
-from ..logic.if_condition_file_manager import IfConditionFileManager
+from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..logic.switch_condition_file_manager import SwitchConditionData
-from ..logic.switch_condition_file_manager import SwitchConditionFileManager
 from .animation_editor_items import ArrowItem
 from .animation_editor_items import FrameBlockItem
 from .animation_editor_items import IfBlockItem
@@ -211,22 +203,9 @@ class AnimationEditorWidget(QGraphicsScene):
                 name, ok = QInputDialog.getText(None, "New Frame", "Enter frame name:")
                 if ok and name.strip():
                     name = name.strip()
-                    frames_dir = os.path.join(
-                        self.editor_widget.motion_directory,
-                        self.editor_widget.current_animation_name,
-                        "frames")
-                    frame_path = os.path.join(frames_dir, f"{name}.yaml")
-
-                    if os.path.exists(frame_path):
-                        QMessageBox.warning(None, "Name Conflict", f"Frame '{name}' already exists.")
-                        return
-
-                    os.makedirs(frames_dir, exist_ok=True)
-                    default_frame_data = FrameData().get_dict()
-                    FrameFileManager.save_dict(
-                        os.path.dirname(frame_path),
-                        default_frame_data,
-                        os.path.basename(frame_path))
+                    frame_data = FrameData()
+                    frame_path = self.editor_widget.motion_directory_manager.resolve_frame_path(name)
+                    frame_data.save_to_file(frame_path)
 
                     id = self._generate_block_id()
                     block = FrameBlockItem(id, name)
@@ -240,24 +219,9 @@ class AnimationEditorWidget(QGraphicsScene):
                 name, ok = QInputDialog.getText(None, "New If Condition", "Enter condition name:")
                 if ok and name.strip():
                     name = name.strip()
-                    conditions_dir = os.path.join(
-                        self.editor_widget.motion_directory,
-                        self.editor_widget.current_animation_name,
-                        "conditions",
-                        "if")
-                    condition_path = os.path.join(conditions_dir, f"{name}.yaml")
-
-                    if os.path.exists(condition_path):
-                        QMessageBox.warning(None, "Name Conflict", f"If condition '{name}' already exists.")
-                        return
-
-                    os.makedirs(conditions_dir, exist_ok=True)
-                    default_if_data = IfConditionData(expression="", condition="")
-                    IfConditionFileManager.save_dict(
-                        conditions_dir,
-                        default_if_data.get_dict(),
-                        f"{name}.yaml"
-                    )
+                    condition_data = IfConditionData(expression="", condition="")
+                    condition_path = self.editor_widget.motion_directory_manager.resolve_if_condition_path(name)
+                    condition_data.save_to_file(condition_path)
 
                     id = self._generate_block_id()
                     block = IfBlockItem(id, name)
@@ -271,28 +235,9 @@ class AnimationEditorWidget(QGraphicsScene):
                 name, ok = QInputDialog.getText(None, "New Switch Condition", "Enter condition name:")
                 if ok and name.strip():
                     name = name.strip()
-                    conditions_dir = os.path.join(
-                        self.editor_widget.motion_directory,
-                        self.editor_widget.current_animation_name,
-                        "conditions",
-                        "switch")
-                    condition_path = os.path.join(conditions_dir, f"{name}.yaml")
-
-                    if os.path.exists(condition_path):
-                        QMessageBox.warning(None, "Name Conflict", f"Switch condition '{name}' already exists.")
-                        return
-
-                    os.makedirs(conditions_dir, exist_ok=True)
-                    default_switch_data = SwitchConditionData(
-                        expression="",
-                        condition="",
-                        case={"case_0": {"value": 0}}
-                    )
-                    SwitchConditionFileManager.save_dict(
-                        conditions_dir,
-                        default_switch_data.get_dict(),
-                        f"{name}.yaml"
-                    )
+                    condition_data = SwitchConditionData(expression="", condition="", case={"case_0": {"value": 0}})
+                    condition_path = self.editor_widget.motion_directory_manager.resolve_switch_condition_path(name)
+                    condition_data.save_to_file(condition_path)
 
                     id = self._generate_block_id()
                     block = SwitchBlockItem(id, name, num_cases=2)
@@ -301,6 +246,7 @@ class AnimationEditorWidget(QGraphicsScene):
                     self.block_objects[block.name] = block
 
                     self.editor_widget.load_animation_list()
+
             elif selected_action == new_arrow_action:
                 id = self._generate_arrow_id()
                 arrow = ArrowItem(id)
