@@ -19,11 +19,11 @@ from ..logic.motion_directory_manager import MotionDirectoryManager
 class AnimationCommander:
     def __init__(
             self,
-            scene,
+            animation_flow_scene,
             trajectory_commander,
             motion_directory_manager: MotionDirectoryManager,
             joint_data_manager: JointDataManager):
-        self.scene = scene
+        self.animation_flow_scene = animation_flow_scene
         self.trajectory_commander = trajectory_commander
         self.motion_directory_manager = motion_directory_manager
         self.joint_data_manager = joint_data_manager
@@ -76,7 +76,7 @@ class AnimationCommander:
             self._pause_event.set()
 
     def _get_start_block(self):
-        for block in self.scene.block_objects.values():
+        for block in self.animation_flow_scene.block_objects.values():
             if isinstance(block, StartBlockItem):
                 return self._get_next_block(block)
         return None

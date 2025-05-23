@@ -44,6 +44,7 @@ class AnimationEditorWidget(QGraphicsScene):
         self.block_objects = {}
         self.arrow_objects = {}
         self.setSceneRect(0, 0, 1000, 1000)
+        self.editor_widget = None
 
     def _generate_block_id(self):
         used_ids = {block.id for block in self.block_objects.values()}

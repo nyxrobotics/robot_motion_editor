@@ -17,11 +17,11 @@ from ..logic.motion_directory_manager import MotionDirectoryManager
 class AnimationVisualizer:
     def __init__(
             self,
-            scene,
+            animation_flow_scene,
             trajectory_visualizer,
             motion_directory_manager: MotionDirectoryManager,
             joint_data_manager: JointDataManager):
-        self.scene = scene
+        self.animation_flow_scene = animation_flow_scene
         self.visualizer = trajectory_visualizer
         self.motion_directory_manager = motion_directory_manager
         self.joint_data_manager = joint_data_manager
@@ -84,7 +84,7 @@ class AnimationVisualizer:
 
     def _get_scene_snapshot(self):
         snapshot = {}
-        for name, block in self.scene.block_objects.items():
+        for name, block in self.animation_flow_scene.block_objects.items():
             entry = {
                 'id': getattr(block, 'id', None),
                 'type': type(block).__name__,
@@ -111,7 +111,7 @@ class AnimationVisualizer:
         return False
 
     def _get_start_block(self):
-        for block in self.scene.block_objects.values():
+        for block in self.animation_flow_scene.block_objects.values():
             if isinstance(block, StartBlockItem):
                 return self._get_next_block(block)
         return None
@@ -143,7 +143,7 @@ class AnimationVisualizer:
                 return
 
             if self.scene is not None:
-                selected = self.scene.selectedItems()
+                selected = self.animation_flow_scene.selectedItems()
                 if self.current_block not in selected:
                     for item in selected:
                         item.setSelected(False)
@@ -191,7 +191,7 @@ class AnimationVisualizer:
             self.current_block = self._get_next_block(self.current_block)
 
             if self.scene is not None:
-                for item in self.scene.selectedItems():
+                for item in self.animation_flow_scene.selectedItems():
                     item.setSelected(False)
 
         self.state = 'stopped'

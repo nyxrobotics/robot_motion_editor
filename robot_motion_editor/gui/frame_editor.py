@@ -190,6 +190,92 @@ class FrameEditorDialog(QDialog):
 
         self.setLayout(layout)
 
+    def set_all_enable_checkboxes(self, state):
+        checked = (state == Qt.Checked)
+        for joint_name, cb in self.enable_checkbox_widgets.items():
+            cb.blockSignals(True)
+            cb.setChecked(checked)
+            self.frame_data.set_enable(joint_name, checked)
+            cb.blockSignals(False)
+
+    def reset_all_positions(self):
+        for slider, spin, _ in self.joint_widgets.values():
+            slider.blockSignals(True)
+            spin.blockSignals(True)
+            slider.setValue(0)
+            spin.setValue(0.0)
+            slider.blockSignals(False)
+            spin.blockSignals(False)
+
+    def open_pid_dialog(self, joint_name, button):
+        current = self.frame_data.get_pid(joint_name)
+        dialog = PIDGainEditorDialog(joint_name, current, parent=self)
+        if dialog.exec_() and dialog.result:
+            self.frame_data.set_pid(joint_name, dialog.result)
+            button.setStyleSheet("background-color: lightblue;" if any(v != 0.0 for v in dialog.result) else "")
+
+    def open_feedback_dialog(self, joint_name, button):
+        current = self.frame_data.get_feedback(joint_name)
+        dialog = FeedbackExpressionDialog(joint_name, current, self.available_variables, parent=self)
+        if dialog.exec_() and dialog.result is not None:
+            self.frame_data.set_feedback(joint_name, dialog.result)
+            button.setStyleSheet("background-color: lightblue;" if dialog.result.strip() else "")
+
+    def handle_play_button(self):
+        sender = self.sender()
+        for btn in [self.play_in_current_btn, self.play_in_current_out_btn, self.play_current_out_btn]:
+            if btn != sender:
+                btn.setChecked(False)
+        if not self.loop_checkbox.isChecked():
+            sender.setChecked(False)
+
+        msg = self.frame_data.get_joint_state()
+        msg.header.stamp = rospy.Time.now()
+
+        if self.trajectory_visualizer is None or self.frame_visualizer is None:
+            rospy.logwarn("FrameVisualizer is not connected to TrajectoryVisualizer.")
+            return
+
+        self.trajectory_visualizer.publish_goal_state(msg)
+        self.frame_visualizer.set_current_frame(msg, self.frame_data.move_duration, self.frame_data.wait_duration)
+
+        if sender == self.play_in_current_btn:
+            self.frame_visualizer.play_in_trajectory()
+        elif sender == self.play_in_current_out_btn:
+            self.frame_visualizer.play_in_out_trajectory()
+        elif sender == self.play_current_out_btn:
+            self.frame_visualizer.play_out_trajectory()
+
+    def on_loop_checkbox_changed(self, state):
+        if state == Qt.Unchecked:
+            for btn in [self.play_in_current_btn, self.play_in_current_out_btn, self.play_current_out_btn]:
+                btn.setChecked(False)
+
+    def publish_goal_state_from_gui(self):
+        for joint_name in self.joint_names:
+            _, spin, _ = self.joint_widgets[joint_name]
+            self.frame_data.set_pose(joint_name, math.radians(spin.value()))
+
+        msg = self.frame_data.get_joint_state()
+        msg.header.stamp = rospy.Time.now()
+
+        if self.trajectory_visualizer:
+            self.trajectory_visualizer.publish_goal_state(msg)
+
+        if self.trajectory_commander:
+            self.trajectory_commander.send_joint_state(msg, duration=1.0)
+
+    def set_frame_to_ui(self):
+        self.duration_spin.setValue(self.frame_data.move_duration)
+        self.wait_spin.setValue(self.frame_data.wait_duration)
+        for joint_name in self.frame_data.get_joint_names():
+            if joint_name not in self.joint_widgets:
+                continue
+            _, spin, vel_spin = self.joint_widgets[joint_name]
+            spin.setValue(math.degrees(self.frame_data.get_pose(joint_name)))
+            vel_spin.setValue(self.frame_data.get_velocity_scale(joint_name))
+            self.enable_checkbox_widgets[joint_name].setChecked(self.frame_data.get_enable(joint_name))
+
     def accept(self):
         if not self.frame_path:
             super().reject()

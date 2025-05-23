@@ -52,16 +52,17 @@ class AnimaitonWidget(QWidget):
 
         self.animation_tree = AnimationFileWidget(motion_directory_manager=self.motion_directory_manager, parent=self)
         self.animation_flow_scene = AnimationEditorWidget(motion_directory_manager=self.motion_directory_manager)
+        self.animation_flow_scene.editor_widget = self
         self.view = AnimatioGraphicsView(self.animation_flow_scene)
 
         self.animation_visualizer = AnimationVisualizer(
-            scene=self.animation_flow_scene,
+            animation_flow_scene=self.animation_flow_scene,
             trajectory_visualizer=self.trajectory_visualizer,
             motion_directory_manager=self.motion_directory_manager,
             joint_data_manager=self.joint_data_manager)
         self.animation_commander = AnimationCommander(
             trajectory_commander=self.trajectory_commander,
-            scene=self.animation_flow_scene,
+            animation_flow_scene=self.animation_flow_scene,
             motion_directory_manager=self.motion_directory_manager,
             joint_data_manager=self.joint_data_manager)
         self.init_ui()
@@ -379,7 +380,7 @@ class AnimaitonWidget(QWidget):
         dlg.exec_()
 
     def open_frame_block_editor(self, block_id: str):
-        block = self.scene.block_objects.get(block_id)
+        block = self.animation_flow_scene.block_objects.get(block_id)
         if not block:
             print(f"[WARN] No block found for id: {block_id}")
             return
