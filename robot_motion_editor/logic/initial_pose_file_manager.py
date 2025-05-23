@@ -1,4 +1,3 @@
-
 import os
 
 import rospy
@@ -7,12 +6,13 @@ from sensor_msgs.msg import JointState
 
 
 class InitialPoseFileManager:
-    def save_dict(path, joint_data, filename="initial_pose.yaml"):
+    @staticmethod
+    def save_dict(filepath, joint_data):
         """
         Save joint initial pose data to a YAML file.
 
         Parameters:
-        - path (str): Directory to save the file.
+        - filepath (str): Full path to the YAML file.
         - joint_data (dict): Dictionary formatted as:
             {
                 "joint_name_1": {
@@ -23,39 +23,36 @@ class InitialPoseFileManager:
                 },
                 ...
             }
-        - filename (str): YAML filename (default: "initial_pose.yaml")
         """
-        os.makedirs(path, exist_ok=True)
-        file_path = os.path.abspath(os.path.join(path, filename))
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
         try:
-            with open(file_path, "w") as f:
+            with open(filepath, "w") as f:
                 yaml.safe_dump({"joints": joint_data}, f, default_flow_style=False)
-            rospy.loginfo(f"Initial pose successfully saved to: {file_path}")
+            rospy.loginfo(f"Initial pose successfully saved to: {filepath}")
         except Exception as e:
-            rospy.logwarn(f"[ERROR] Failed to save initial pose to: {file_path} — {e}")
+            rospy.logwarn(f"[ERROR] Failed to save initial pose to: {filepath} — {e}")
 
-    def load_dict(path, filename="initial_pose.yaml"):
+    @staticmethod
+    def load_dict(filepath):
         """
         Load joint initial pose data from a YAML file.
 
         Parameters:
-        - path (str): Directory containing the YAML file.
-        - filename (str): YAML filename (default: "initial_pose.yaml")
+        - filepath (str): Full path to the YAML file.
 
         Returns:
         - dict: joint_data dictionary with same format as described in save_dict()
         """
-        file_path = os.path.abspath(os.path.join(path, filename))
-        if not os.path.exists(file_path):
-            rospy.logwarn(f"[WARN] Initial pose file not found: {file_path}")
+        if not os.path.exists(filepath):
+            rospy.logwarn(f"[WARN] Initial pose file not found: {filepath}")
             return {}
         try:
-            with open(file_path, "r") as f:
+            with open(filepath, "r") as f:
                 data = yaml.safe_load(f)
-            rospy.loginfo(f"Initial pose successfully loaded from: {file_path}")
+            rospy.loginfo(f"Initial pose successfully loaded from: {filepath}")
             return data.get("joints", {})
         except Exception as e:
-            rospy.logwarn(f"[ERROR] Failed to load initial pose from: {file_path} — {e}")
+            rospy.logwarn(f"[ERROR] Failed to load initial pose from: {filepath} — {e}")
             return {}
 
 
@@ -69,6 +66,8 @@ class InitialPoseData:
     - get_dict() -> dict
     - set_joint_state(JointState)
     - get_joint_state() -> JointState
+    - save_to_file(filepath: str)
+    - load_from_file(filepath: str)
     """
 
     def __init__(self):
@@ -107,16 +106,13 @@ class InitialPoseData:
         Only 'position' is updated. Other fields remain unchanged.
         If joint_names is not set, it's populated with the order from the message.
         """
-        if not self.joint_names:  # If joint_names is not set, initialize it from the order in joint_state_msg
+        if not self.joint_names:
             self.joint_names = joint_state_msg.name
-
         for name, pos in zip(joint_state_msg.name, joint_state_msg.position):
             if name in self.data:
                 self.data[name]["position"] = pos
             else:
                 self.data[name] = {"position": pos}
-
-        # After setting the state, reorder data if needed
         self.align_data()
 
     def get_joint_state(self):
@@ -157,3 +153,16 @@ class InitialPoseData:
 
     def get_enable(self, joint_name: str) -> bool:
         return self.data.get(joint_name, {}).get("enable", True)
+
+    def save_to_file(self, filepath: str):
+        """
+        Save internal joint data to a YAML file using InitialPoseFileManager.
+        """
+        InitialPoseFileManager.save_dict(filepath, self.get_dict())
+
+    def load_from_file(self, filepath: str):
+        """
+        Load joint data from a YAML file and update internal state.
+        """
+        data = InitialPoseFileManager.load_dict(filepath)
+        self.set_dict(data)
