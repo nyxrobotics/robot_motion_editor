@@ -12,6 +12,7 @@ from ..gui.animation_editor_widget import StartBlockItem
 from ..gui.animation_editor_widget import SwitchBlockItem
 from ..logic.frame_file_manager import FrameData
 from ..logic.initial_pose_file_manager import InitialPoseData
+from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 
 
@@ -20,22 +21,19 @@ class AnimationCommander:
             self,
             scene,
             trajectory_commander,
-            motion_directory_manager: MotionDirectoryManager):
-        """
-        Args:
-            scene: Animation scene with block graph
-            trajectory_commander: Instance of TrajectoryCommander
-            motion_directory_manager: Handles path resolution
-        """
+            motion_directory_manager: MotionDirectoryManager,
+            joint_data_manager: JointDataManager):
         self.scene = scene
         self.trajectory_commander = trajectory_commander
         self.motion_directory_manager = motion_directory_manager
+        self.joint_data_manager = joint_data_manager
 
         self.initial_joint_state = None
         try:
             pose_path = self.motion_directory_manager.resolve_initial_pose_path()
             if os.path.exists(pose_path):
                 pose_data = InitialPoseData()
+                pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
                 pose_data.load_from_file(pose_path)
                 self.initial_joint_state = pose_data.get_joint_state()
         except Exception as e:
@@ -112,6 +110,7 @@ class AnimationCommander:
             try:
                 frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
                 frame_data = FrameData()
+                frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
                 frame_data.load_from_file(frame_path)
                 target_joint_state = frame_data.get_joint_state()
                 move_duration = frame_data.move_duration

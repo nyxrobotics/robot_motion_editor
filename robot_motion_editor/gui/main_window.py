@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import QTabWidget
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
+from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..urdf_interface.urdf_joint_extractor import get_joint_limit
@@ -27,16 +28,17 @@ class MainWindow(QWidget):
         self.setWindowTitle("Robot Motion Editor")
         self.resize(1000, 800)
 
-        self.joint_names = get_transmission_joints()
-        self.joint_limits = {
-            name: get_joint_limit(name)
-            for name in self.joint_names
-        }
-        self.variable_names = self.generate_variable_names()
+        self.joint_data_manager = JointDataManager(
+            joint_names=get_transmission_joints()
+        )
+        self.joint_data_manager.set_joint_limits({
+            name: get_joint_limit(name) for name in self.joint_data_manager.get_joint_names()
+        })
+        self.joint_data_manager.set_available_variables(self.generate_variable_names())
 
-        # Initialize visualizer and commander
         self.trajectory_visualizer = TrajectoryVisualizer(visualize_as_state=True, rate=30.0)
-        self.trajectory_commander = TrajectoryCommander("kuroko", self.joint_names, mode="position")
+        self.trajectory_commander = TrajectoryCommander(
+            "kuroko", self.joint_data_manager.get_joint_names(), mode="position")
         self.motion_directory_manager = MotionDirectoryManager(motion_directory=".")
 
         self.init_ui()
@@ -47,7 +49,7 @@ class MainWindow(QWidget):
             "imu_ang_vel_x", "imu_ang_vel_y", "imu_ang_vel_z",
             "imu_lin_acc_x", "imu_lin_acc_y", "imu_lin_acc_z"
         ]
-        joint_vars = [f"joint_{name}" for name in self.joint_names]
+        joint_vars = [f"joint_{name}" for name in self.joint_data_manager.get_joint_names()]
         return joint_vars + imu_vars
 
     def get_available_serial_ports(self):
@@ -66,7 +68,7 @@ class MainWindow(QWidget):
             self.motion_directory_manager.set_motion_directory(folder)
 
             if self.initial_pose_editor:
-                self.initial_pose_editor.load_pose
+                self.initial_pose_editor.load_pose()
             if self.animation_widget:
                 self.animation_widget.load_animation_list()
 
@@ -133,9 +135,7 @@ class MainWindow(QWidget):
 
         self.tabs = QTabWidget()
         self.initial_pose_editor = InitialPoseEditor(
-            self.joint_names,
-            self.joint_limits,
-            available_variables=self.variable_names,
+            joint_data_manager=self.joint_data_manager,
             motion_directory_manager=self.motion_directory_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander
@@ -144,9 +144,7 @@ class MainWindow(QWidget):
 
         self.animation_widget = AnimaitonWidget(
             motion_directory_manager=self.motion_directory_manager,
-            joint_names=self.joint_names,
-            joint_limits=self.joint_limits,
-            available_variables=self.variable_names,
+            joint_data_manager=self.joint_data_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander
         )

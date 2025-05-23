@@ -1,4 +1,3 @@
-
 import os
 import threading
 import time
@@ -10,8 +9,8 @@ from ..gui.animation_editor_items import IfBlockItem
 from ..gui.animation_editor_items import StartBlockItem
 from ..gui.animation_editor_items import SwitchBlockItem
 from ..logic.frame_file_manager import FrameData
-from ..logic.frame_file_manager import FrameFileManager
 from ..logic.initial_pose_file_manager import InitialPoseData
+from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 
 
@@ -20,17 +19,19 @@ class AnimationVisualizer:
             self,
             scene,
             trajectory_visualizer,
-            motion_directory_manager: MotionDirectoryManager):
+            motion_directory_manager: MotionDirectoryManager,
+            joint_data_manager: JointDataManager):
         self.scene = scene
         self.visualizer = trajectory_visualizer
         self.motion_directory_manager = motion_directory_manager
+        self.joint_data_manager = joint_data_manager
 
-        # Load initial pose
         self.initial_joint_state = None
         try:
             pose_path = self.motion_directory_manager.resolve_initial_pose_path()
             if os.path.exists(pose_path):
                 pose_data = InitialPoseData()
+                pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
                 pose_data.load_from_file(pose_path)
                 self.initial_joint_state = pose_data.get_joint_state()
         except Exception as e:
@@ -90,8 +91,7 @@ class AnimationVisualizer:
                 'filename': getattr(block, 'filename', ''),
                 'preview_output_index': getattr(block, 'preview_output_index', None),
                 'num_outputs': len(getattr(block, 'output_arrows', [])),
-                'subblock_keys': sorted(block.output_sub_blocks.keys())
-                if hasattr(block, 'output_sub_blocks') else [],
+                'subblock_keys': sorted(block.output_sub_blocks.keys()) if hasattr(block, 'output_sub_blocks') else [],
             }
             snapshot[name] = entry
         return snapshot
@@ -137,13 +137,11 @@ class AnimationVisualizer:
         while self.current_block and not self._stop_event.is_set():
             self._pause_event.wait()
 
-            # シーン変更検出
             if self._scene_changed():
                 rospy.logwarn("[AnimationVisualizer] Scene changed. Stopping.")
                 self.stop()
                 return
 
-            # 🔽 再生中のブロックだけを選択表示
             if self.scene is not None:
                 selected = self.scene.selectedItems()
                 if self.current_block not in selected:
@@ -160,16 +158,13 @@ class AnimationVisualizer:
             try:
                 frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
                 frame_data = FrameData()
-                frame_data.set_joint_names(self.joint_names)
-                frame_data.set_dict(
-                    FrameFileManager.load_dict(
-                        os.path.dirname(frame_path),
-                        os.path.basename(frame_path)))
+                frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
+                frame_data.load_from_file(frame_path)
                 target_joint_state = frame_data.get_joint_state()
                 move_duration = frame_data.move_duration
                 wait_duration = frame_data.wait_duration
             except Exception as e:
-                rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_path}': {e}")
+                rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
                 self.stop()
                 return
 
@@ -199,7 +194,7 @@ class AnimationVisualizer:
                 for item in self.scene.selectedItems():
                     item.setSelected(False)
 
-            self.state = 'stopped'
+        self.state = 'stopped'
 
     def play_single_block(self, block):
         if isinstance(block, FrameBlockItem):
@@ -207,11 +202,8 @@ class AnimationVisualizer:
             try:
                 frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
                 frame_data = FrameData()
-                frame_data.set_joint_names(self.joint_names)
-                frame_data.set_dict(
-                    FrameFileManager.load_dict(
-                        os.path.dirname(frame_path),
-                        os.path.basename(frame_path)))
+                frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
+                frame_data.load_from_file(frame_path)
                 target_joint_state = frame_data.get_joint_state()
                 move_duration = frame_data.move_duration
                 wait_duration = frame_data.wait_duration
@@ -235,13 +227,10 @@ class AnimationVisualizer:
         elif isinstance(block, StartBlockItem):
             current_joint_state = self.initial_joint_state
             try:
-                frame_path = self.resolve_initial_frame_path()
+                frame_path = self.motion_directory_manager.resolve_initial_frame_path()
                 frame_data = FrameData()
-                frame_data.set_joint_names(self.joint_names)
-                frame_data.set_dict(
-                    FrameFileManager.load_dict(
-                        os.path.dirname(frame_path),
-                        os.path.basename(frame_path)))
+                frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
+                frame_data.load_from_file(frame_path)
                 current_joint_state = frame_data.get_joint_state()
             except Exception as e:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load initial frame: {e}")

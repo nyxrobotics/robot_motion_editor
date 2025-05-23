@@ -21,6 +21,7 @@ from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
 from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.initial_pose_file_manager import InitialPoseFileManager
+from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.animation_commander import AnimationCommander
 from ..robot_interface.trajectory_commander import TrajectoryCommander
@@ -40,16 +41,12 @@ class AnimaitonWidget(QWidget):
     def __init__(
             self,
             motion_directory_manager: MotionDirectoryManager,
-            joint_names=None,
-            joint_limits=None,
-            available_variables=None,
+            joint_data_manager: JointDataManager,
             trajectory_visualizer: TrajectoryVisualizer = None,
             trajectory_commander: TrajectoryCommander = None):
         super().__init__()
         self.motion_directory_manager = motion_directory_manager
-        self.joint_names = joint_names or []
-        self.joint_limits = joint_limits or {}
-        self.available_variables = available_variables or []
+        self.joint_data_manager = joint_data_manager
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
 
@@ -60,12 +57,13 @@ class AnimaitonWidget(QWidget):
         self.animation_visualizer = AnimationVisualizer(
             scene=self.scene,
             trajectory_visualizer=self.trajectory_visualizer,
-            motion_directory_manager=self.motion_directory_manager)
+            motion_directory_manager=self.motion_directory_manager,
+            joint_data_manager=self.joint_data_manager)
         self.animation_commander = AnimationCommander(
             trajectory_commander=self.trajectory_commander,
             scene=self.scene,
-            motion_directory_manager=self.motion_directory_manager)
-
+            motion_directory_manager=self.motion_directory_manager,
+            joint_data_manager=self.joint_data_manager)
         self.init_ui()
         self.load_animation_list()
 
@@ -160,8 +158,7 @@ class AnimaitonWidget(QWidget):
         self.scene.highlight_preview_path()
 
         try:
-            frame_data = FrameData()
-            frame_data.set_joint_names(self.joint_names)
+            frame_data = FrameData(joint_names=self.joint_data_manager.get_joint_names())
             frame_data.load_from_file(self.motion_directory_manager.resolve_initial_frame_path())
             self.initial_joint_state = frame_data.get_joint_state()
             self.animation_visualizer.initial_joint_state = self.initial_joint_state
@@ -319,11 +316,10 @@ class AnimaitonWidget(QWidget):
 
         if item.text(0) == "initial_frame":
             dlg = InitialFrameEditorDialog(
-                joint_names=self.joint_names,
-                joint_limits=self.joint_limits,
-                available_variables=self.available_variables,
-                frame_path=self.motion_directory_manager.resolve_initial_frame_path()
-            )
+                joint_data_manager=self.joint_data_manager,
+                motion_directory_manager=self.motion_directory_manager,
+                trajectory_visualizer=self.trajectory_visualizer,
+                trajectory_commander=self.trajectory_commander)
             if dlg.exec_():
                 joint_data = dlg.get_joint_data()
                 InitialPoseFileManager.save_dict(
@@ -340,9 +336,7 @@ class AnimaitonWidget(QWidget):
                 return
 
             dlg = FrameEditorDialog(
-                joint_names=self.joint_names,
-                joint_limits=self.joint_limits,
-                available_variables=self.available_variables,
+                joint_data_manager=self.joint_data_manager,
                 motion_directory_manager=self.motion_directory_manager,
                 frame_name=frame_name,
                 trajectory_visualizer=self.trajectory_visualizer,
@@ -369,7 +363,10 @@ class AnimaitonWidget(QWidget):
             if not os.path.exists(condition_path):
                 QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
                 return
-            dlg = IfConditionEditorDialog(available_variables=self.available_variables, condition_path=condition_path)
+            dlg = IfConditionEditorDialog(
+                joint_data_manager=self.joint_data_manager,
+                motion_directory_manager=self.motion_directory_manager,
+                condition_name=condition_name)
             dlg.exec_()
 
         elif item.parent() and item.parent().text(0) == "switch":
@@ -379,8 +376,9 @@ class AnimaitonWidget(QWidget):
                 QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
                 return
             dlg = SwitchConditionEditorDialog(
-                condition_path=condition_path,
-                available_variables=self.available_variables)
+                joint_data_manager=self.joint_data_manager,
+                motion_directory_manager=self.motion_directory_manager,
+                condition_name=condition_name)
             if dlg.exec_():
                 if dlg.result:
                     new_num_cases = dlg.result.get("num_cases", 2)
