@@ -11,7 +11,8 @@ from ..gui.animation_editor_widget import IfBlockItem
 from ..gui.animation_editor_widget import StartBlockItem
 from ..gui.animation_editor_widget import SwitchBlockItem
 from ..logic.frame_file_manager import FrameData
-from ..logic.frame_file_manager import FrameFileManager
+from ..logic.initial_pose_file_manager import InitialPoseData
+from ..logic.motion_directory_manager import MotionDirectoryManager
 
 
 class AnimationCommander:
@@ -19,21 +20,26 @@ class AnimationCommander:
             self,
             scene,
             trajectory_commander,
-            initial_joint_state=None,
-            motion_directory=None,
-            current_animation_name=None):
+            motion_directory_manager: MotionDirectoryManager):
         """
         Args:
             scene: Animation scene with block graph
-            frame_loader: Function to load a frame by name, returns (JointState, move_duration, wait_duration)
             trajectory_commander: Instance of TrajectoryCommander
-            initial_joint_state: Optional initial JointState to start from
+            motion_directory_manager: Handles path resolution
         """
         self.scene = scene
         self.trajectory_commander = trajectory_commander
-        self.initial_joint_state = initial_joint_state
-        self.motion_directory = motion_directory
-        self.current_animation_name = current_animation_name
+        self.motion_directory_manager = motion_directory_manager
+
+        self.initial_joint_state = None
+        try:
+            pose_path = self.motion_directory_manager.resolve_initial_pose_path()
+            if os.path.exists(pose_path):
+                pose_data = InitialPoseData()
+                pose_data.load_from_file(pose_path)
+                self.initial_joint_state = pose_data.to_joint_state()
+        except Exception as e:
+            rospy.logwarn(f"Failed to load initial pose: {e}")
 
         self._thread = None
         self._stop_event = threading.Event()
@@ -104,13 +110,9 @@ class AnimationCommander:
 
             frame_name = self.current_block.filename
             try:
-                frame_path = self.resolve_frame_path(frame_name)
+                frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
                 frame_data = FrameData()
-                frame_data.set_joint_names(self.joint_names)
-                frame_data.set_dict(
-                    FrameFileManager.load_dict(
-                        os.path.dirname(frame_path),
-                        os.path.basename(frame_path)))
+                frame_data.load_from_file(frame_path)
                 target_joint_state = frame_data.get_joint_state()
                 move_duration = frame_data.move_duration
                 wait_duration = frame_data.wait_duration
@@ -122,7 +124,6 @@ class AnimationCommander:
             if previous_joint_state is None:
                 previous_joint_state = target_joint_state
 
-            # Send trajectory instead of just target pose
             traj = JointTrajectory()
             traj.joint_names = target_joint_state.name
 
@@ -161,9 +162,3 @@ class AnimationCommander:
             self.current_block = self._get_next_block(self.current_block)
 
         self.state = 'stopped'
-
-    def resolve_frame_path(self, frame_name):
-        return os.path.join(self.motion_directory, self.current_animation_name, "frames", f"{frame_name}.yaml")
-
-    def resolve_initial_frame_path(self):
-        return os.path.join(self.motion_directory, self.current_animation_name, "initial_frame.yaml")

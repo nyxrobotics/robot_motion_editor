@@ -11,6 +11,8 @@ from ..gui.animation_editor_items import StartBlockItem
 from ..gui.animation_editor_items import SwitchBlockItem
 from ..logic.frame_file_manager import FrameData
 from ..logic.frame_file_manager import FrameFileManager
+from ..logic.initial_pose_file_manager import InitialPoseData
+from ..logic.motion_directory_manager import MotionDirectoryManager
 
 
 class AnimationVisualizer:
@@ -18,14 +20,21 @@ class AnimationVisualizer:
             self,
             scene,
             trajectory_visualizer,
-            initial_joint_state=None,
-            motion_directory=None,
-            current_animation_name=None):
+            motion_directory_manager: MotionDirectoryManager):
         self.scene = scene
         self.visualizer = trajectory_visualizer
-        self.initial_joint_state = initial_joint_state
-        self.motion_directory = motion_directory
-        self.current_animation_name = current_animation_name
+        self.motion_directory_manager = motion_directory_manager
+
+        # Load initial pose
+        self.initial_joint_state = None
+        try:
+            pose_path = self.motion_directory_manager.resolve_initial_pose_path()
+            if os.path.exists(pose_path):
+                pose_data = InitialPoseData()
+                pose_data.load_from_file(pose_path)
+                self.initial_joint_state = pose_data.to_joint_state()
+        except Exception as e:
+            rospy.logwarn(f"Failed to load initial pose: {e}")
 
         self._thread = None
         self._stop_event = threading.Event()
@@ -243,9 +252,3 @@ class AnimationVisualizer:
 
             self.visualizer.publish_goal_state(current_joint_state)
             rospy.loginfo("[Visualizer] Played StartBlockItem with initial_joint_state.")
-
-    def resolve_frame_path(self, frame_name):
-        return os.path.join(self.motion_directory, self.current_animation_name, "frames", f"{frame_name}.yaml")
-
-    def resolve_initial_frame_path(self):
-        return os.path.join(self.motion_directory, self.current_animation_name, "initial_frame.yaml")
