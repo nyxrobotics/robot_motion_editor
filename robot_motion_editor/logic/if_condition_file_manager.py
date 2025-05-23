@@ -1,7 +1,5 @@
 import os
 from dataclasses import dataclass
-from typing import List
-from typing import Optional
 
 import yaml
 
@@ -12,55 +10,78 @@ class IfConditionData:
     condition: str = ""
 
     def set_dict(self, data: dict):
+        """
+        Populate this IfConditionData object from a dictionary.
+        """
         self.expression = data.get("expression", "")
         self.condition = data.get("condition", "")
 
     def get_dict(self) -> dict:
+        """
+        Generate a dictionary from this IfConditionData object.
+        """
         return {
             "expression": self.expression,
             "condition": self.condition
         }
 
+    def save_to_file(self, filepath: str):
+        """
+        Save this IfConditionData to a YAML file.
+
+        Parameters:
+        - filepath (str): Full path to save the YAML file.
+        """
+        IfConditionFileManager.save_dict(filepath, self.get_dict())
+
+    def load_from_file(self, filepath: str):
+        """
+        Load and update this IfConditionData from a YAML file.
+
+        Parameters:
+        - filepath (str): Full path to the YAML file to load.
+        """
+        data = IfConditionFileManager.load_dict(filepath)
+        self.set_dict(data)
+
 
 class IfConditionFileManager:
     @staticmethod
-    def get_folder_path(project_root: str, animation_name: str) -> str:
-        return os.path.join(project_root, animation_name, "conditions", "if")
+    def save_dict(filepath: str, data: dict):
+        """
+        Save condition data to a YAML file.
 
-    @staticmethod
-    def get_file_path(project_root: str, animation_name: str, name: str) -> str:
-        return os.path.join(IfConditionFileManager.get_folder_path(project_root, animation_name), f"{name}.yaml")
-
-    @staticmethod
-    def save_dict(project_root: str, data: dict, name: str = "condition.yaml"):
-        folder = os.path.dirname(IfConditionFileManager.get_file_path(project_root, "", name))
-        os.makedirs(folder, exist_ok=True)
-        file_path = os.path.join(folder, name)
+        Parameters:
+        - filepath (str): Full file path to save.
+        - data (dict): Dictionary to be saved.
+        """
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
         try:
-            with open(file_path, "w") as f:
+            with open(filepath, "w") as f:
                 yaml.safe_dump(data, f, default_flow_style=False)
-            print(f"[INFO] IfCondition data saved to: {file_path}")
+            print(f"[INFO] IfCondition data saved to: {filepath}")
         except Exception as e:
-            print(f"[ERROR] Failed to save IfCondition data to {file_path}: {e}")
+            print(f"[ERROR] Failed to save IfCondition data to {filepath}: {e}")
 
     @staticmethod
-    def load_dict(project_root: str, name: str = "condition.yaml") -> dict:
-        file_path = IfConditionFileManager.get_file_path(project_root, "", name)
-        if not os.path.exists(file_path):
-            print(f"[WARN] IfCondition file not found: {file_path}")
+    def load_dict(filepath: str) -> dict:
+        """
+        Load condition data from a YAML file.
+
+        Parameters:
+        - filepath (str): Full file path to load.
+
+        Returns:
+        - dict: Loaded condition data.
+        """
+        if not os.path.exists(filepath):
+            print(f"[WARN] IfCondition file not found: {filepath}")
             return {}
         try:
-            with open(file_path, "r") as f:
+            with open(filepath, "r") as f:
                 data = yaml.safe_load(f)
-            print(f"[INFO] IfCondition data loaded from: {file_path}")
+            print(f"[INFO] IfCondition data loaded from: {filepath}")
             return data or {}
         except Exception as e:
-            print(f"[ERROR] Failed to load IfCondition data from {file_path}: {e}")
+            print(f"[ERROR] Failed to load IfCondition data from {filepath}: {e}")
             return {}
-
-    @staticmethod
-    def list_files(project_root: str, animation_name: str) -> List[str]:
-        folder = IfConditionFileManager.get_folder_path(project_root, animation_name)
-        if not os.path.exists(folder):
-            return []
-        return [f[:-5] for f in os.listdir(folder) if f.endswith(".yaml")]
