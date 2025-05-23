@@ -90,35 +90,35 @@ class AnimationEditorWidget(QGraphicsScene):
     def contextMenuEvent(self, event):
         item = self.itemAt(event.scenePos(), self.views()[0].transform())
         menu = QMenu()
-        if isinstance(self, FrameBlockItem):
+        if isinstance(item, FrameBlockItem):
             delete_action = menu.addAction("Delete Frame Block")
             action = menu.exec_(event.screenPos())
             if action == delete_action:
                 scene = self.scene()
                 if scene:
                     scene.remove_block_and_arrows(self)
-        elif isinstance(self, IfBlockItem):
+        elif isinstance(item, IfBlockItem):
             delete_action = menu.addAction("Delete If Block")
             action = menu.exec_(event.screenPos())
             if action == delete_action:
                 scene = self.scene()
                 if scene:
                     scene.remove_block_and_arrows(self)
-        elif isinstance(self, SwitchBlockItem):
+        elif isinstance(item, SwitchBlockItem):
             delete_action = menu.addAction("Delete Switch Block")
             action = menu.exec_(event.screenPos())
             if action == delete_action:
                 scene = self.scene()
                 if scene:
                     scene.remove_block_and_arrows(self)
-        elif isinstance(self, ArrowItem):
+        elif isinstance(item, ArrowItem):
             delete_arrow_action = menu.addAction("Delete Arrow")
             action = menu.exec_(event.screenPos())
             if action == delete_arrow_action:
                 scene = self.scene()
                 if scene:
                     scene.remove_arrow(self)
-        elif isinstance(self, OutputSubBlockItem):
+        elif isinstance(item, OutputSubBlockItem):
             item.setSelected(True)
             item.contextMenuEvent(event)
         else:
@@ -209,26 +209,26 @@ class AnimationEditorWidget(QGraphicsScene):
 
     def remove_block_and_arrows(self, block):
         for arrow in list(getattr(block, 'input_arrows', [])):
-            arrow.remove_from_scene()
             if arrow.name in self.arrow_objects:
                 self.arrow_objects.pop(arrow.name)
+            arrow.remove_from_scene()
         for arrow in list(getattr(block, 'output_arrows', [])):
-            arrow.remove_from_scene()
             if arrow.name in self.arrow_objects:
                 self.arrow_objects.pop(arrow.name)
-        block.remove_from_scene()
+            arrow.remove_from_scene()
         if block.name in self.block_objects:
             self.block_objects.pop(block.name)
+        block.remove_from_scene()
 
     def remove_block(self, block):
-        block.remove_from_scene()
         if block.name in self.block_objects:
             self.block_objects.pop(block.name)
+        block.remove_from_scene()
 
     def remove_arrow(self, arrow):
-        arrow.remove_from_scene()
         if arrow in self.arrow_objects:
             self.arrow_objects.pop(arrow.name)
+        arrow.remove_from_scene()
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete:
