@@ -14,10 +14,18 @@ from ..logic.frame_file_manager import FrameFileManager
 
 
 class AnimationVisualizer:
-    def __init__(self, scene, trajectory_visualizer, initial_joint_state=None):
+    def __init__(
+            self,
+            scene,
+            trajectory_visualizer,
+            initial_joint_state=None,
+            motion_directory=None,
+            current_animation_name=None):
         self.scene = scene
         self.visualizer = trajectory_visualizer
         self.initial_joint_state = initial_joint_state
+        self.motion_directory = motion_directory
+        self.current_animation_name = current_animation_name
 
         self._thread = None
         self._stop_event = threading.Event()
@@ -144,12 +152,15 @@ class AnimationVisualizer:
                 frame_path = self.resolve_frame_path(frame_name)
                 frame_data = FrameData()
                 frame_data.set_joint_names(self.joint_names)
-                frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(frame_path)))
+                frame_data.set_dict(
+                    FrameFileManager.load_dict(
+                        os.path.dirname(frame_path),
+                        os.path.basename(frame_path)))
                 target_joint_state = frame_data.get_joint_state()
                 move_duration = frame_data.move_duration
                 wait_duration = frame_data.wait_duration
             except Exception as e:
-                rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
+                rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_path}': {e}")
                 self.stop()
                 return
 
@@ -188,7 +199,10 @@ class AnimationVisualizer:
                 frame_path = self.resolve_frame_path(frame_name)
                 frame_data = FrameData()
                 frame_data.set_joint_names(self.joint_names)
-                frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(frame_path)))
+                frame_data.set_dict(
+                    FrameFileManager.load_dict(
+                        os.path.dirname(frame_path),
+                        os.path.basename(frame_path)))
                 target_joint_state = frame_data.get_joint_state()
                 move_duration = frame_data.move_duration
                 wait_duration = frame_data.wait_duration
@@ -210,11 +224,28 @@ class AnimationVisualizer:
             rospy.loginfo(f"[Visualizer] Played single frame: {frame_name}")
 
         elif isinstance(block, StartBlockItem):
-            # StartBlockItemはtrajectory不要で初期状態をそのまま表示
             current_joint_state = self.initial_joint_state
+            try:
+                frame_path = self.resolve_initial_frame_path()
+                frame_data = FrameData()
+                frame_data.set_joint_names(self.joint_names)
+                frame_data.set_dict(
+                    FrameFileManager.load_dict(
+                        os.path.dirname(frame_path),
+                        os.path.basename(frame_path)))
+                current_joint_state = frame_data.get_joint_state()
+            except Exception as e:
+                rospy.logwarn(f"[AnimationVisualizer] Failed to load initial frame: {e}")
+
             if current_joint_state is None:
                 rospy.logwarn("[AnimationVisualizer] No initial_joint_state set for StartBlockItem visualization.")
                 return
 
             self.visualizer.publish_goal_state(current_joint_state)
             rospy.loginfo("[Visualizer] Played StartBlockItem with initial_joint_state.")
+
+    def resolve_frame_path(self, frame_name):
+        return os.path.join(self.motion_directory, self.current_animation_name, "frames", f"{frame_name}.yaml")
+
+    def resolve_initial_frame_path(self):
+        return os.path.join(self.motion_directory, self.current_animation_name, "initial_frame.yaml")

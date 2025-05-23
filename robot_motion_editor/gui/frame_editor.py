@@ -214,7 +214,7 @@ class FrameEditorDialog(QDialog):
             button.setStyleSheet("background-color: lightblue;" if dialog.result.strip() else "")
 
     def load_frame_from_file(self, path):
-        raw = FrameFileManager.load_dict(os.path.dirname(path), os.path.basename(path))
+        raw = FrameFileManager.load_dict(os.path.dirname(frame_path), os.path.basename(frame_path))
         self.frame_data.set_dict(raw)
 
         self.duration_spin.setValue(self.frame_data.move_duration)

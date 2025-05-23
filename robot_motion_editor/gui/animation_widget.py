@@ -61,12 +61,16 @@ class AnimaitonWidget(QWidget):
         self.animation_visualizer = AnimationVisualizer(
             scene=self.scene,
             trajectory_visualizer=self.trajectory_visualizer,
-            initial_joint_state=self.initial_joint_state
+            initial_joint_state=self.initial_joint_state,
+            motion_directory=self.motion_directory,
+            current_animation_name=self.current_animation_name
         )
         self.animation_commander = AnimationCommander(
             trajectory_commander=self.trajectory_commander,
             scene=self.scene,
-            initial_joint_state=self.initial_joint_state
+            initial_joint_state=self.initial_joint_state,
+            motion_directory=self.motion_directory,
+            current_animation_name=self.current_animation_name
         )
 
         self.init_ui()
@@ -75,21 +79,6 @@ class AnimaitonWidget(QWidget):
     def set_motion_directory(self, directory):
         self.motion_directory = directory
         self.load_animation_list()
-
-    def resolve_frame_path(self, frame_name):
-        return os.path.join(
-            self.motion_directory,
-            self.current_animation_name,
-            "frames",
-            f"{frame_name}.yaml"
-        )
-
-    def resolve_initial_frame_path(self):
-        return os.path.join(
-            self.motion_directory,
-            self.current_animation_name,
-            "initial_frame.yaml"
-        )
 
     def init_ui(self):
         splitter = QSplitter(Qt.Horizontal)
@@ -184,7 +173,7 @@ class AnimaitonWidget(QWidget):
             )
             frame_data = FrameData()
             frame_data.set_joint_names(self.joint_names)
-            frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(frame_path)))
+            frame_data.set_dict(FrameFileManager.load_dict(os.path.dirname(frame_path), os.path.basename(frame_path)))
             current_state = frame_data.get_joint_state()
             current_move = frame_data.move_duration
             current_wait = frame_data.wait_duration
@@ -286,6 +275,8 @@ class AnimaitonWidget(QWidget):
         if not self.confirm_save_if_unsaved_changes():
             return
         self.current_animation_name = animation_name
+        self.animation_visualizer.current_animation_name = animation_name
+        self.animation_commander.current_animation_name = animation_name
 
         raw = AnimationFileManager.load_dict(self.motion_directory, animation_name)
         anim_data = AnimationData()
@@ -484,7 +475,7 @@ class AnimaitonWidget(QWidget):
             frame_data = FrameData()
             frame_data.set_joint_names(self.joint_names)
 
-            frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(frame_path)))
+            frame_data.set_dict(FrameFileManager.load_dict(os.path.dirname(frame_path), os.path.basename(frame_path)))
             current_state = frame_data.get_joint_state()
             current_move = frame_data.move_duration
             current_wait = frame_data.wait_duration

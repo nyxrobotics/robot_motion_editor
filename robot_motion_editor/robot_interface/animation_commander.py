@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 
@@ -14,7 +15,13 @@ from ..logic.frame_file_manager import FrameFileManager
 
 
 class AnimationCommander:
-    def __init__(self, scene, trajectory_commander, initial_joint_state=None):
+    def __init__(
+            self,
+            scene,
+            trajectory_commander,
+            initial_joint_state=None,
+            motion_directory=None,
+            current_animation_name=None):
         """
         Args:
             scene: Animation scene with block graph
@@ -25,6 +32,8 @@ class AnimationCommander:
         self.scene = scene
         self.trajectory_commander = trajectory_commander
         self.initial_joint_state = initial_joint_state
+        self.motion_directory = motion_directory
+        self.current_animation_name = current_animation_name
 
         self._thread = None
         self._stop_event = threading.Event()
@@ -98,7 +107,10 @@ class AnimationCommander:
                 frame_path = self.resolve_frame_path(frame_name)
                 frame_data = FrameData()
                 frame_data.set_joint_names(self.joint_names)
-                frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(frame_path)))
+                frame_data.set_dict(
+                    FrameFileManager.load_dict(
+                        os.path.dirname(frame_path),
+                        os.path.basename(frame_path)))
                 target_joint_state = frame_data.get_joint_state()
                 move_duration = frame_data.move_duration
                 wait_duration = frame_data.wait_duration
@@ -149,3 +161,9 @@ class AnimationCommander:
             self.current_block = self._get_next_block(self.current_block)
 
         self.state = 'stopped'
+
+    def resolve_frame_path(self, frame_name):
+        return os.path.join(self.motion_directory, self.current_animation_name, "frames", f"{frame_name}.yaml")
+
+    def resolve_initial_frame_path(self):
+        return os.path.join(self.motion_directory, self.current_animation_name, "initial_frame.yaml")
