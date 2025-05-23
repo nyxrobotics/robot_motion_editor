@@ -126,36 +126,35 @@ class FrameData:
         msg.position = [self.get_pose(name) for name in self.joint_names]
         return msg
 
+    def save_to_file(self, filepath: str):
+        FrameFileManager.save_dict(filepath, self.get_dict())
+
+    def load_from_file(self, filepath: str):
+        data = FrameFileManager.load_dict(filepath)
+        self.set_dict(data)
+
 
 class FrameFileManager:
     @staticmethod
-    def save_dict(path: str, data: dict, filename="frame.yaml"):
-        os.makedirs(path, exist_ok=True)
-        file_path = os.path.join(path, filename)
+    def save_dict(filepath: str, data: dict):
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
         try:
-            with open(file_path, "w") as f:
+            with open(filepath, "w") as f:
                 yaml.safe_dump(data, f, default_flow_style=False)
-            print(f"[INFO] Frame data saved to: {file_path}")
+            print(f"[INFO] Frame data saved to: {filepath}")
         except Exception as e:
-            print(f"[ERROR] Failed to save frame data to {file_path}: {e}")
+            print(f"[ERROR] Failed to save frame data to {filepath}: {e}")
 
     @staticmethod
-    def load_dict(path: str, filename="frame.yaml") -> dict:
-        file_path = os.path.join(path, filename)
-        if not os.path.exists(file_path):
-            print(f"[WARN] Frame data file not found: {file_path}")
+    def load_dict(filepath: str) -> dict:
+        if not os.path.exists(filepath):
+            print(f"[WARN] Frame data file not found: {filepath}")
             return {}
         try:
-            with open(file_path, "r") as f:
+            with open(filepath, "r") as f:
                 data = yaml.safe_load(f)
-            print(f"[INFO] Frame data loaded from: {file_path}")
+            print(f"[INFO] Frame data loaded from: {filepath}")
             return data or {}
         except Exception as e:
-            print(f"[ERROR] Failed to load frame data from {file_path}: {e}")
+            print(f"[ERROR] Failed to load frame data from {filepath}: {e}")
             return {}
-
-    @staticmethod
-    def list_frame_files(folder: str) -> List[str]:
-        if not os.path.exists(folder):
-            return []
-        return [f[:-5] for f in os.listdir(folder) if f.endswith(".yaml")]
