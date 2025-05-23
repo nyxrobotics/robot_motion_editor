@@ -12,14 +12,21 @@ from PyQt5.QtWidgets import QMenu
 from PyQt5.QtWidgets import QMessageBox
 
 from ..logic.animation_file_manager import AnimationData
+from ..logic.animation_file_manager import AnimationFileManager
 from ..logic.animation_file_manager import ArrowData
 from ..logic.animation_file_manager import BlockConnection
 from ..logic.animation_file_manager import BlockData
 from ..logic.animation_file_manager import BlockInfo
 from ..logic.frame_file_manager import FrameData
+from ..logic.frame_file_manager import FrameFileManager
 from ..logic.if_condition_file_manager import IfConditionData
+from ..logic.initial_pose_file_manager import InitialPoseFileManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..logic.switch_condition_file_manager import SwitchConditionData
+from ..robot_interface.animation_commander import AnimationCommander
+from ..robot_interface.trajectory_commander import TrajectoryCommander
+from ..visualizer.animation_visualizer import AnimationVisualizer
+from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .animation_editor_items import ArrowItem
 from .animation_editor_items import FrameBlockItem
 from .animation_editor_items import IfBlockItem
@@ -27,6 +34,14 @@ from .animation_editor_items import OutputSubBlockItem
 from .animation_editor_items import StartBlockItem
 from .animation_editor_items import SwitchBlockItem
 from .animation_editor_items import WaypointItem
+from .animation_editor_widget import AnimationEditorWidget
+from .animation_file_widget import AnimationFileWidget
+from .animation_graphics_view import AnimatioGraphicsView
+from .animation_preview_button_widget import AnimationPreviewButtonWidget
+from .frame_editor import FrameEditorDialog
+from .if_condition_editor import IfConditionEditorDialog
+from .initial_frame_editor import InitialFrameEditorDialog
+from .switch_condition_editor import SwitchConditionEditorDialog
 
 
 class AnimationEditorWidget(QGraphicsScene):
@@ -597,3 +612,101 @@ class AnimationEditorWidget(QGraphicsScene):
 
     def dragMoveEvent(self, event):
         event.acceptProposedAction()
+
+    def open_initial_frame_editor(self):
+        dlg = InitialFrameEditorDialog(
+            joint_data_manager=self.joint_data_manager,
+            motion_directory_manager=self.motion_directory_manager,
+            trajectory_visualizer=self.trajectory_visualizer,
+            trajectory_commander=self.trajectory_commander
+        )
+
+        if dlg.exec_():
+            joint_data = dlg.get_joint_data()  # {joint_name: {position, enable, pid, feedback}}
+            InitialPoseFileManager.save_dict(initial_frame_dir, joint_data, filename=initial_frame_filename)
+
+    def open_frame_file_editor(self, frame_name):
+        dlg = FrameEditorDialog(
+            joint_data_manager=self.joint_data_manager,
+            motion_directory_manager=self.motion_directory_manager,
+            frame_name=frame_name,
+            trajectory_visualizer=self.trajectory_visualizer,
+            trajectory_commander=self.trajectory_commander
+        )
+        dlg.exec_()
+
+    def open_frame_block_editor(self, block_id: str):
+        block = self.scene.block_objects.get(block_id)
+        if not block:
+            print(f"[WARN] No block found for id: {block_id}")
+            return
+        filename = block.filename
+        dlg = FrameEditorDialog(
+            joint_data_manager=self.joint_data_manager,
+            motion_directory_manager=self.motion_directory_manager,
+            frame_name=filename,
+            trajectory_visualizer=self.trajectory_visualizer,
+            trajectory_commander=self.trajectory_commander
+        )
+
+        if hasattr(dlg, "frame_visualizer"):
+            if hasattr(self, "initial_joint_state"):
+                dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
+
+            frame_data = FrameData(joint_names=self.joint_names)
+            frame_data.load_from_file(self.motion_directory_manager.resolve_frame_path(filename))
+            current_state = frame_data.get_joint_state()
+            current_move = frame_data.move_duration
+            current_wait = frame_data.wait_duration
+            dlg.frame_visualizer.set_current_frame(current_state, current_move, current_wait)
+
+            in_block = self.scene.find_previous_frame_block(block)
+            if in_block and in_block.filename:
+                in_path = os.path.join(
+                    self.motion_directory,
+                    self.current_animation_name,
+                    "frames",
+                    f"{in_block.filename}.yaml"
+                )
+                frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(in_path)))
+                in_state = frame_data.get_joint_state()
+                in_move = frame_data.move_duration
+                in_wait = frame_data.wait_duration
+                dlg.frame_visualizer.set_in_frame(in_state, in_move, in_wait)
+
+            out_block = self.scene.find_next_frame_block(block)
+            if out_block and out_block.filename:
+                out_path = os.path.join(
+                    self.motion_directory,
+                    self.current_animation_name,
+                    "frames",
+                    f"{out_block.filename}.yaml"
+                )
+                frame_data.set_dict(FrameFileManager.load_dict(*os.path.split(out_path)))
+                out_state = frame_data.get_joint_state()
+                out_move = frame_data.move_duration
+                out_wait = frame_data.wait_duration
+                dlg.frame_visualizer.set_out_frame(out_state, out_move, out_wait)
+
+            dlg.exec_()
+
+    def open_if_condition_editor(self, condition_name):
+        dlg = IfConditionEditorDialog(
+            joint_data_manager=self.joint_data_manager,
+            motion_directory_manager=self.motion_directory_manager,
+            condition_name=condition_name,
+        )
+        dlg.exec_()
+
+    def open_switch_condition_editor(self, condition_name):
+        dlg = SwitchConditionEditorDialog(
+            joint_data_manager=self.joint_data_manager,
+            motion_directory_manager=self.motion_directory_manager,
+            condition_name=condition_name
+        )
+
+        if dlg.exec_():
+            if dlg.result:
+                new_num_cases = dlg.result.get("num_cases", 2)
+                # フローチャート上のブロックを更新
+                self.scene.update_switch_block(condition_name, new_num_cases)
