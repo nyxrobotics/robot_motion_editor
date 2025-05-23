@@ -12,7 +12,6 @@ from PyQt5.QtWidgets import QMenu
 from PyQt5.QtWidgets import QMessageBox
 
 from ..logic.animation_file_manager import AnimationData
-from ..logic.animation_file_manager import AnimationFileManager
 from ..logic.animation_file_manager import ArrowData
 from ..logic.animation_file_manager import BlockConnection
 from ..logic.animation_file_manager import BlockData
@@ -23,10 +22,6 @@ from ..logic.if_condition_file_manager import IfConditionData
 from ..logic.initial_pose_file_manager import InitialPoseFileManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..logic.switch_condition_file_manager import SwitchConditionData
-from ..robot_interface.animation_commander import AnimationCommander
-from ..robot_interface.trajectory_commander import TrajectoryCommander
-from ..visualizer.animation_visualizer import AnimationVisualizer
-from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .animation_editor_items import ArrowItem
 from .animation_editor_items import FrameBlockItem
 from .animation_editor_items import IfBlockItem
@@ -34,10 +29,6 @@ from .animation_editor_items import OutputSubBlockItem
 from .animation_editor_items import StartBlockItem
 from .animation_editor_items import SwitchBlockItem
 from .animation_editor_items import WaypointItem
-from .animation_editor_widget import AnimationEditorWidget
-from .animation_file_widget import AnimationFileWidget
-from .animation_graphics_view import AnimatioGraphicsView
-from .animation_preview_button_widget import AnimationPreviewButtonWidget
 from .frame_editor import FrameEditorDialog
 from .if_condition_editor import IfConditionEditorDialog
 from .initial_frame_editor import InitialFrameEditorDialog
@@ -623,7 +614,8 @@ class AnimationEditorWidget(QGraphicsScene):
 
         if dlg.exec_():
             joint_data = dlg.get_joint_data()  # {joint_name: {position, enable, pid, feedback}}
-            InitialPoseFileManager.save_dict(initial_frame_dir, joint_data, filename=initial_frame_filename)
+            initial_frame_file = self.motion_directory_manager.resolve_initial_frame_path()
+            InitialPoseFileManager.save_dict(initial_frame_file, joint_data)
 
     def open_frame_file_editor(self, frame_name):
         dlg = FrameEditorDialog(

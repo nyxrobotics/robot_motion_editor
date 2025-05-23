@@ -15,7 +15,7 @@ class MotionDirectoryManager:
 
     def get_joint_names(self):
         return self.joint_names
-    
+
     def set_current_frame(self, frame_id: str):
         self.current_frame_id = frame_id
 
@@ -83,6 +83,22 @@ class MotionDirectoryManager:
         return os.path.join(*args)
 
     # Listing available files
+    def list_animation(self):
+        """モーションディレクトリ内のすべてのアニメーション名を返す（animation.yamlが存在するもの）"""
+        animations = []
+        if not self.motion_directory:
+            rospy.logwarn("motion_directory is not set.")
+            return animations
+
+        for name in os.listdir(self.motion_directory):
+            dir_path = os.path.join(self.motion_directory, name)
+            if os.path.isdir(dir_path):
+                anim_yaml = os.path.join(dir_path, "animation.yaml")
+                if os.path.isfile(anim_yaml):
+                    animations.append(name)
+
+        return sorted(animations)
+
     def list_frame_files(self):
         path = self._join(self.motion_directory, self.current_animation_name, "frames")
         if not os.path.exists(path):
