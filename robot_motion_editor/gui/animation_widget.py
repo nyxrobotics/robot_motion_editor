@@ -315,18 +315,7 @@ class AnimaitonWidget(QWidget):
         self.motion_directory_manager.set_current_animation(animation_name)
 
         if item.text(0) == "initial_frame":
-            dlg = InitialFrameEditorDialog(
-                joint_data_manager=self.joint_data_manager,
-                motion_directory_manager=self.motion_directory_manager,
-                trajectory_visualizer=self.trajectory_visualizer,
-                trajectory_commander=self.trajectory_commander)
-            if dlg.exec_():
-                joint_data = dlg.get_joint_data()
-                InitialPoseFileManager.save_dict(
-                    os.path.dirname(self.motion_directory_manager.resolve_initial_frame_path()),
-                    joint_data,
-                    filename="initial_frame.yaml"
-                )
+            self.open_initial_frame_editor()
 
         elif item.parent() and item.parent().text(0) == "frames":
             frame_name = item.text(0)
@@ -344,7 +333,7 @@ class AnimaitonWidget(QWidget):
             )
 
             frame_data = FrameData()
-            frame_data.set_joint_names(self.joint_names)
+            frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
             frame_data.set_dict(FrameFileManager.load_dict(os.path.dirname(frame_path), os.path.basename(frame_path)))
             current_state = frame_data.get_joint_state()
             current_move = frame_data.move_duration
@@ -358,28 +347,69 @@ class AnimaitonWidget(QWidget):
             dlg.exec_()
 
         elif item.parent() and item.parent().text(0) == "if":
-            condition_name = item.text(0)
-            condition_path = self.motion_directory_manager.resolve_if_condition_path(condition_name)
-            if not os.path.exists(condition_path):
-                QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
-                return
-            dlg = IfConditionEditorDialog(
-                joint_data_manager=self.joint_data_manager,
-                motion_directory_manager=self.motion_directory_manager,
-                condition_name=condition_name)
-            dlg.exec_()
+            self.open_if_condition_editor(item.text(0))
 
         elif item.parent() and item.parent().text(0) == "switch":
-            condition_name = item.text(0)
-            condition_path = self.motion_directory_manager.resolve_switch_condition_path(condition_name)
-            if not os.path.exists(condition_path):
-                QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
-                return
-            dlg = SwitchConditionEditorDialog(
-                joint_data_manager=self.joint_data_manager,
-                motion_directory_manager=self.motion_directory_manager,
-                condition_name=condition_name)
-            if dlg.exec_():
-                if dlg.result:
-                    new_num_cases = dlg.result.get("num_cases", 2)
-                    self.animation_flow_scene.update_switch_block(condition_name, new_num_cases)
+            self.open_switch_condition_editor(item.text(0))
+
+    def open_initial_frame_editor(self):
+        dlg = InitialFrameEditorDialog(
+            joint_data_manager=self.joint_data_manager,
+            motion_directory_manager=self.motion_directory_manager,
+            trajectory_visualizer=self.trajectory_visualizer,
+            trajectory_commander=self.trajectory_commander
+        )
+
+        if dlg.exec_():
+            joint_data = dlg.get_joint_data()
+            InitialPoseFileManager.save_dict(
+                os.path.dirname(self.motion_directory_manager.resolve_initial_frame_path()),
+                joint_data,
+                filename="initial_frame.yaml"
+            )
+
+    def open_frame_file_editor(self, frame_name):
+        dlg = FrameEditorDialog(
+            joint_data_manager=self.joint_data_manager,
+            motion_directory_manager=self.motion_directory_manager,
+            frame_name=frame_name,
+            trajectory_visualizer=self.trajectory_visualizer,
+            trajectory_commander=self.trajectory_commander
+        )
+        dlg.exec_()
+
+    def open_frame_block_editor(self, block_id: str):
+        block = self.scene.block_objects.get(block_id)
+        if not block:
+            print(f"[WARN] No block found for id: {block_id}")
+            return
+        filename = block.filename
+        self.open_frame_file_editor(filename)
+
+    def open_if_condition_editor(self, condition_name):
+        condition_path = self.motion_directory_manager.resolve_if_condition_path(condition_name)
+        if not os.path.exists(condition_path):
+            QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
+            return
+        dlg = IfConditionEditorDialog(
+            joint_data_manager=self.joint_data_manager,
+            motion_directory_manager=self.motion_directory_manager,
+            condition_name=condition_name,
+        )
+        dlg.exec_()
+
+    def open_switch_condition_editor(self, condition_name):
+        condition_path = self.motion_directory_manager.resolve_switch_condition_path(condition_name)
+        if not os.path.exists(condition_path):
+            QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
+            return
+        dlg = SwitchConditionEditorDialog(
+            joint_data_manager=self.joint_data_manager,
+            motion_directory_manager=self.motion_directory_manager,
+            condition_name=condition_name
+        )
+
+        if dlg.exec_():
+            if dlg.result:
+                new_num_cases = dlg.result.get("num_cases", 2)
+                self.animation_flow_scene.update_switch_block(condition_name, new_num_cases)
