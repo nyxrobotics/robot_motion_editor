@@ -4,11 +4,18 @@ import rospy
 
 
 class MotionDirectoryManager:
-    def __init__(self, motion_directory=None):
+    def __init__(self, motion_directory=None, joint_names=None):
         self.motion_directory = motion_directory
         self.current_animation_name = None
         self.current_frame_id = None
+        self.joint_names = joint_names or []
 
+    def set_joint_names(self, joint_names):
+        self.joint_names = joint_names
+
+    def get_joint_names(self):
+        return self.joint_names
+    
     def set_current_frame(self, frame_id: str):
         self.current_frame_id = frame_id
 

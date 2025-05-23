@@ -158,7 +158,7 @@ class AnimationVisualizer:
 
             frame_name = self.current_block.filename
             try:
-                frame_path = self.resolve_frame_path(frame_name)
+                frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
                 frame_data = FrameData()
                 frame_data.set_joint_names(self.joint_names)
                 frame_data.set_dict(
@@ -205,7 +205,7 @@ class AnimationVisualizer:
         if isinstance(block, FrameBlockItem):
             frame_name = block.filename
             try:
-                frame_path = self.resolve_frame_path(frame_name)
+                frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
                 frame_data = FrameData()
                 frame_data.set_joint_names(self.joint_names)
                 frame_data.set_dict(
