@@ -9,26 +9,24 @@ from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtWidgets import QVBoxLayout
 
+from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..logic.switch_condition_file_manager import SwitchConditionData
-from ..logic.switch_condition_file_manager import SwitchConditionFileManager
 
 
 class SwitchConditionEditorDialog(QDialog):
-    def __init__(self, condition_path, available_variables=None, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(f"Switch Condition Editor: {os.path.basename(condition_path)}")
+    def __init__(
+            self,
+            motion_directory_manager: MotionDirectoryManager,
+            condition_name: str,
+            available_variables=None):
+        super().__init__()
+        self.setWindowTitle(f"Switch Condition Editor: {condition_name}")
         self.available_variables = available_variables or []
-        self.condition_path = condition_path
-        self.motion_directory, self.animation_name, self.condition_name = self.parse_path(condition_path)
+        self.motion_directory_manager = motion_directory_manager
+        self.condition_name = condition_name
+        self.condition_data = SwitchConditionData()
         self.init_ui()
         self.load_condition()
-
-    def parse_path(self, path):
-        condition_name = os.path.splitext(os.path.basename(path))[0]
-        conditions_dir = os.path.dirname(os.path.dirname(path))
-        animation_name = os.path.basename(os.path.dirname(conditions_dir))
-        motion_directory = os.path.dirname(os.path.dirname(conditions_dir))
-        return motion_directory, animation_name, condition_name
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -80,27 +78,16 @@ class SwitchConditionEditorDialog(QDialog):
             QMessageBox.information(self, "Available Variables", "\n".join(self.available_variables))
 
     def load_condition(self):
-        data_dict = SwitchConditionFileManager.load_dict(
-            os.path.join(self.motion_directory, self.animation_name, "conditions", "switch"),
-            f"{self.condition_name}.yaml"
-        )
+        file_path = self.motion_directory_manager.resolve_switch_condition_path(self.condition_name)
+        self.condition_data.load_from_file(file_path)
+        self.expression_edit.setPlainText(self.condition_data.expression)
+        self.condition_edit.setPlainText(self.condition_data.condition)
+
         self.case_list.clear()
-
-        if data_dict:
-            cond_data = SwitchConditionData()
-            cond_data.set_dict(data_dict)
-
-            self.expression_edit.setPlainText(cond_data.expression)
-            self.condition_edit.setPlainText(cond_data.condition)
-
-            case_section = cond_data.case
-            if isinstance(case_section, dict):
-                sorted_keys = sorted(case_section.keys(), key=lambda k: int(k.split("_")[1]))
-                for key in sorted_keys:
-                    self.case_list.addItem(key)
-            else:
-                for i, val in enumerate(case_section):
-                    self.case_list.addItem(f"case_{i}")
+        if isinstance(self.condition_data.case, dict):
+            sorted_keys = sorted(self.condition_data.case.keys(), key=lambda k: int(k.split("_")[1]))
+            for key in sorted_keys:
+                self.case_list.addItem(key)
 
     def add_case(self):
         current_count = self.case_list.count()
@@ -146,22 +133,14 @@ class SwitchConditionEditorDialog(QDialog):
                 "This may not match any case."
             )
 
-        # 保存構造の生成
-        case_dict = {}
-        for i in range(case_count):
-            case_dict[f"case_{i}"] = {"value": i}
+        case_dict = {f"case_{i}": {"value": i} for i in range(case_count)}
 
-        cond_data = SwitchConditionData(
-            expression=expression,
-            condition=condition,
-            case=case_dict
-        )
+        self.condition_data.expression = expression
+        self.condition_data.condition = condition
+        self.condition_data.case = case_dict
 
-        SwitchConditionFileManager.save_dict(
-            os.path.join(self.motion_directory, self.animation_name, "conditions", "switch"),
-            cond_data.get_dict(),
-            f"{self.condition_name}.yaml"
-        )
+        file_path = self.motion_directory_manager.resolve_switch_condition_path(self.condition_name)
+        self.condition_data.save_to_file(file_path)
 
-        self.result = {"num_cases": case_count + 1}  # default 含む
+        self.result = {"num_cases": case_count + 1}
         self.accept()
