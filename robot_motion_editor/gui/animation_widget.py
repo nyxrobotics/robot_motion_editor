@@ -5,6 +5,7 @@ import rospy
 import yaml
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter
+from PyQt5.QtWidgets import QDialog
 from PyQt5.QtWidgets import QInputDialog
 from PyQt5.QtWidgets import QLabel
 from PyQt5.QtWidgets import QMessageBox
@@ -394,6 +395,11 @@ class AnimaitonWidget(QWidget):
         self.open_frame_file_editor(filename)
 
     def open_if_condition_editor(self, condition_name):
+        key = f"if:{condition_name}"
+        if key in self.open_editors and self.open_editors[key].isVisible():
+            self.open_editors[key].raise_()
+            self.open_editors[key].activateWindow()
+            return
         condition_path = self.motion_directory_manager.resolve_if_condition_path(condition_name)
         if not os.path.exists(condition_path):
             QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
@@ -403,9 +409,17 @@ class AnimaitonWidget(QWidget):
             motion_directory_manager=self.motion_directory_manager,
             condition_name=condition_name,
         )
-        dlg.exec_()
+        dlg.setAttribute(Qt.WA_DeleteOnClose)
+        dlg.show()
+        self.open_editors[key] = dlg
+        dlg.destroyed.connect(lambda: self.open_editors.pop(key, None))
 
     def open_switch_condition_editor(self, condition_name):
+        key = f"switch:{condition_name}"
+        if key in self.open_editors and self.open_editors[key].isVisible():
+            self.open_editors[key].raise_()
+            self.open_editors[key].activateWindow()
+            return
         condition_path = self.motion_directory_manager.resolve_switch_condition_path(condition_name)
         if not os.path.exists(condition_path):
             QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
@@ -416,7 +430,14 @@ class AnimaitonWidget(QWidget):
             condition_name=condition_name
         )
 
-        if dlg.exec_():
-            if dlg.result:
+        dlg.setAttribute(Qt.WA_DeleteOnClose)
+
+        def on_finished(result_code):
+            if result_code == QDialog.Accepted and dlg.result:
                 new_num_cases = dlg.result.get("num_cases", 2)
                 self.animation_flow_scene.update_switch_block(condition_name, new_num_cases)
+            self.open_editors.pop(key, None)
+
+        dlg.finished.connect(on_finished)
+        dlg.show()
+        self.open_editors[key] = dlg
