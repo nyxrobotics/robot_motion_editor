@@ -326,23 +326,8 @@ class AnimaitonWidget(QWidget):
         elif parent == "switch":
             self.open_editor_by_type("switch", label)
 
-    def open_initial_frame_editor(self):
-        key = "initial_frame"
-        if key in self.open_editors and self.open_editors[key].isVisible():
-            self.open_editors[key].raise_()
-            self.open_editors[key].activateWindow()
-            return
-        dlg = InitialFrameEditorDialog(
-            joint_data_manager=self.joint_data_manager,
-            motion_directory_manager=self.motion_directory_manager,
-            trajectory_visualizer=self.trajectory_visualizer,
-            trajectory_commander=self.trajectory_commander,
-            parent=self
-        )
-        dlg.setAttribute(Qt.WA_DeleteOnClose)
-        dlg.show()
-        self.open_editors[key] = dlg
-        dlg.destroyed.connect(lambda: self.open_editors.pop(key, None))
+    def on_start_block_double_clicked(self):
+        self.open_editor_by_type("initial_frame", "")
 
     def on_frame_block_double_clicked(self, filename: str):
         self.open_editor_by_type("frame", filename)
@@ -365,8 +350,7 @@ class AnimaitonWidget(QWidget):
                 joint_data_manager=self.joint_data_manager,
                 motion_directory_manager=self.motion_directory_manager,
                 trajectory_visualizer=self.trajectory_visualizer,
-                trajectory_commander=self.trajectory_commander,
-                parent=self
+                trajectory_commander=self.trajectory_commander
             )
         elif type == "frame":
             dlg = FrameEditorDialog(
@@ -374,22 +358,19 @@ class AnimaitonWidget(QWidget):
                 motion_directory_manager=self.motion_directory_manager,
                 frame_name=name,
                 trajectory_visualizer=self.trajectory_visualizer,
-                trajectory_commander=self.trajectory_commander,
-                parent=self
+                trajectory_commander=self.trajectory_commander
             )
         elif type == "if":
             dlg = IfConditionEditorDialog(
                 joint_data_manager=self.joint_data_manager,
                 motion_directory_manager=self.motion_directory_manager,
-                filename=name,
-                parent=self
+                filename=name
             )
         elif type == "switch":
             dlg = SwitchConditionEditorDialog(
                 joint_data_manager=self.joint_data_manager,
                 motion_directory_manager=self.motion_directory_manager,
-                filename=name,
-                parent=self
+                filename=name
             )
             dlg.finished.connect(lambda result_code: (
                 self.animation_flow_scene.update_switch_block(name, dlg.result.get("num_cases", 2))
