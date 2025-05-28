@@ -1,5 +1,6 @@
 import os
 
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialog
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
@@ -19,15 +20,18 @@ class SwitchConditionEditorDialog(QDialog):
             self,
             joint_data_manager: JointDataManager,
             motion_directory_manager: MotionDirectoryManager,
-            condition_name: str):
-        super().__init__()
-        self.setWindowTitle(f"Switch Condition Editor: {condition_name}")
+            condition_name: str, parent=None):
+        super().__init__(parent)
+        if parent is None:
+            self.setWindowFlags(Qt.Window)
         self.joint_data_manager = joint_data_manager
         self.motion_directory_manager = motion_directory_manager
         self.condition_name = condition_name
         self.condition_data = SwitchConditionData()
         self.init_ui()
         self.load_condition()
+        self.filepath = self.motion_directory_manager.resolve_switch_condition_path(self.condition_name)
+        self.setWindowTitle(f"Switch: {os.path.basename(self.filepath)}")
 
     def init_ui(self):
         layout = QVBoxLayout()

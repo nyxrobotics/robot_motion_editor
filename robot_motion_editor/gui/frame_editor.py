@@ -36,11 +36,12 @@ class FrameEditorDialog(QDialog):
         motion_directory_manager: MotionDirectoryManager,
         frame_name=None,
         trajectory_visualizer: TrajectoryVisualizer = None,
-        trajectory_commander: TrajectoryCommander = None
+        trajectory_commander: TrajectoryCommander = None,
+        parent=None,
     ):
-        super().__init__()
-        self.setWindowTitle("Edit Frame")
-
+        super().__init__(parent)
+        if parent is None:
+            self.setWindowFlags(Qt.Window)
         self.joint_data_manager = joint_data_manager
         self.motion_directory_manager = motion_directory_manager
         self.frame_name = frame_name
@@ -59,14 +60,14 @@ class FrameEditorDialog(QDialog):
         self.init_ui()
 
         if frame_name:
-            path = self.motion_directory_manager.resolve_frame_path(frame_name)
-            if os.path.exists(path):
-                self.frame_data.load_from_file(path)
-                self.frame_path = path
-            else:
-                self.frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
+            self.filepath = self.motion_directory_manager.resolve_frame_path(frame_name)
+            if os.path.exists(self.filepath):
+                self.frame_data.load_from_file(self.filepath)
         else:
-            self.frame_path = None
+            rospy.logwarn("Frame name is not provided, creating a new frame.")
+            self.filepath = None
+
+        self.setWindowTitle(f"Frame: {os.path.basename(self.filepath)}")
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -291,7 +292,7 @@ class FrameEditorDialog(QDialog):
             self.enable_checkbox_widgets[joint_name].setChecked(self.frame_data.get_enable(joint_name))
 
     def accept(self):
-        if not self.frame_path:
+        if not self.filepath:
             super().reject()
             return
 
@@ -304,7 +305,7 @@ class FrameEditorDialog(QDialog):
             self.frame_data.set_velocity_scale(joint_name, vel_spin.value())
             self.frame_data.set_enable(joint_name, self.enable_checkbox_widgets[joint_name].isChecked())
 
-        self.frame_data.save_to_file(self.frame_path)
+        self.frame_data.save_to_file(self.filepath)
         super().accept()
 
     def handle_play_button(self):

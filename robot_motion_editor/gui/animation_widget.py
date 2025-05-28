@@ -328,7 +328,8 @@ class AnimaitonWidget(QWidget):
                 motion_directory_manager=self.motion_directory_manager,
                 frame_name=frame_name,
                 trajectory_visualizer=self.trajectory_visualizer,
-                trajectory_commander=self.trajectory_commander
+                trajectory_commander=self.trajectory_commander,
+                parent=self
             )
 
             frame_data = FrameData()
@@ -361,7 +362,8 @@ class AnimaitonWidget(QWidget):
             joint_data_manager=self.joint_data_manager,
             motion_directory_manager=self.motion_directory_manager,
             trajectory_visualizer=self.trajectory_visualizer,
-            trajectory_commander=self.trajectory_commander
+            trajectory_commander=self.trajectory_commander,
+            parent=self
         )
         dlg.setAttribute(Qt.WA_DeleteOnClose)
         dlg.show()
@@ -379,7 +381,8 @@ class AnimaitonWidget(QWidget):
             motion_directory_manager=self.motion_directory_manager,
             frame_name=frame_name,
             trajectory_visualizer=self.trajectory_visualizer,
-            trajectory_commander=self.trajectory_commander
+            trajectory_commander=self.trajectory_commander,
+            parent=self
         )
         dlg.setAttribute(Qt.WA_DeleteOnClose)
         dlg.show()
@@ -408,6 +411,7 @@ class AnimaitonWidget(QWidget):
             joint_data_manager=self.joint_data_manager,
             motion_directory_manager=self.motion_directory_manager,
             condition_name=condition_name,
+            parent=self
         )
         dlg.setAttribute(Qt.WA_DeleteOnClose)
         dlg.show()
@@ -427,7 +431,8 @@ class AnimaitonWidget(QWidget):
         dlg = SwitchConditionEditorDialog(
             joint_data_manager=self.joint_data_manager,
             motion_directory_manager=self.motion_directory_manager,
-            condition_name=condition_name
+            condition_name=condition_name,
+            parent=self
         )
 
         dlg.setAttribute(Qt.WA_DeleteOnClose)

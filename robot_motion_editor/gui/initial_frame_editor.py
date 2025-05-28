@@ -35,10 +35,12 @@ class InitialFrameEditorDialog(QDialog):
         joint_data_manager: JointDataManager,
         motion_directory_manager: MotionDirectoryManager,
         trajectory_visualizer: TrajectoryVisualizer = None,
-        trajectory_commander: TrajectoryCommander = None
+        trajectory_commander: TrajectoryCommander = None,
+        parent=None
     ):
-        super().__init__()
-        self.setWindowTitle("Edit Initial Frame")
+        super().__init__(parent)
+        if parent is None:
+            self.setWindowFlags(Qt.Window)
 
         self.joint_data_manager = joint_data_manager
         self.motion_directory_manager = motion_directory_manager
@@ -56,10 +58,12 @@ class InitialFrameEditorDialog(QDialog):
 
         self.init_ui()
 
-        self.frame_path = self.motion_directory_manager.resolve_initial_frame_path()
-        if os.path.exists(self.frame_path):
-            self.frame_data.load_from_file(self.frame_path)
+        self.filepath = self.motion_directory_manager.resolve_initial_frame_path()
+        if os.path.exists(self.filepath):
+            self.frame_data.load_from_file(self.filepath)
             self.set_frame_to_ui()
+
+        self.setWindowTitle(f"Initial Frame: {os.path.basename(self.filepath)}")
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -207,7 +211,7 @@ class InitialFrameEditorDialog(QDialog):
             self.frame_data.set_velocity_scale(joint_name, vel_spin.value())
             self.frame_data.set_enable(joint_name, self.enable_checkbox_widgets[joint_name].isChecked())
 
-        self.frame_data.save_to_file(self.frame_path)
+        self.frame_data.save_to_file(self.filepath)
         super().accept()
 
     def set_all_enable_checkboxes(self, state):
@@ -306,5 +310,5 @@ class InitialFrameEditorDialog(QDialog):
             self.frame_data.set_velocity_scale(joint_name, vel_spin.value())
             self.frame_data.set_enable(joint_name, self.enable_checkbox_widgets[joint_name].isChecked())
 
-        self.frame_data.save_to_file(self.frame_path)
+        self.frame_data.save_to_file(self.filepath)
         super().accept()
