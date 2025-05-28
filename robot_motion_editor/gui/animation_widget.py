@@ -63,6 +63,7 @@ class AnimaitonWidget(QWidget):
             joint_data_manager=self.joint_data_manager)
         self.init_ui()
         self.load_animation_list()
+        self.open_editors = {}  # e.g. {"initial_frame": dlg, "frame:walk1": dlg}
 
     def init_ui(self):
         splitter = QSplitter(Qt.Horizontal)
@@ -350,15 +351,28 @@ class AnimaitonWidget(QWidget):
             self.open_switch_condition_editor(item.text(0))
 
     def open_initial_frame_editor(self):
+        key = "initial_frame"
+        if key in self.open_editors and self.open_editors[key].isVisible():
+            self.open_editors[key].raise_()
+            self.open_editors[key].activateWindow()
+            return
         dlg = InitialFrameEditorDialog(
             joint_data_manager=self.joint_data_manager,
             motion_directory_manager=self.motion_directory_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander
         )
-        dlg.exec_()
+        dlg.setAttribute(Qt.WA_DeleteOnClose)
+        dlg.show()
+        self.open_editors[key] = dlg
+        dlg.destroyed.connect(lambda: self.open_editors.pop(key, None))
 
     def open_frame_file_editor(self, frame_name):
+        key = f"frame:{frame_name}"
+        if key in self.open_editors and self.open_editors[key].isVisible():
+            self.open_editors[key].raise_()
+            self.open_editors[key].activateWindow()
+            return
         dlg = FrameEditorDialog(
             joint_data_manager=self.joint_data_manager,
             motion_directory_manager=self.motion_directory_manager,
@@ -366,7 +380,10 @@ class AnimaitonWidget(QWidget):
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander
         )
-        dlg.exec_()
+        dlg.setAttribute(Qt.WA_DeleteOnClose)
+        dlg.show()
+        self.open_editors[key] = dlg
+        dlg.destroyed.connect(lambda: self.open_editors.pop(key, None))
 
     def open_frame_block_editor(self, block_id: str):
         block = self.animation_flow_scene.block_objects.get(block_id)

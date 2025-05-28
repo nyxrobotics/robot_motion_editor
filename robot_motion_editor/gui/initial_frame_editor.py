@@ -183,6 +183,20 @@ class InitialFrameEditorDialog(QDialog):
 
         self.setLayout(layout)
 
+    def focusInEvent(self, event):
+        if self.trajectory_visualizer:
+            self.trajectory_visualizer.enable()
+        if self.trajectory_commander:
+            self.trajectory_commander.enable()
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event):
+        if self.trajectory_visualizer:
+            self.trajectory_visualizer.disable()
+        if self.trajectory_commander:
+            self.trajectory_commander.disable()
+        super().focusOutEvent(event)
+
     def save_frame(self):
         self.frame_data.move_duration = self.duration_spin.value()
         self.frame_data.wait_duration = self.wait_spin.value()

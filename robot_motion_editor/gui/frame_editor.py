@@ -190,6 +190,20 @@ class FrameEditorDialog(QDialog):
 
         self.setLayout(layout)
 
+    def focusInEvent(self, event):
+        if self.trajectory_visualizer:
+            self.trajectory_visualizer.enable()
+        if self.trajectory_commander:
+            self.trajectory_commander.enable()
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event):
+        if self.trajectory_visualizer:
+            self.trajectory_visualizer.disable()
+        if self.trajectory_commander:
+            self.trajectory_commander.disable()
+        super().focusOutEvent(event)
+
     def set_all_enable_checkboxes(self, state):
         checked = (state == Qt.Checked)
         for joint_name, cb in self.enable_checkbox_widgets.items():
