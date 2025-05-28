@@ -50,15 +50,24 @@ class MotionDirectoryManager:
         return os.path.join(self.motion_directory, "initial_pose.yaml")
 
     def resolve_animation_path(self):
+        if not self.motion_directory or not self.current_animation_name:
+            rospy.logerr("motion_directory and current_animation_name must be set before resolving paths.")
+            return None
         return self._join(self.motion_directory, f"{self.current_animation_name}.yaml")
 
     def resolve_initial_frame_path(self):
         return self._join(self.motion_directory, self.current_animation_name, "initial_frame.yaml")
 
     def resolve_frame_path(self, frame_name):
+        if frame_name is None:
+            rospy.logerr("Frame name must be provided to resolve path.")
+            return None
         return self._join(self.motion_directory, self.current_animation_name, "frames", f"{frame_name}.yaml")
 
     def resolve_if_condition_path(self, condition_name):
+        if condition_name is None:
+            rospy.logerr("Condition name must be provided to resolve path.")
+            return None
         return self._join(
             self.motion_directory,
             self.current_animation_name,
@@ -67,6 +76,9 @@ class MotionDirectoryManager:
             f"{condition_name}.yaml")
 
     def resolve_switch_condition_path(self, condition_name):
+        if condition_name is None:
+            rospy.logerr("Condition name must be provided to resolve path.")
+            return None
         return self._join(
             self.motion_directory,
             self.current_animation_name,

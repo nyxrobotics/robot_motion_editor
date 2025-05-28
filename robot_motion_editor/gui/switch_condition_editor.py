@@ -29,8 +29,9 @@ class SwitchConditionEditorDialog(QDialog):
         self.condition_name = condition_name
         self.condition_data = SwitchConditionData()
         self.init_ui()
-        self.load_condition()
         self.filepath = self.motion_directory_manager.resolve_switch_condition_path(self.condition_name)
+        if os.path.exists(self.filepath):
+            self.load_condition()
         self.setWindowTitle(f"Switch: {os.path.basename(self.filepath)}")
 
     def init_ui(self):

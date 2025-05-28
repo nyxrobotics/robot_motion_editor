@@ -34,7 +34,7 @@ class FrameEditorDialog(QDialog):
         self,
         joint_data_manager: JointDataManager,
         motion_directory_manager: MotionDirectoryManager,
-        frame_name=None,
+        frame_name: str,
         trajectory_visualizer: TrajectoryVisualizer = None,
         trajectory_commander: TrajectoryCommander = None,
         parent=None,
@@ -59,13 +59,9 @@ class FrameEditorDialog(QDialog):
 
         self.init_ui()
 
-        if frame_name:
-            self.filepath = self.motion_directory_manager.resolve_frame_path(frame_name)
-            if os.path.exists(self.filepath):
-                self.frame_data.load_from_file(self.filepath)
-        else:
-            rospy.logwarn("Frame name is not provided, creating a new frame.")
-            self.filepath = None
+        self.filepath = self.motion_directory_manager.resolve_frame_path(frame_name)
+        if os.path.exists(self.filepath):
+            self.frame_data.load_from_file(self.filepath)
 
         self.setWindowTitle(f"Frame: {os.path.basename(self.filepath)}")
 
