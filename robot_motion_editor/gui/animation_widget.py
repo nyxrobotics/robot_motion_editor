@@ -146,6 +146,8 @@ class AnimaitonWidget(QWidget):
             for cond in self.motion_directory_manager.list_switch_condition_files():
                 QTreeWidgetItem(switch_item, [cond])
 
+            self.motion_directory_manager.set_current_animation(None)
+
     def load_animation_by_name(self, animation_name):
         if not self.confirm_save_if_unsaved_changes():
             return
