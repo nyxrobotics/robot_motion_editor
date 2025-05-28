@@ -19,17 +19,17 @@ class IfConditionEditorDialog(QDialog):
             self,
             joint_data_manager: JointDataManager,
             motion_directory_manager: MotionDirectoryManager,
-            condition_name: str,
+            filename: str,
             parent=None):
         super().__init__(parent)
         if parent is None:
             self.setWindowFlags(Qt.Window)
         self.joint_data_manager = joint_data_manager
         self.motion_directory_manager = motion_directory_manager
-        self.condition_name = condition_name
+        self.filename = filename
         self.condition_data = IfConditionData()
         self.init_ui()
-        self.filepath = self.motion_directory_manager.resolve_if_condition_path(self.condition_name)
+        self.filepath = self.motion_directory_manager.resolve_if_condition_path(self.filename)
         if os.path.exists(self.filepath):
             self.load_condition()
         self.setWindowTitle(f"If: {os.path.basename(self.filepath)}")
@@ -67,7 +67,7 @@ class IfConditionEditorDialog(QDialog):
                 self.joint_data_manager.get_available_variables()))
 
     def load_condition(self):
-        file_path = self.motion_directory_manager.resolve_if_condition_path(self.condition_name)
+        file_path = self.motion_directory_manager.resolve_if_condition_path(self.filename)
         self.condition_data.load_from_file(file_path)
         self.expression_edit.setPlainText(self.condition_data.expression)
         self.condition_edit.setPlainText(self.condition_data.condition)
@@ -113,7 +113,7 @@ class IfConditionEditorDialog(QDialog):
 
         self.condition_data.expression = expression
         self.condition_data.condition = condition
-        file_path = self.motion_directory_manager.resolve_if_condition_path(self.condition_name)
+        file_path = self.motion_directory_manager.resolve_if_condition_path(self.filename)
         self.condition_data.save_to_file(file_path)
 
         self.accept()

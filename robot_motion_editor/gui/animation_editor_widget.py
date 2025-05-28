@@ -17,9 +17,7 @@ from ..logic.animation_file_manager import BlockConnection
 from ..logic.animation_file_manager import BlockData
 from ..logic.animation_file_manager import BlockInfo
 from ..logic.frame_file_manager import FrameData
-from ..logic.frame_file_manager import FrameFileManager
 from ..logic.if_condition_file_manager import IfConditionData
-from ..logic.initial_pose_file_manager import InitialPoseFileManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..logic.switch_condition_file_manager import SwitchConditionData
 from .animation_editor_items import ArrowItem
@@ -29,10 +27,6 @@ from .animation_editor_items import OutputSubBlockItem
 from .animation_editor_items import StartBlockItem
 from .animation_editor_items import SwitchBlockItem
 from .animation_editor_items import WaypointItem
-from .frame_editor import FrameEditorDialog
-from .if_condition_editor import IfConditionEditorDialog
-from .initial_frame_editor import InitialFrameEditorDialog
-from .switch_condition_editor import SwitchConditionEditorDialog
 
 
 class AnimationEditorWidget(QGraphicsScene):
@@ -427,10 +421,10 @@ class AnimationEditorWidget(QGraphicsScene):
 
         self.update_scene_rect()
 
-    def update_switch_block(self, condition_name, new_num_cases):
+    def update_switch_block(self, filename, new_num_cases):
         target_block = None
         for block in self.block_objects.values():
-            if isinstance(block, SwitchBlockItem) and block.filename == condition_name:
+            if isinstance(block, SwitchBlockItem) and block.filename == filename:
                 target_block = block
                 break
 
@@ -463,7 +457,7 @@ class AnimationEditorWidget(QGraphicsScene):
         del self.block_objects[target_block.name]
 
         # 新しいブロックを作成
-        new_block = SwitchBlockItem(id, condition_name, num_cases=new_num_cases)
+        new_block = SwitchBlockItem(id, filename, num_cases=new_num_cases)
         new_block.setPos(pos)
         self.addItem(new_block)
         self.block_objects[new_block.name] = new_block

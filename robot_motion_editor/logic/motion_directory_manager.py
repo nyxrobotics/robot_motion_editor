@@ -64,8 +64,8 @@ class MotionDirectoryManager:
             return None
         return self._join(self.motion_directory, self.current_animation_name, "frames", f"{frame_name}.yaml")
 
-    def resolve_if_condition_path(self, condition_name):
-        if condition_name is None:
+    def resolve_if_condition_path(self, filename):
+        if filename is None:
             rospy.logerr("Condition name must be provided to resolve path.")
             return None
         return self._join(
@@ -73,10 +73,10 @@ class MotionDirectoryManager:
             self.current_animation_name,
             "conditions",
             "if",
-            f"{condition_name}.yaml")
+            f"{filename}.yaml")
 
-    def resolve_switch_condition_path(self, condition_name):
-        if condition_name is None:
+    def resolve_switch_condition_path(self, filename):
+        if filename is None:
             rospy.logerr("Condition name must be provided to resolve path.")
             return None
         return self._join(
@@ -84,7 +84,7 @@ class MotionDirectoryManager:
             self.current_animation_name,
             "conditions",
             "switch",
-            f"{condition_name}.yaml")
+            f"{filename}.yaml")
 
     def resolve_animation_yaml_path(self):
         return self._join(self.motion_directory, self.current_animation_name, "animation.yaml")

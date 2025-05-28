@@ -104,6 +104,7 @@ class AnimaitonWidget(QWidget):
         self.delete_anim_btn.clicked.connect(self.delete_animation)
         self.delete_frame_btn.clicked.connect(self.delete_frame)
         self.animation_tree.itemClicked.connect(self.on_tree_item_clicked)
+        self.animation_tree.itemDoubleClickedSignal.connect(self.on_tree_item_double_clicked)
 
         self.view.setAcceptDrops(True)
         self.view.setRenderHints(self.view.renderHints() | QPainter.Antialiasing)
@@ -313,44 +314,17 @@ class AnimaitonWidget(QWidget):
         animation_name = animation_item.text(0)
         self.motion_directory_manager.set_current_animation(animation_name)
 
-        if item.text(0) == "initial_frame":
-            self.open_initial_frame_editor()
+        label = item.text(0)
+        parent = item.parent().text(0) if item.parent() else ""
 
-        elif item.parent() and item.parent().text(0) == "frames":
-            frame_name = item.text(0)
-            frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
-            if not os.path.exists(frame_path):
-                QMessageBox.warning(self, "Missing File", f"{frame_path} not found.")
-                return
-
-            dlg = FrameEditorDialog(
-                joint_data_manager=self.joint_data_manager,
-                motion_directory_manager=self.motion_directory_manager,
-                frame_name=frame_name,
-                trajectory_visualizer=self.trajectory_visualizer,
-                trajectory_commander=self.trajectory_commander,
-                parent=self
-            )
-
-            frame_data = FrameData()
-            frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
-            frame_data.set_dict(FrameFileManager.load_dict(os.path.dirname(frame_path), os.path.basename(frame_path)))
-            current_state = frame_data.get_joint_state()
-            current_move = frame_data.move_duration
-            current_wait = frame_data.wait_duration
-
-            if hasattr(self, "initial_joint_state"):
-                dlg.frame_visualizer.set_initial_frame(self.initial_joint_state)
-                dlg.frame_visualizer.set_in_frame(current_state, current_move, current_wait)
-                dlg.frame_visualizer.set_out_frame(current_state, current_move, current_wait)
-
-            dlg.exec_()
-
-        elif item.parent() and item.parent().text(0) == "if":
-            self.open_if_condition_editor(item.text(0))
-
-        elif item.parent() and item.parent().text(0) == "switch":
-            self.open_switch_condition_editor(item.text(0))
+        if label == "initial_frame":
+            self.open_editor_by_type("initial_frame")
+        elif parent == "frames":
+            self.open_editor_by_type("frame", label)
+        elif parent == "if":
+            self.open_editor_by_type("if", label)
+        elif parent == "switch":
+            self.open_editor_by_type("switch", label)
 
     def open_initial_frame_editor(self):
         key = "initial_frame"
@@ -370,79 +344,62 @@ class AnimaitonWidget(QWidget):
         self.open_editors[key] = dlg
         dlg.destroyed.connect(lambda: self.open_editors.pop(key, None))
 
-    def open_frame_file_editor(self, frame_name):
-        key = f"frame:{frame_name}"
+    def on_frame_block_double_clicked(self, filename: str):
+        self.open_editor_by_type("frame", filename)
+
+    def on_if_block_double_clicked(self, filename: str):
+        self.open_editor_by_type("if", filename)
+
+    def on_switch_block_double_clicked(self, filename: str):
+        self.open_editor_by_type("switch", filename)
+
+    def open_editor_by_type(self, type: str, name: str = ""):
+        key = f"{type}:{name}" if name else type
         if key in self.open_editors and self.open_editors[key].isVisible():
             self.open_editors[key].raise_()
             self.open_editors[key].activateWindow()
             return
-        dlg = FrameEditorDialog(
-            joint_data_manager=self.joint_data_manager,
-            motion_directory_manager=self.motion_directory_manager,
-            frame_name=frame_name,
-            trajectory_visualizer=self.trajectory_visualizer,
-            trajectory_commander=self.trajectory_commander,
-            parent=self
-        )
+
+        if type == "initial_frame":
+            dlg = InitialFrameEditorDialog(
+                joint_data_manager=self.joint_data_manager,
+                motion_directory_manager=self.motion_directory_manager,
+                trajectory_visualizer=self.trajectory_visualizer,
+                trajectory_commander=self.trajectory_commander,
+                parent=self
+            )
+        elif type == "frame":
+            dlg = FrameEditorDialog(
+                joint_data_manager=self.joint_data_manager,
+                motion_directory_manager=self.motion_directory_manager,
+                frame_name=name,
+                trajectory_visualizer=self.trajectory_visualizer,
+                trajectory_commander=self.trajectory_commander,
+                parent=self
+            )
+        elif type == "if":
+            dlg = IfConditionEditorDialog(
+                joint_data_manager=self.joint_data_manager,
+                motion_directory_manager=self.motion_directory_manager,
+                filename=name,
+                parent=self
+            )
+        elif type == "switch":
+            dlg = SwitchConditionEditorDialog(
+                joint_data_manager=self.joint_data_manager,
+                motion_directory_manager=self.motion_directory_manager,
+                filename=name,
+                parent=self
+            )
+            dlg.finished.connect(lambda result_code: (
+                self.animation_flow_scene.update_switch_block(name, dlg.result.get("num_cases", 2))
+                if result_code == QDialog.Accepted and dlg.result else None
+            ))
+        else:
+            rospy.logwarn(f"[AnimaitonWidget] Unknown editor type: {type}")
+            return
+
         dlg.setAttribute(Qt.WA_DeleteOnClose)
         dlg.show()
         self.open_editors[key] = dlg
         dlg.destroyed.connect(lambda: self.open_editors.pop(key, None))
-
-    def open_frame_block_editor(self, block_id: str):
-        block = self.animation_flow_scene.block_objects.get(block_id)
-        if not block:
-            print(f"[WARN] No block found for id: {block_id}")
-            return
-        filename = block.filename
-        self.open_frame_file_editor(filename)
-
-    def open_if_condition_editor(self, condition_name):
-        key = f"if:{condition_name}"
-        if key in self.open_editors and self.open_editors[key].isVisible():
-            self.open_editors[key].raise_()
-            self.open_editors[key].activateWindow()
-            return
-        condition_path = self.motion_directory_manager.resolve_if_condition_path(condition_name)
-        if not os.path.exists(condition_path):
-            QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
-            return
-        dlg = IfConditionEditorDialog(
-            joint_data_manager=self.joint_data_manager,
-            motion_directory_manager=self.motion_directory_manager,
-            condition_name=condition_name,
-            parent=self
-        )
-        dlg.setAttribute(Qt.WA_DeleteOnClose)
-        dlg.show()
-        self.open_editors[key] = dlg
-        dlg.destroyed.connect(lambda: self.open_editors.pop(key, None))
-
-    def open_switch_condition_editor(self, condition_name):
-        key = f"switch:{condition_name}"
-        if key in self.open_editors and self.open_editors[key].isVisible():
-            self.open_editors[key].raise_()
-            self.open_editors[key].activateWindow()
-            return
-        condition_path = self.motion_directory_manager.resolve_switch_condition_path(condition_name)
-        if not os.path.exists(condition_path):
-            QMessageBox.warning(self, "Missing File", f"{condition_path} not found.")
-            return
-        dlg = SwitchConditionEditorDialog(
-            joint_data_manager=self.joint_data_manager,
-            motion_directory_manager=self.motion_directory_manager,
-            condition_name=condition_name,
-            parent=self
-        )
-
-        dlg.setAttribute(Qt.WA_DeleteOnClose)
-
-        def on_finished(result_code):
-            if result_code == QDialog.Accepted and dlg.result:
-                new_num_cases = dlg.result.get("num_cases", 2)
-                self.animation_flow_scene.update_switch_block(condition_name, new_num_cases)
-            self.open_editors.pop(key, None)
-
-        dlg.finished.connect(on_finished)
-        dlg.show()
-        self.open_editors[key] = dlg

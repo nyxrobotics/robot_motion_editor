@@ -3,6 +3,7 @@ import os
 from PyQt5.QtCore import QMimeData
 from PyQt5.QtCore import QPoint
 from PyQt5.QtCore import Qt
+from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QDrag
 from PyQt5.QtWidgets import QAbstractItemView
 from PyQt5.QtWidgets import QInputDialog
@@ -16,6 +17,8 @@ from ..logic.motion_directory_manager import MotionDirectoryManager
 
 
 class AnimationFileWidget(QTreeWidget):
+    itemDoubleClickedSignal = pyqtSignal(object)
+
     def __init__(self, motion_directory_manager: MotionDirectoryManager, parent=None):
         super().__init__(parent)
         self.motion_directory_manager = motion_directory_manager
@@ -23,6 +26,10 @@ class AnimationFileWidget(QTreeWidget):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.itemDoubleClicked.connect(self.on_item_double_clicked)
+
+    def on_item_double_clicked(self, item, column):
+        self.itemDoubleClickedSignal.emit(item)
 
     def show_context_menu(self, pos: QPoint):
         item = self.itemAt(pos)
