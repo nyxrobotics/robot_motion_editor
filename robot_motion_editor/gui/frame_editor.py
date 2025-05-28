@@ -62,6 +62,7 @@ class FrameEditorDialog(QDialog):
         self.filepath = self.motion_directory_manager.resolve_frame_path(frame_name)
         if os.path.exists(self.filepath):
             self.frame_data.load_from_file(self.filepath)
+            self.set_frame_to_ui()
 
         self.setWindowTitle(f"Frame: {os.path.basename(self.filepath)}")
 
@@ -282,16 +283,20 @@ class FrameEditorDialog(QDialog):
         for joint_name in self.frame_data.get_joint_names():
             if joint_name not in self.joint_widgets:
                 continue
-            _, spin, vel_spin = self.joint_widgets[joint_name]
-            spin.setValue(math.degrees(self.frame_data.get_pose(joint_name)))
+            slider, spin, vel_spin = self.joint_widgets[joint_name]
+
+            deg = math.degrees(self.frame_data.get_pose(joint_name))
+            spin.blockSignals(True)
+            slider.blockSignals(True)
+            spin.setValue(deg)
+            slider.setValue(int(round(deg)))
+            spin.blockSignals(False)
+            slider.blockSignals(False)
+
             vel_spin.setValue(self.frame_data.get_velocity_scale(joint_name))
             self.enable_checkbox_widgets[joint_name].setChecked(self.frame_data.get_enable(joint_name))
 
     def accept(self):
-        if not self.filepath:
-            super().reject()
-            return
-
         self.frame_data.move_duration = self.duration_spin.value()
         self.frame_data.wait_duration = self.wait_spin.value()
 
