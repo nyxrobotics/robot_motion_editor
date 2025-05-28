@@ -63,7 +63,7 @@ class AnimaitonWidget(QWidget):
             motion_directory_manager=self.motion_directory_manager,
             joint_data_manager=self.joint_data_manager)
         self.init_ui()
-        self.load_animation_list()
+        self.reload_animation_tree()
         self.open_editors = {}  # e.g. {"initial_frame": dlg, "frame:walk1": dlg}
 
     def init_ui(self):
@@ -118,36 +118,6 @@ class AnimaitonWidget(QWidget):
         layout.addWidget(splitter)
         self.setLayout(layout)
 
-    def load_animation_list(self):
-        self.animation_tree.clear()
-        base_dir = self.motion_directory_manager.get_motion_directory()
-        if not os.path.isdir(base_dir):
-            return
-
-        for animation_name in sorted(os.listdir(base_dir)):
-            animation_path = os.path.join(base_dir, animation_name)
-            if not os.path.isdir(animation_path):
-                continue
-            anim_item = QTreeWidgetItem([animation_name])
-            self.animation_tree.addTopLevelItem(anim_item)
-
-            QTreeWidgetItem(anim_item, ["initial_frame"])
-
-            frames_item = QTreeWidgetItem(anim_item, ["frames"])
-            self.motion_directory_manager.set_current_animation(animation_name)
-            for frame in self.motion_directory_manager.list_frame_files():
-                QTreeWidgetItem(frames_item, [frame])
-
-            conditions_item = QTreeWidgetItem(anim_item, ["conditions"])
-            if_item = QTreeWidgetItem(conditions_item, ["if"])
-            for cond in self.motion_directory_manager.list_if_condition_files():
-                QTreeWidgetItem(if_item, [cond])
-            switch_item = QTreeWidgetItem(conditions_item, ["switch"])
-            for cond in self.motion_directory_manager.list_switch_condition_files():
-                QTreeWidgetItem(switch_item, [cond])
-
-            self.motion_directory_manager.set_current_animation(None)
-
     def load_animation_by_name(self, animation_name):
         if not self.confirm_save_if_unsaved_changes():
             return
@@ -166,6 +136,64 @@ class AnimaitonWidget(QWidget):
             self.animation_visualizer.initial_joint_state = self.initial_joint_state
         except Exception as e:
             rospy.logwarn(f"[MotionEditor] Failed to load initial_frame: {e}")
+
+    def reload_animation_tree(self):
+        """Reload the full animation tree with all children."""
+        self.reload_animation_list()
+        for i in range(self.animation_tree.topLevelItemCount()):
+            animation_name = self.animation_tree.topLevelItem(i).text(0)
+            self.reload_animation_contents(animation_name)
+        self.animation_tree.setCurrentItem(None)
+
+    def reload_animation_list(self):
+        """Update only the top-level animation names in the tree."""
+        self.animation_tree.clear()
+        base_dir = self.motion_directory_manager.get_motion_directory()
+        if not os.path.isdir(base_dir):
+            return
+
+        for animation_name in sorted(os.listdir(base_dir)):
+            animation_path = os.path.join(base_dir, animation_name)
+            if os.path.isdir(animation_path):
+                anim_item = QTreeWidgetItem([animation_name])
+                self.animation_tree.addTopLevelItem(anim_item)
+
+    def reload_animation_contents(self, animation_name: str):
+        """Update the contents of a specific animation node (initial_frame, frames, conditions)."""
+        base_dir = self.motion_directory_manager.get_motion_directory()
+        anim_path = os.path.join(base_dir, animation_name)
+        if not os.path.isdir(anim_path):
+            return
+
+        # Find or create parent item
+        for i in range(self.animation_tree.topLevelItemCount()):
+            if self.animation_tree.topLevelItem(i).text(0) == animation_name:
+                parent_item = self.animation_tree.topLevelItem(i)
+                parent_item.takeChildren()
+                break
+        else:
+            parent_item = QTreeWidgetItem([animation_name])
+            self.animation_tree.addTopLevelItem(parent_item)
+
+        # initial_frame
+        QTreeWidgetItem(parent_item, ["initial_frame"])
+
+        # frames
+        frames_item = QTreeWidgetItem(parent_item, ["frames"])
+        self.motion_directory_manager.set_current_animation(animation_name)
+        for frame in self.motion_directory_manager.list_frame_files():
+            QTreeWidgetItem(frames_item, [frame])
+
+        # conditions
+        conditions_item = QTreeWidgetItem(parent_item, ["conditions"])
+        if_item = QTreeWidgetItem(conditions_item, ["if"])
+        for cond in self.motion_directory_manager.list_if_condition_files():
+            QTreeWidgetItem(if_item, [cond])
+        switch_item = QTreeWidgetItem(conditions_item, ["switch"])
+        for cond in self.motion_directory_manager.list_switch_condition_files():
+            QTreeWidgetItem(switch_item, [cond])
+
+        self.motion_directory_manager.set_current_animation(None)
 
     def save_current_animation(self):
         anim_name = self.motion_directory_manager.get_current_animation()
@@ -223,7 +251,8 @@ class AnimaitonWidget(QWidget):
         with open(os.path.join(animation_path, "initial_frame.yaml"), "w") as f:
             f.write("# initial frame")
 
-        self.load_animation_list()
+        self.reload_animation_list()
+        self.reload_animation_contents(name)
         self.load_animation_by_name(name)
 
     def create_new_frame(self):
@@ -252,7 +281,7 @@ class AnimaitonWidget(QWidget):
         default_frame_data = FrameData().get_dict()
         FrameFileManager.save_dict(os.path.dirname(frame_path), default_frame_data, os.path.basename(frame_path))
 
-        self.load_animation_list()
+        self.reload_animation_contents(animation_name)
         self.load_animation_by_name(animation_name)
 
     def delete_animation(self):
@@ -270,8 +299,8 @@ class AnimaitonWidget(QWidget):
             QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
             shutil.rmtree(path, ignore_errors=True)
-            self.load_animation_list()
             self.motion_directory_manager.set_current_animation(None)
+            self.reload_animation_list()
 
     def delete_frame(self):
         item = self.animation_tree.currentItem()
@@ -297,7 +326,7 @@ class AnimaitonWidget(QWidget):
             QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes and os.path.exists(frame_path):
             os.remove(frame_path)
-            self.load_animation_list()
+            self.reload_animation_contents(animation_name)
             self.load_animation_by_name(animation_name)
 
     def on_tree_item_clicked(self, item):

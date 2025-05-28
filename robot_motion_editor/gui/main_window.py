@@ -70,7 +70,7 @@ class MainWindow(QWidget):
             if self.initial_pose_editor:
                 self.initial_pose_editor.load_pose()
             if self.animation_widget:
-                self.animation_widget.load_animation_list()
+                self.animation_widget.reload_animation_tree()
 
     def init_ui(self):
         layout = QVBoxLayout()
