@@ -279,7 +279,7 @@ class AnimaitonWidget(QWidget):
             return
 
         default_frame_data = FrameData().get_dict()
-        FrameFileManager.save_dict(os.path.dirname(frame_path), default_frame_data, os.path.basename(frame_path))
+        FrameFileManager.save_dict(frame_path, default_frame_data)
 
         self.reload_animation_contents(animation_name)
         self.load_animation_by_name(animation_name)
