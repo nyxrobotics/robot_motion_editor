@@ -126,16 +126,17 @@ class AnimationFileWidget(QTreeWidget):
         while animation_item.parent():
             animation_item = animation_item.parent()
         animation_name = animation_item.text(0)
+        self.motion_directory_manager.set_current_animation(animation_name)
 
         if category == "frames":
-            old_path = self.motion_directory_manager.resolve_frame_path(old_name, animation_name)
-            new_path = self.motion_directory_manager.resolve_frame_path(new_name, animation_name)
+            old_path = self.motion_directory_manager.resolve_frame_path(old_name)
+            new_path = self.motion_directory_manager.resolve_frame_path(new_name)
         elif category == "if":
-            old_path = self.motion_directory_manager.resolve_if_condition_path(old_name, animation_name)
-            new_path = self.motion_directory_manager.resolve_if_condition_path(new_name, animation_name)
+            old_path = self.motion_directory_manager.resolve_if_condition_path(old_name)
+            new_path = self.motion_directory_manager.resolve_if_condition_path(new_name)
         elif category == "switch":
-            old_path = self.motion_directory_manager.resolve_switch_condition_path(old_name, animation_name)
-            new_path = self.motion_directory_manager.resolve_switch_condition_path(new_name, animation_name)
+            old_path = self.motion_directory_manager.resolve_switch_condition_path(old_name)
+            new_path = self.motion_directory_manager.resolve_switch_condition_path(new_name)
         else:
             return False
 
@@ -373,8 +374,6 @@ class AnimationFileWidget(QTreeWidget):
         for cond in self.motion_directory_manager.list_switch_condition_files():
             QTreeWidgetItem(switch_item, [cond])
 
-        self.motion_directory_manager.set_current_animation(None)
-
     def open_editor_by_type(self, type: str, name: str = ""):
         key = f"{type}:{name}" if name else type
         if key in self.open_editors and self.open_editors[key].isVisible():
@@ -463,6 +462,7 @@ class AnimationFileWidget(QTreeWidget):
             shutil.rmtree(path, ignore_errors=True)
             self.motion_directory_manager.set_current_animation(None)
             self.reload_animation_contents(name)
+            self.motion_directory_manager.set_current_animation(None)
 
     def delete_frame(self):
         item = self.animation_tree.currentItem()

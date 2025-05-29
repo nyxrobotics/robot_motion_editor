@@ -117,6 +117,7 @@ class AnimaitonWidget(QWidget):
         for i in range(self.animation_tree.topLevelItemCount()):
             animation_name = self.animation_tree.topLevelItem(i).text(0)
             self.animation_tree.reload_animation_contents(animation_name)
+        self.motion_directory_manager.set_current_animation(None)
         self.animation_tree.setCurrentItem(None)
 
     def on_save_anim_btn(self):
@@ -147,7 +148,7 @@ class AnimaitonWidget(QWidget):
             QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
 
         if reply == QMessageBox.Save:
-            self.save_current_animation()
+            self.on_save_anim_btn()
             return True
         elif reply == QMessageBox.Discard:
             return True
