@@ -97,7 +97,9 @@ class AnimationFileWidget(QTreeWidget):
                 old_name = item.text(0)
                 new_name, ok = QInputDialog.getText(self, "Rename", f"Rename '{old_name}' to:", text=old_name)
                 if ok and new_name and new_name != old_name:
-                    self.rename_yaml_file(parent.text(0), old_name, new_name.strip(), item)
+                    success = self.rename_yaml_file(parent.text(0), old_name, new_name.strip(), item)
+                    if success:
+                        self.update_scene_after_rename()
 
             elif selected == delete_action:
                 self.delete_file_item(parent.text(0), item.text(0))
@@ -125,7 +127,7 @@ class AnimationFileWidget(QTreeWidget):
         if hasattr(self.parent(), "current_animation_name") and self.current_animation_name == old_name:
             self.current_animation_name = new_name
 
-    def rename_yaml_file(self, category, old_name, new_name, item_widget) -> bool:
+    def rename_yaml_file(self, category, old_name, new_name, item_widget):
         # animation_name の決定
         animation_item = item_widget
         if animation_item:
@@ -136,12 +138,11 @@ class AnimationFileWidget(QTreeWidget):
             animation_name = self.motion_directory_manager.get_current_animation()
 
         if not animation_name:
-            QMessageBox.warning(self, "Rename Error", "No animation selected.")
             return False
 
         self.motion_directory_manager.set_current_animation(animation_name)
 
-        # パスの決定
+        # ファイルのパス設定
         if category == "frames":
             old_path = self.motion_directory_manager.resolve_frame_path(old_name)
             new_path = self.motion_directory_manager.resolve_frame_path(new_name)
@@ -164,17 +165,19 @@ class AnimationFileWidget(QTreeWidget):
             QMessageBox.critical(self, "Rename Failed", str(e))
             return False
 
-        # animation.yaml の読み込みと更新
-        anim_path = self.motion_directory_manager.resolve_animation_yaml_path()
+        # animation.yaml の更新
+        yaml_path = self.motion_directory_manager.resolve_animation_yaml_path()
+        if not os.path.exists(yaml_path):
+            return False
+
         anim_data = AnimationData()
-        anim_data.load_from_file(anim_path)
+        anim_data.load_from_file(yaml_path)
         anim_data_dict = anim_data.get_dict()
         block_dict = anim_data_dict.get("block", {})
         updated = False
-        singular_type = category.rstrip("s")
-
-        new_block = {}
         rename_map = {}
+        new_block = {}
+        singular_type = category.rstrip("s")
 
         for block_key, block_data in block_dict.items():
             info = block_data.get("info", {})
@@ -185,29 +188,43 @@ class AnimationFileWidget(QTreeWidget):
                     new_key = f"{parts[0]}_{parts[1]}_{new_name}"
                     rename_map[block_key] = new_key
                     new_block[new_key] = block_data
+                    updated = True
                 else:
                     new_block[block_key] = block_data
-                updated = True
             else:
                 new_block[block_key] = block_data
 
+        # target名を更新
         for block_data in new_block.values():
             output = block_data.get("connection", {}).get("output", {})
             for conn in output.values():
                 if isinstance(conn, dict) and "target" in conn:
-                    old_target = conn["target"]
-                    if old_target in rename_map:
-                        conn["target"] = rename_map[old_target]
+                    if conn["target"] in rename_map:
+                        conn["target"] = rename_map[conn["target"]]
                         updated = True
 
         if updated:
             anim_data_dict["block"] = new_block
             anim_data.set_dict(anim_data_dict)
-            anim_data.save_to_file(anim_path)
+            anim_data.save_to_file(yaml_path)
 
-        # ツリー表示の更新
+        # GUI再読み込み
         self.reload_animation_contents(animation_name)
-        return updated
+        return True
+
+    def update_scene_after_rename(self):
+        animation_name = self.motion_directory_manager.get_current_animation()
+        if not animation_name:
+            return
+
+        yaml_path = self.motion_directory_manager.resolve_animation_yaml_path()
+        if not os.path.exists(yaml_path):
+            return
+
+        anim_data = AnimationData()
+        anim_data.load_from_file(yaml_path)
+        if hasattr(self.editor_scene, "set_animation_data"):
+            self.editor_scene.set_animation_data(anim_data)
 
     def mouseMoveEvent(self, event):
         item = self.currentItem()
