@@ -3,6 +3,12 @@ import xml.etree.ElementTree as ET
 import rospy
 
 
+def get_robot_name():
+    xml_string = rospy.get_param("/robot_description")
+    root = ET.fromstring(xml_string)
+    return root.attrib.get("name", "robot_name")
+
+
 def get_transmission_joints():
     xml_string = rospy.get_param("/robot_description")
     root = ET.fromstring(xml_string)

@@ -16,6 +16,7 @@ from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..urdf_interface.urdf_joint_extractor import get_joint_limit
+from ..urdf_interface.urdf_joint_extractor import get_robot_name
 from ..urdf_interface.urdf_joint_extractor import get_transmission_joints
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .animation_widget import AnimaitonWidget
@@ -38,7 +39,7 @@ class MainWindow(QWidget):
 
         self.trajectory_visualizer = TrajectoryVisualizer(visualize_as_state=True, rate=30.0)
         self.trajectory_commander = TrajectoryCommander(
-            "kuroko", self.joint_data_manager.get_joint_names(), mode="position")
+            get_robot_name(), self.joint_data_manager.get_joint_names(), mode="position")
         self.motion_directory_manager = MotionDirectoryManager(motion_directory=".")
 
         self.init_ui()
