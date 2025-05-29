@@ -69,6 +69,18 @@ class AnimationFileWidget(QTreeWidget):
         parent = item.parent()
         text = item.text(0)
 
+        if parent is None:
+            rename_action = menu.addAction("Rename Animation")
+            delete_action = menu.addAction("Delete Animation")
+            selected = menu.exec_(self.viewport().mapToGlobal(pos))
+
+            if selected == rename_action:
+                self.rename_animation_folder(item)
+
+            elif selected == delete_action:
+                self.delete_animation_folder(item)
+            return
+
         if text in {"frames", "if", "switch"}:
             if text == "frames":
                 action = menu.addAction("New Frame")
@@ -106,7 +118,7 @@ class AnimationFileWidget(QTreeWidget):
 
     def rename_animation_folder(self, item: QTreeWidgetItem):
         old_name = item.text(0)
-        new_name, ok = QInputDialog.getText(self, "Rename", f"Rename Animation '{old_name}' to:", text=old_name)
+        new_name, ok = QInputDialog.getText(self, "Rename Animation", f"Rename '{old_name}' to:", text=old_name)
         if not ok or not new_name or old_name == new_name:
             return
 
@@ -124,8 +136,36 @@ class AnimationFileWidget(QTreeWidget):
             return
 
         item.setText(0, new_name)
-        if hasattr(self.parent(), "current_animation_name") and self.current_animation_name == old_name:
-            self.current_animation_name = new_name
+
+        # 現在のアニメーション名が一致するなら更新
+        if self.motion_directory_manager.get_current_animation() == old_name:
+            self.motion_directory_manager.set_current_animation(new_name)
+
+        self.reload_animation_list()
+        self.reload_animation_contents(new_name)
+        self.update_scene_after_rename()
+
+    def delete_animation_folder(self, item: QTreeWidgetItem):
+        name = item.text(0)
+        path = self.motion_directory_manager.resolve_animation_path(name)
+
+        reply = QMessageBox.question(
+            self, "Delete Animation", f"Are you sure you want to delete animation '{name}'?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            try:
+                shutil.rmtree(path)
+            except Exception as e:
+                QMessageBox.critical(self, "Delete Failed", str(e))
+                return
+
+            if self.motion_directory_manager.get_current_animation() == name:
+                self.motion_directory_manager.set_current_animation(None)
+
+            self.reload_animation_list()
+            if hasattr(self, "editor_scene"):
+                self.editor_scene.clear()
 
     def rename_yaml_file(self, category, old_name, new_name, item_widget):
         # animation_name の決定
