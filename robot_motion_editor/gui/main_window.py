@@ -53,15 +53,6 @@ class MainWindow(QWidget):
         joint_vars = [f"joint_{name}" for name in self.joint_data_manager.get_joint_names()]
         return joint_vars + imu_vars
 
-    def get_available_serial_ports(self):
-        ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
-        return sorted(ports)
-
-    def update_serial_ports(self):
-        ports = self.get_available_serial_ports()
-        self.com_port_box.clear()
-        self.com_port_box.addItems(ports if ports else ["(no ports found)"])
-
     def browse_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Motion Directory", os.getcwd())
         if folder:
@@ -99,26 +90,7 @@ class MainWindow(QWidget):
         checkbox_row = QHBoxLayout()
         checkbox_row.addWidget(self.preview_checkbox)
         checkbox_row.addWidget(self.hardware_checkbox)
-        checkbox_row.addStretch()
         checkbox_row.addWidget(self.torque_checkbox)
-
-        com_layout = QHBoxLayout()
-        self.com_port_box = QComboBox()
-        self.refresh_ports_button = QPushButton("Refresh Ports")
-        self.refresh_ports_button.clicked.connect(self.update_serial_ports)
-        self.update_serial_ports()
-        com_layout.addWidget(QLabel("COM Port:"))
-        com_layout.addWidget(self.com_port_box)
-        com_layout.addWidget(self.refresh_ports_button)
-
-        baud_layout = QHBoxLayout()
-        self.baudrate_combo = QComboBox()
-        baud_rates = ["4500000", "4000000", "3000000", "2000000", "1000000", "115200", "57600", "9600"]
-        self.baudrate_combo.addItems(baud_rates)
-        self.baudrate_combo.setEditable(True)
-        self.baudrate_combo.setCurrentText("115200")
-        baud_layout.addWidget(QLabel("Baudrate:"))
-        baud_layout.addWidget(self.baudrate_combo)
 
         path_layout = QHBoxLayout()
         self.path_lineedit = QLineEdit()
@@ -130,8 +102,6 @@ class MainWindow(QWidget):
 
         layout.addLayout(checkbox_row)
         layout.addWidget(self.init_pose_button)
-        layout.addLayout(com_layout)
-        layout.addLayout(baud_layout)
         layout.addLayout(path_layout)
 
         self.tabs = QTabWidget()
