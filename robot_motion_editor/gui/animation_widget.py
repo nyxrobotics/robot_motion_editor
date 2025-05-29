@@ -176,7 +176,7 @@ class AnimaitonWidget(QWidget):
         if not animation_name:
             QMessageBox.information(self, "Delete Frame", "No animation selected.")
             return
-        self.animation_tree.delete_frame(animation_name)
+        self.animation_tree.delete_frame()
         self.animation_tree.reload_animation_contents(animation_name)
 
     def on_tree_item_clicked(self, item):

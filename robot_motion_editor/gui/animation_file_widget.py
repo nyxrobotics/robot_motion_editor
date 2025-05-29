@@ -52,6 +52,9 @@ class AnimationFileWidget(QTreeWidget):
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.itemDoubleClicked.connect(self.on_item_double_clicked)
 
+        self.header().setContextMenuPolicy(Qt.CustomContextMenu)
+        self.header().customContextMenuRequested.connect(self.on_header_context_menu)
+
     def on_item_double_clicked(self, item, column):
         self.itemDoubleClickedSignal.emit(item)
 
@@ -116,6 +119,14 @@ class AnimationFileWidget(QTreeWidget):
             elif selected == delete_action:
                 self.delete_file_item(parent.text(0), item.text(0))
 
+    def on_header_context_menu(self, pos):
+        global_pos = self.header().mapToGlobal(pos)
+        menu = QMenu(self)
+        action = menu.addAction("New Animation")
+        selected = menu.exec_(global_pos)
+        if selected == action:
+            self.create_new_animation()
+
     def rename_animation_folder(self, item: QTreeWidgetItem):
         old_name = item.text(0)
         new_name, ok = QInputDialog.getText(self, "Rename Animation", f"Rename '{old_name}' to:", text=old_name)
@@ -135,14 +146,21 @@ class AnimationFileWidget(QTreeWidget):
             QMessageBox.critical(self, "Rename Failed", str(e))
             return
 
-        item.setText(0, new_name)
-
-        # 現在のアニメーション名が一致するなら更新
+        # アニメーション名の更新
         if self.motion_directory_manager.get_current_animation() == old_name:
             self.motion_directory_manager.set_current_animation(new_name)
+        else:
+            self.motion_directory_manager.set_current_animation(None)
 
+        # 完全にリロード（←ここが重要）
+        self.clear()
         self.reload_animation_list()
-        self.reload_animation_contents(new_name)
+        for i in range(self.topLevelItemCount()):
+            anim = self.topLevelItem(i).text(0)
+            self.reload_animation_contents(anim)
+
+        # シーンも更新
+        self.setCurrentItem(None)
         self.update_scene_after_rename()
 
     def delete_animation_folder(self, item: QTreeWidgetItem):
@@ -509,7 +527,7 @@ class AnimationFileWidget(QTreeWidget):
         return name
 
     def delete_animation(self):
-        item = self.animation_tree.currentItem()
+        item = self.currentItem()
         if not item or item.parent() is not None:
             QMessageBox.warning(self, "Selection Error", "Please select an animation to delete.")
             return
@@ -528,7 +546,7 @@ class AnimationFileWidget(QTreeWidget):
             self.motion_directory_manager.set_current_animation(None)
 
     def delete_frame(self):
-        item = self.animation_tree.currentItem()
+        item = self.currentItem()
         parent = item.parent() if item else None
         if not item or not parent:
             QMessageBox.warning(self, "Selection Error", "Please select a frame to delete.")
