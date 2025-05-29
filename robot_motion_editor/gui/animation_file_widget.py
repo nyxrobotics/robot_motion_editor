@@ -94,7 +94,11 @@ class AnimationFileWidget(QTreeWidget):
             selected = menu.exec_(self.viewport().mapToGlobal(pos))
 
             if selected == rename_action:
-                self.rename_yaml_file(parent.text(0), item.text(0), ..., item)
+                old_name = item.text(0)
+                new_name, ok = QInputDialog.getText(self, "Rename", f"Rename '{old_name}' to:", text=old_name)
+                if ok and new_name and new_name != old_name:
+                    self.rename_yaml_file(parent.text(0), old_name, new_name.strip(), item)
+
             elif selected == delete_action:
                 self.delete_file_item(parent.text(0), item.text(0))
 
@@ -121,13 +125,23 @@ class AnimationFileWidget(QTreeWidget):
         if hasattr(self.parent(), "current_animation_name") and self.current_animation_name == old_name:
             self.current_animation_name = new_name
 
-    def rename_yaml_file(self, category, old_name, new_name, item_widget):
+    def rename_yaml_file(self, category, old_name, new_name, item_widget) -> bool:
+        # animation_name の決定
         animation_item = item_widget
-        while animation_item.parent():
-            animation_item = animation_item.parent()
-        animation_name = animation_item.text(0)
+        if animation_item:
+            while animation_item.parent():
+                animation_item = animation_item.parent()
+            animation_name = animation_item.text(0)
+        else:
+            animation_name = self.motion_directory_manager.get_current_animation()
+
+        if not animation_name:
+            QMessageBox.warning(self, "Rename Error", "No animation selected.")
+            return False
+
         self.motion_directory_manager.set_current_animation(animation_name)
 
+        # パスの決定
         if category == "frames":
             old_path = self.motion_directory_manager.resolve_frame_path(old_name)
             new_path = self.motion_directory_manager.resolve_frame_path(new_name)
@@ -150,43 +164,34 @@ class AnimationFileWidget(QTreeWidget):
             QMessageBox.critical(self, "Rename Failed", str(e))
             return False
 
-        editor = self
-        while editor and not hasattr(editor, "scene"):
-            editor = editor.parent()
-        if not editor:
-            QMessageBox.critical(self, "Error", "AnimationWidget not found.")
-            return False
-
-        anim_data = editor.scene.get_animation_data()
+        # animation.yaml の読み込みと更新
+        anim_path = self.motion_directory_manager.resolve_animation_yaml_path()
+        anim_data = AnimationData()
+        anim_data.load_from_file(anim_path)
         anim_data_dict = anim_data.get_dict()
         block_dict = anim_data_dict.get("block", {})
         updated = False
-
         singular_type = category.rstrip("s")
+
         new_block = {}
         rename_map = {}
 
         for block_key, block_data in block_dict.items():
             info = block_data.get("info", {})
-            block_type = info.get("type")
-            block_filename = info.get("filename")
-
-            if block_type == singular_type and block_filename == old_name:
+            if info.get("type") == singular_type and info.get("filename") == old_name:
                 info["filename"] = new_name
-                parts = block_key.split("_")
-                if len(parts) >= 3 and parts[0] == singular_type and parts[2] == old_name:
+                parts = block_key.split("_", 2)
+                if len(parts) == 3 and parts[0] == singular_type and parts[2] == old_name:
                     new_key = f"{parts[0]}_{parts[1]}_{new_name}"
                     rename_map[block_key] = new_key
                     new_block[new_key] = block_data
-                    updated = True
                 else:
                     new_block[block_key] = block_data
+                updated = True
             else:
                 new_block[block_key] = block_data
 
-        anim_data_dict["block"] = new_block
-
-        for block_data in anim_data_dict["block"].values():
+        for block_data in new_block.values():
             output = block_data.get("connection", {}).get("output", {})
             for conn in output.values():
                 if isinstance(conn, dict) and "target" in conn:
@@ -196,12 +201,13 @@ class AnimationFileWidget(QTreeWidget):
                         updated = True
 
         if updated:
-            new_anim_data = AnimationData()
-            new_anim_data.set_dict(anim_data_dict)
-            editor.scene.set_animation_data(new_anim_data)
-            editor.save_current_animation()
+            anim_data_dict["block"] = new_block
+            anim_data.set_dict(anim_data_dict)
+            anim_data.save_to_file(anim_path)
 
-        return True
+        # ツリー表示の更新
+        self.reload_animation_contents(animation_name)
+        return updated
 
     def mouseMoveEvent(self, event):
         item = self.currentItem()
