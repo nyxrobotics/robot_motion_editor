@@ -264,11 +264,11 @@ class InitialFrameEditorDialog(QDialog):
         self.frame_visualizer.set_current_frame(msg, self.frame_data.move_duration, self.frame_data.wait_duration)
 
         if sender == self.play_in_current_btn:
-            self.frame_visualizer.play_in_trajectory()
+            self.frame_visualizer.play_prev_trajectory()
         elif sender == self.play_in_current_out_btn:
-            self.frame_visualizer.play_in_out_trajectory()
+            self.frame_visualizer.play_prev_next_trajectory()
         elif sender == self.play_current_out_btn:
-            self.frame_visualizer.play_out_trajectory()
+            self.frame_visualizer.play_next_trajectory()
 
     def on_loop_checkbox_changed(self, state):
         if state == Qt.Unchecked:

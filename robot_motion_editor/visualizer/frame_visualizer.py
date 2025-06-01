@@ -46,15 +46,15 @@ class FrameVisualizer:
         with self._lock:
             self.out_frame = None
 
-    def play_in_trajectory(self):
+    def play_prev_trajectory(self):
         traj = self._make_trajectory_sequence([self.in_frame, self.current_frame])
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
-    def play_out_trajectory(self):
+    def play_next_trajectory(self):
         traj = self._make_trajectory_sequence([self.current_frame, self.out_frame])
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
-    def play_in_out_trajectory(self):
+    def play_prev_next_trajectory(self):
         traj = self._make_trajectory_sequence([self.in_frame, self.current_frame, self.out_frame])
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 

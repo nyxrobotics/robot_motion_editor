@@ -96,11 +96,11 @@ class FrameEditorDialog(QDialog):
         self.loop_checkbox.stateChanged.connect(self.on_loop_checkbox_changed)
         playback_row.addWidget(self.loop_checkbox)
 
-        self.play_in_current_btn = QPushButton("In-Current")
-        self.play_in_current_out_btn = QPushButton("In-Current-Out")
-        self.play_current_out_btn = QPushButton("Current-Out")
+        self.play_prev_current_btn = QPushButton("Previous-Current")
+        self.play_prev_current_next_btn = QPushButton("Previous-Current-Next")
+        self.play_current_next_btn = QPushButton("Current-Next")
 
-        for btn in [self.play_in_current_btn, self.play_in_current_out_btn, self.play_current_out_btn]:
+        for btn in [self.play_prev_current_btn, self.play_prev_current_next_btn, self.play_current_next_btn]:
             btn.setCheckable(True)
             btn.clicked.connect(self.handle_play_button)
             playback_row.addWidget(btn)
@@ -252,28 +252,44 @@ class FrameEditorDialog(QDialog):
 
     def handle_play_button(self):
         sender = self.sender()
-        for btn in [self.play_in_current_btn, self.play_in_current_out_btn, self.play_current_out_btn]:
+        for btn in [self.play_prev_current_btn, self.play_prev_current_next_btn, self.play_current_next_btn]:
             if btn != sender:
                 btn.setChecked(False)
         if not self.loop_checkbox.isChecked():
             sender.setChecked(False)
 
-        msg = self.frame_data.get_joint_state()
-        msg.header.stamp = rospy.Time.now()
+        self.frame_data.move_duration = self.duration_spin.value()
+        self.frame_data.wait_duration = self.wait_spin.value()
+        for joint_name in self.joint_data_manager.get_joint_names():
+            _, spin, vel_spin = self.joint_widgets[joint_name]
+            self.frame_data.set_pose(joint_name, math.radians(spin.value()))
+            self.frame_data.set_velocity_scale(joint_name, vel_spin.value())
+            self.frame_data.set_enable(joint_name, self.enable_checkbox_widgets[joint_name].isChecked())
 
-        if self.trajectory_visualizer is None or self.frame_visualizer is None:
-            rospy.logwarn("FrameVisualizer is not connected to TrajectoryVisualizer.")
-            return
+        current_frame = self.frame_data
+        prev_frame = self._get_prev_frame_data()
+        next_frame = self._get_next_frame_data()
 
-        self.trajectory_visualizer.publish_goal_state(msg)
-        self.frame_visualizer.set_current_frame(msg, self.frame_data.move_duration, self.frame_data.wait_duration)
+        self.frame_visualizer.set_prev_frame(
+            prev_frame.get_joint_state(),
+            prev_frame.move_duration,
+            prev_frame.wait_duration)
+        self.frame_visualizer.set_current_frame(
+            current_frame.get_joint_state(),
+            current_frame.move_duration,
+            current_frame.wait_duration)
+        self.frame_visualizer.set_next_frame(
+            next_frame.get_joint_state(),
+            next_frame.move_duration,
+            next_frame.wait_duration)
+        self.trajectory_visualizer.publish_goal_state(current_frame.get_joint_state())
 
-        if sender == self.play_in_current_btn:
-            self.frame_visualizer.play_in_trajectory()
-        elif sender == self.play_in_current_out_btn:
-            self.frame_visualizer.play_in_out_trajectory()
-        elif sender == self.play_current_out_btn:
-            self.frame_visualizer.play_out_trajectory()
+        if sender == self.play_prev_current_btn:
+            self.frame_visualizer.play_prev_trajectory()
+        elif sender == self.play_prev_current_next_btn:
+            self.frame_visualizer.play_prev_next_trajectory()
+        elif sender == self.play_current_next_btn:
+            self.frame_visualizer.play_next_trajectory()
 
     def on_loop_checkbox_changed(self, state):
         if state == Qt.Unchecked:
@@ -281,7 +297,7 @@ class FrameEditorDialog(QDialog):
                 btn.setChecked(False)
 
     def publish_goal_state_from_gui(self):
-        for joint_name in self.joint_names:
+        for joint_name in self.frame_data.get_joint_names():
             _, spin, _ = self.joint_widgets[joint_name]
             self.frame_data.set_pose(joint_name, math.radians(spin.value()))
 
