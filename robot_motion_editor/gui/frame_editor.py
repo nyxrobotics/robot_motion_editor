@@ -292,9 +292,16 @@ class FrameEditorDialog(QDialog):
             self.frame_visualizer.play_next_trajectory()
 
     def on_loop_checkbox_changed(self, state):
-        if state == Qt.Unchecked:
+        loop_enabled = state == Qt.Checked
+
+        # If loop is disabled, uncheck all play buttons (no persistent playback)
+        if not loop_enabled:
             for btn in [self.play_previous_current_btn, self.play_full_btn, self.play_current_next_btn]:
                 btn.setChecked(False)
+
+        # Apply loop setting to trajectory visualizer
+        if self.trajectory_visualizer:
+            self.trajectory_visualizer.enable_loop(loop_enabled)
 
     def publish_goal_state_from_gui(self):
         for joint_name in self.frame_data.get_joint_names():
