@@ -114,7 +114,7 @@ class AnimationVisualizer:
         self.current_block = start_block or self.animation_flow_scene.get_start_block()
         previous_joint_state = self.initial_joint_state
 
-        while self.current_block and not self._stop_event.is_set():
+        while self.current_block and not self._stop_event.is_set() and not rospy.is_shutdown():
             self._pause_event.wait()
 
             if self._scene_changed():
@@ -159,7 +159,7 @@ class AnimationVisualizer:
             start_time = time.perf_counter()
 
             while elapsed < total_duration:
-                if self._stop_event.is_set():
+                if self._stop_event.is_set() or rospy.is_shutdown():
                     return
                 if self.state == 'paused':
                     self._pause_event.wait()
