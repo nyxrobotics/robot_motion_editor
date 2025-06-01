@@ -16,6 +16,14 @@ from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 
 
+def joint_states_equal(js1, js2, tol=1e-4):
+    if js1 is None or js2 is None:
+        return False
+    if js1.name != js2.name:
+        return False
+    return all(abs(a - b) < tol for a, b in zip(js1.position, js2.position))
+
+
 class AnimationCommander:
     def __init__(
             self,
@@ -46,6 +54,7 @@ class AnimationCommander:
 
         self.state = 'stopped'
         self.current_block = None
+        self.previous_target_joint_state = self.initial_joint_state
         self._pause_event.set()
 
     def start(self, start_block=None):
@@ -77,7 +86,29 @@ class AnimationCommander:
 
     def _run(self, start_block=None):
         self.current_block = start_block or self.animation_flow_scene.get_start_block()
-        previous_joint_state = self.initial_joint_state
+
+        # Move to initial_joint_state at the beginning
+        if self.previous_target_joint_state and self.initial_joint_state and \
+           not joint_states_equal(self.previous_target_joint_state, self.initial_joint_state):
+            traj = JointTrajectory()
+            traj.joint_names = self.initial_joint_state.name
+
+            point_start = JointTrajectoryPoint()
+            point_start.time_from_start = rospy.Duration(0.0)
+            point_start.positions = self.previous_target_joint_state.position
+            point_start.velocities = [
+                (b - a) for a, b in zip(self.previous_target_joint_state.position, self.initial_joint_state.position)
+            ]
+
+            point_end = JointTrajectoryPoint()
+            point_end.time_from_start = rospy.Duration(1.0)
+            point_end.positions = self.initial_joint_state.position
+            point_end.velocities = [0.0] * len(self.initial_joint_state.position)
+
+            traj.points = [point_start, point_end]
+            self.trajectory_commander.send_trajectory(traj)
+            time.sleep(1.0)
+            self.previous_target_joint_state = self.initial_joint_state
 
         while self.current_block and not self._stop_event.is_set() and not rospy.is_shutdown():
             self._pause_event.wait()
@@ -100,21 +131,23 @@ class AnimationCommander:
                 self.stop()
                 return
 
-            if previous_joint_state is None:
-                previous_joint_state = target_joint_state
+            if self.previous_target_joint_state is None:
+                self.previous_target_joint_state = target_joint_state
 
             traj = JointTrajectory()
             traj.joint_names = target_joint_state.name
 
             point_start = JointTrajectoryPoint()
             point_start.time_from_start = rospy.Duration(0.0)
-            point_start.positions = previous_joint_state.position
+            point_start.positions = self.previous_target_joint_state.position
             if move_duration > 0.0:
                 point_start.velocities = [
-                    (b - a) / move_duration for a, b in zip(previous_joint_state.position, target_joint_state.position)
-                ]
+                    (b - a) / move_duration for a,
+                    b in zip(
+                        self.previous_target_joint_state.position,
+                        target_joint_state.position)]
             else:
-                point_start.velocities = [0.0] * len(previous_joint_state.position)
+                point_start.velocities = [0.0] * len(self.previous_target_joint_state.position)
 
             point_end = JointTrajectoryPoint()
             point_end.time_from_start = rospy.Duration(move_duration)
@@ -137,7 +170,7 @@ class AnimationCommander:
                 time.sleep(0.001)
                 elapsed = time.perf_counter() - start_time
 
-            previous_joint_state = target_joint_state
+            self.previous_target_joint_state = target_joint_state
             self.current_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
 
         self.state = 'stopped'
