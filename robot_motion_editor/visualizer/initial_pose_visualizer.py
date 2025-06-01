@@ -15,8 +15,6 @@ class InitialPoseVisualizer:
         self.start_pose = None
         self.goal_pose = None
         self.duration = 1.0
-        # Subscriber
-        # self.joint_state_sub = rospy.Subscriber("/joint_states", JointState, self.joint_state_callback)
 
     def set_duration(self, duration):
         self.duration = duration
@@ -26,9 +24,7 @@ class InitialPoseVisualizer:
             self.start_pose = joint_state_msg
             if self.goal_pose is None:
                 self.goal_pose = joint_state_msg
-            self.trajectory_visualizer.visualize_current2target(
-                self.start_pose, self.start_pose, 1.0)
-            self.trajectory_visualizer.publish_goal_state(self.start_pose)
+            self.visualize_goal_state(self.start_pose)
 
     def set_goal_pose(self, joint_state_msg):
         with self.lock:
@@ -36,13 +32,14 @@ class InitialPoseVisualizer:
                 self.goal_pose = joint_state_msg
                 if self.start_pose is None:
                     self.start_pose = joint_state_msg
-                self.trajectory_visualizer.visualize_current2target(
-                    self.start_pose, self.goal_pose, self.duration)
-                self.trajectory_visualizer.publish_goal_state(self.goal_pose)
+                self.visualize_movement(self.start_pose, self.goal_pose)
 
     def get_goal_pose(self):
         with self.lock:
             return copy.deepcopy(self.goal_pose)
 
-    def joint_state_callback(self, msg):
-        self.start_pose = msg
+    def visualize_goal_state(self, joint_state):
+        self.trajectory_visualizer.visualize_goal_state(joint_state)
+
+    def visualize_movement(self, start, end):
+        self.trajectory_visualizer.visualize_movement(start, end, self.duration)

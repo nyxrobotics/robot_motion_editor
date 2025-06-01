@@ -4,33 +4,32 @@ from sensor_msgs.msg import JointState
 
 class InitialPoseCommander:
     def __init__(self, trajectory_commander):
-        """
-        Args:
-            trajectory_commander: Instance of TrajectoryCommander
-        """
         self.trajectory_commander = trajectory_commander
         self.start_pose = None
         self.goal_pose = None
         self.duration = 1.0
 
+    def set_duration(self, duration: float):
+        self.duration = duration
+
     def set_start_pose(self, joint_state: JointState):
         self.start_pose = joint_state
         if self.goal_pose is None:
             self.goal_pose = joint_state
-        self._send_to_robot(self.start_pose)
+        self.send_goal_state(self.start_pose)
 
     def set_goal_pose(self, joint_state: JointState):
         if self.goal_pose is None or joint_state.position != self.goal_pose.position:
             self.goal_pose = joint_state
             if self.start_pose is None:
                 self.start_pose = joint_state
-            self._send_to_robot(self.goal_pose)
-
-    def set_duration(self, duration: float):
-        self.duration = duration
-
-    def _send_to_robot(self, joint_state: JointState):
-        self.trajectory_commander.send_joint_state(joint_state, duration=self.duration)
+            self.send_movement(self.start_pose, self.goal_pose)
 
     def get_goal_pose(self):
         return self.goal_pose
+
+    def send_goal_state(self, joint_state: JointState):
+        self.trajectory_commander.send_goal_state(joint_state, duration=self.duration)
+
+    def send_movement(self, start: JointState, end: JointState):
+        self.trajectory_commander.send_movement(start, end, duration=self.duration)

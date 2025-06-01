@@ -1,4 +1,5 @@
 import threading
+from typing import Union
 
 import rospy
 from sensor_msgs.msg import JointState
@@ -115,7 +116,7 @@ class TrajectoryCommander:
     def get_last_goal_state(self) -> JointState:
         return self._last_goal_state
 
-    def _align_positions(self, source: JointState, reference_names: list) -> list:
+    def _align_positions(self, source: JointState, reference: Union[JointState, list]) -> list:
         source_dict = dict(zip(source.name, source.position))
         return [source_dict.get(name, 0.0) for name in reference_names]
 

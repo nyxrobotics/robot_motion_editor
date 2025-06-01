@@ -3,17 +3,16 @@ import threading
 import time
 
 import rospy
+from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 from ..gui.animation_editor_widget import FrameBlockItem
-from ..gui.animation_editor_widget import IfBlockItem
-from ..gui.animation_editor_widget import StartBlockItem
-from ..gui.animation_editor_widget import SwitchBlockItem
 from ..logic.frame_file_manager import FrameData
 from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
+from .trajectory_commander import TrajectoryCommander
 
 
 def joint_states_equal(js1, js2, tol=1e-4):
@@ -25,12 +24,9 @@ def joint_states_equal(js1, js2, tol=1e-4):
 
 
 class AnimationCommander:
-    def __init__(
-            self,
-            animation_flow_scene,
-            trajectory_commander,
-            motion_directory_manager: MotionDirectoryManager,
-            joint_data_manager: JointDataManager):
+    def __init__(self, animation_flow_scene, trajectory_commander: TrajectoryCommander,
+                 motion_directory_manager: MotionDirectoryManager,
+                 joint_data_manager: JointDataManager):
         self.animation_flow_scene = animation_flow_scene
         self.trajectory_commander = trajectory_commander
         self.motion_directory_manager = motion_directory_manager
@@ -45,7 +41,7 @@ class AnimationCommander:
                 pose_data.load_from_file(pose_path)
                 self.initial_joint_state = pose_data.get_joint_state()
         except Exception as e:
-            rospy.logwarn(f"Failed to load initial pose: {e}")
+            rospy.logwarn(f"[AnimationCommander] Failed to load initial pose: {e}")
 
         self._thread = None
         self._stop_event = threading.Event()
@@ -87,26 +83,10 @@ class AnimationCommander:
     def _run(self, start_block=None):
         self.current_block = start_block or self.animation_flow_scene.get_start_block()
 
-        # Move to initial_joint_state at the beginning
         if self.previous_target_joint_state and self.initial_joint_state and \
            not joint_states_equal(self.previous_target_joint_state, self.initial_joint_state):
-            traj = JointTrajectory()
-            traj.joint_names = self.initial_joint_state.name
-
-            point_start = JointTrajectoryPoint()
-            point_start.time_from_start = rospy.Duration(0.0)
-            point_start.positions = self.previous_target_joint_state.position
-            point_start.velocities = [
-                (b - a) for a, b in zip(self.previous_target_joint_state.position, self.initial_joint_state.position)
-            ]
-
-            point_end = JointTrajectoryPoint()
-            point_end.time_from_start = rospy.Duration(1.0)
-            point_end.positions = self.initial_joint_state.position
-            point_end.velocities = [0.0] * len(self.initial_joint_state.position)
-
-            traj.points = [point_start, point_end]
-            self.trajectory_commander.send_trajectory(traj)
+            self.trajectory_commander.send_movement(
+                self.previous_target_joint_state, self.initial_joint_state, duration=1.0)
             time.sleep(1.0)
             self.previous_target_joint_state = self.initial_joint_state
 
@@ -134,28 +114,8 @@ class AnimationCommander:
             if self.previous_target_joint_state is None:
                 self.previous_target_joint_state = target_joint_state
 
-            traj = JointTrajectory()
-            traj.joint_names = target_joint_state.name
-
-            point_start = JointTrajectoryPoint()
-            point_start.time_from_start = rospy.Duration(0.0)
-            point_start.positions = self.previous_target_joint_state.position
-            if move_duration > 0.0:
-                point_start.velocities = [
-                    (b - a) / move_duration for a,
-                    b in zip(
-                        self.previous_target_joint_state.position,
-                        target_joint_state.position)]
-            else:
-                point_start.velocities = [0.0] * len(self.previous_target_joint_state.position)
-
-            point_end = JointTrajectoryPoint()
-            point_end.time_from_start = rospy.Duration(move_duration)
-            point_end.positions = target_joint_state.position
-            point_end.velocities = [0.0] * len(target_joint_state.position)
-
-            traj.points = [point_start, point_end]
-            self.trajectory_commander.send_trajectory(traj)
+            self.trajectory_commander.send_movement(
+                self.previous_target_joint_state, target_joint_state, move_duration)
 
             total_duration = move_duration + wait_duration
             elapsed = 0.0

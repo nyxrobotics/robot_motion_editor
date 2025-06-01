@@ -1,4 +1,5 @@
 import threading
+from typing import Union
 
 import rospy
 from moveit_msgs.msg import DisplayRobotState
@@ -99,7 +100,7 @@ class TrajectoryVisualizer:
             msg.trajectory.append(RobotTrajectory(joint_trajectory=interpolated_traj))
             self.path_pub.publish(msg)
 
-    def _align_positions(self, source: JointState, reference: JointState | list) -> list:
+    def _align_positions(self, source: JointState, reference: Union[JointState, list]) -> list:
         ref_names = reference.name if isinstance(reference, JointState) else reference
         pos_dict = dict(zip(source.name, source.position))
         return [pos_dict.get(name, 0.0) for name in ref_names]

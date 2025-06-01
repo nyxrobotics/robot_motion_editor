@@ -4,17 +4,14 @@ import time
 
 import rospy
 from sensor_msgs.msg import JointState
-from trajectory_msgs.msg import JointTrajectory
-from trajectory_msgs.msg import JointTrajectoryPoint
 
 from ..gui.animation_editor_items import FrameBlockItem
-from ..gui.animation_editor_items import IfBlockItem
 from ..gui.animation_editor_items import StartBlockItem
-from ..gui.animation_editor_items import SwitchBlockItem
 from ..logic.frame_file_manager import FrameData
 from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
+from .trajectory_visualizer import TrajectoryVisualizer
 
 
 def joint_states_equal(js1, js2, tol=1e-4):
@@ -26,12 +23,10 @@ def joint_states_equal(js1, js2, tol=1e-4):
 
 
 class AnimationVisualizer:
-    def __init__(
-            self,
-            animation_flow_scene,
-            trajectory_visualizer,
-            motion_directory_manager: MotionDirectoryManager,
-            joint_data_manager: JointDataManager):
+    def __init__(self, animation_flow_scene,
+                 trajectory_visualizer: TrajectoryVisualizer,
+                 motion_directory_manager: MotionDirectoryManager,
+                 joint_data_manager: JointDataManager):
         self.animation_flow_scene = animation_flow_scene
         self.visualizer = trajectory_visualizer
         self.motion_directory_manager = motion_directory_manager
@@ -46,7 +41,7 @@ class AnimationVisualizer:
                 pose_data.load_from_file(pose_path)
                 self.initial_joint_state = pose_data.get_joint_state()
         except Exception as e:
-            rospy.logwarn(f"Failed to load initial pose: {e}")
+            rospy.logwarn(f"[AnimationVisualizer] Failed to load initial pose: {e}")
 
         self._thread = None
         self._stop_event = threading.Event()
@@ -55,7 +50,6 @@ class AnimationVisualizer:
 
         self.state = 'stopped'
         self.current_block = None
-        self.next_block = None
         self.previous_target_joint_state = self.initial_joint_state
         self._prev_snapshot = self._get_scene_snapshot()
 
@@ -90,14 +84,10 @@ class AnimationVisualizer:
         if self._thread:
             self._thread.join()
 
-    def update_scene(self, new_scene):
-        with self._lock:
-            self.scene = new_scene
-
     def _get_scene_snapshot(self):
         snapshot = {}
         for name, block in self.animation_flow_scene.block_objects.items():
-            entry = {
+            snapshot[name] = {
                 'id': getattr(block, 'id', None),
                 'type': type(block).__name__,
                 'filename': getattr(block, 'filename', ''),
@@ -105,7 +95,6 @@ class AnimationVisualizer:
                 'num_outputs': len(getattr(block, 'output_arrows', [])),
                 'subblock_keys': sorted(block.output_sub_blocks.keys()) if hasattr(block, 'output_sub_blocks') else [],
             }
-            snapshot[name] = entry
         return snapshot
 
     def _scene_changed(self):
@@ -125,12 +114,11 @@ class AnimationVisualizer:
     def _run(self, start_block=None):
         self.current_block = start_block or self.animation_flow_scene.get_start_block()
 
-        # Move to initial_joint_state at the beginning
         if self.previous_target_joint_state and self.initial_joint_state and \
            not joint_states_equal(self.previous_target_joint_state, self.initial_joint_state):
-            self.visualizer.visualize_current2target(
+            self.visualizer.visualize_movement(
                 self.previous_target_joint_state, self.initial_joint_state, duration=1.0)
-            self.visualizer.publish_goal_state(self.initial_joint_state)
+            self.visualizer.visualize_goal_state(self.initial_joint_state)
             time.sleep(1.0)
             self.previous_target_joint_state = self.initial_joint_state
 
@@ -170,9 +158,10 @@ class AnimationVisualizer:
 
             if self.previous_target_joint_state is None:
                 self.previous_target_joint_state = target_joint_state
-            self.visualizer.visualize_current2target(
+
+            self.visualizer.visualize_movement(
                 self.previous_target_joint_state, target_joint_state, move_duration)
-            self.visualizer.publish_goal_state(target_joint_state)
+            self.visualizer.visualize_goal_state(target_joint_state)
 
             total_duration = move_duration + wait_duration
             elapsed = 0.0
@@ -206,7 +195,6 @@ class AnimationVisualizer:
                 frame_data.load_from_file(frame_path)
                 target_joint_state = frame_data.get_joint_state()
                 move_duration = frame_data.move_duration
-                wait_duration = frame_data.wait_duration
             except Exception as e:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
                 return
@@ -215,13 +203,9 @@ class AnimationVisualizer:
             if current_joint_state is None:
                 return
 
-            self.visualizer.visualize_current2target(
-                current=current_joint_state,
-                target=target_joint_state,
-                duration=move_duration
-            )
-            self.visualizer.publish_goal_state(target_joint_state)
-            self.previous_joint_state = target_joint_state
+            self.visualizer.visualize_movement(current_joint_state, target_joint_state, move_duration)
+            self.visualizer.visualize_goal_state(target_joint_state)
+            self.previous_target_joint_state = target_joint_state
             rospy.loginfo(f"[Visualizer] Played single frame: {frame_name}")
 
         elif isinstance(block, StartBlockItem):
@@ -239,5 +223,5 @@ class AnimationVisualizer:
                 rospy.logwarn("[AnimationVisualizer] No initial_joint_state set for StartBlockItem visualization.")
                 return
 
-            self.visualizer.publish_goal_state(current_joint_state)
+            self.visualizer.visualize_goal_state(current_joint_state)
             rospy.loginfo("[Visualizer] Played StartBlockItem with initial_joint_state.")
