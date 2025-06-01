@@ -3,6 +3,9 @@ import threading
 import time
 
 import rospy
+from sensor_msgs.msg import JointState
+from trajectory_msgs.msg import JointTrajectory
+from trajectory_msgs.msg import JointTrajectoryPoint
 
 from ..gui.animation_editor_items import FrameBlockItem
 from ..gui.animation_editor_items import IfBlockItem
@@ -12,6 +15,14 @@ from ..logic.frame_file_manager import FrameData
 from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
+
+
+def joint_states_equal(js1, js2, tol=1e-4):
+    if js1 is None or js2 is None:
+        return False
+    if js1.name != js2.name:
+        return False
+    return all(abs(a - b) < tol for a, b in zip(js1.position, js2.position))
 
 
 class AnimationVisualizer:
@@ -45,6 +56,7 @@ class AnimationVisualizer:
         self.state = 'stopped'
         self.current_block = None
         self.next_block = None
+        self.previous_target_joint_state = self.initial_joint_state
         self._prev_snapshot = self._get_scene_snapshot()
 
         self._pause_event.set()
@@ -112,7 +124,15 @@ class AnimationVisualizer:
 
     def _run(self, start_block=None):
         self.current_block = start_block or self.animation_flow_scene.get_start_block()
-        previous_joint_state = self.initial_joint_state
+
+        # Move to initial_joint_state at the beginning
+        if self.previous_target_joint_state and self.initial_joint_state and \
+           not joint_states_equal(self.previous_target_joint_state, self.initial_joint_state):
+            self.visualizer.visualize_current2target(
+                self.previous_target_joint_state, self.initial_joint_state, duration=1.0)
+            self.visualizer.publish_goal_state(self.initial_joint_state)
+            time.sleep(1.0)
+            self.previous_target_joint_state = self.initial_joint_state
 
         while self.current_block and not self._stop_event.is_set() and not rospy.is_shutdown():
             self._pause_event.wait()
@@ -148,10 +168,10 @@ class AnimationVisualizer:
                 self.stop()
                 return
 
-            if previous_joint_state is None:
-                previous_joint_state = target_joint_state
-
-            self.visualizer.visualize_current2target(previous_joint_state, target_joint_state, move_duration)
+            if self.previous_target_joint_state is None:
+                self.previous_target_joint_state = target_joint_state
+            self.visualizer.visualize_current2target(
+                self.previous_target_joint_state, target_joint_state, move_duration)
             self.visualizer.publish_goal_state(target_joint_state)
 
             total_duration = move_duration + wait_duration
@@ -167,7 +187,7 @@ class AnimationVisualizer:
                 time.sleep(0.001)
                 elapsed = time.perf_counter() - start_time
 
-            previous_joint_state = target_joint_state
+            self.previous_target_joint_state = target_joint_state
             self.current_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
 
             if self.animation_flow_scene is not None:
