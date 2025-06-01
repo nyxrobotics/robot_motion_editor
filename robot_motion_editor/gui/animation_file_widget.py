@@ -473,7 +473,7 @@ class AnimationFileWidget(QTreeWidget):
             dlg = FrameEditorDialog(
                 joint_data_manager=self.joint_data_manager,
                 motion_directory_manager=self.motion_directory_manager,
-                frame_name=name,
+                filename=name,
                 trajectory_visualizer=self.trajectory_visualizer,
                 trajectory_commander=self.trajectory_commander
             )
