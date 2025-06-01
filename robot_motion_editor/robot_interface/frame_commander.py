@@ -6,10 +6,6 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 
 class FrameCommander:
     def __init__(self, trajectory_commander):
-        """
-        Args:
-            trajectory_commander: Instance of TrajectoryCommander
-        """
         self.trajectory_commander = trajectory_commander
         self.initial_frame = None
         self.in_frame = None
@@ -22,11 +18,19 @@ class FrameCommander:
     def reset_frame(self, name):
         setattr(self, name, None)
 
-    def play_sequence(self, sequence_names):
-        """
-        Args:
-            sequence_names: list of frame names in ['in_frame', 'current_frame', 'out_frame']
-        """
+    def set_initial_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
+        self.set_frame("initial_frame", joint_state, move_duration, wait_duration)
+
+    def set_previous_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
+        self.set_frame("in_frame", joint_state, move_duration, wait_duration)
+
+    def set_current_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
+        self.set_frame("current_frame", joint_state, move_duration, wait_duration)
+
+    def set_next_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
+        self.set_frame("out_frame", joint_state, move_duration, wait_duration)
+
+    def send_frame_sequence(self, sequence_names):
         frames = [getattr(self, name, None) for name in sequence_names]
         traj = self._build_trajectory(frames)
         if traj:
@@ -36,7 +40,6 @@ class FrameCommander:
         traj = JointTrajectory()
         current_time = 0.0
 
-        # Determine reference joint names
         reference_names = None
         for data in frame_data_list:
             if data is not None:
@@ -60,17 +63,20 @@ class FrameCommander:
             start_state, _, _ = start_data
             end_state, move_duration, wait_duration = end_data
 
+            aligned_start = self._align_positions(start_state, reference_names)
+            aligned_end = self._align_positions(end_state, reference_names)
+
             point_start = JointTrajectoryPoint()
             point_start.time_from_start = rospy.Duration(current_time)
-            point_start.positions = self._get_aligned_positions(start_state, reference_names)
+            point_start.positions = aligned_start
             point_start.velocities = [
-                (b - a) / move_duration for a, b in zip(point_start.positions,
-                                                        self._get_aligned_positions(end_state, reference_names))
+                (b - a) / move_duration if move_duration > 0 else 0.0
+                for a, b in zip(aligned_start, aligned_end)
             ]
 
             point_end = JointTrajectoryPoint()
             point_end.time_from_start = rospy.Duration(current_time + move_duration)
-            point_end.positions = self._get_aligned_positions(end_state, reference_names)
+            point_end.positions = aligned_end
             point_end.velocities = [0.0] * len(reference_names)
 
             traj.points.append(point_start)
@@ -80,6 +86,6 @@ class FrameCommander:
 
         return traj
 
-    def _get_aligned_positions(self, joint_state: JointState, reference_names):
+    def _align_positions(self, joint_state: JointState, reference_names):
         source_dict = dict(zip(joint_state.name, joint_state.position))
         return [source_dict.get(name, 0.0) for name in reference_names]
