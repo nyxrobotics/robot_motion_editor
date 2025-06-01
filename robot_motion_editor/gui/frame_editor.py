@@ -1,3 +1,4 @@
+import copy
 import math
 import os
 
@@ -81,7 +82,9 @@ class FrameEditorDialog(QDialog):
         if os.path.exists(self.filepath):
             self.frame_data.load_from_file(self.filepath)
             self.set_frame_to_ui()
-
+            self.loaded_frame_data = copy.deepcopy(self.frame_data)
+        else:
+            self.loaded_frame_data = None
         self.setWindowTitle(f"Frame: {os.path.basename(self.filepath)}")
 
     def init_ui(self):
@@ -314,6 +317,13 @@ class FrameEditorDialog(QDialog):
 
         if self.trajectory_visualizer:
             self.trajectory_visualizer.publish_goal_state(msg)
+            if self.loaded_frame_data:
+                self.frame_visualizer.set_previous_frame(
+                    self.loaded_frame_data.get_joint_state(), 0.0, 0.0)
+                self.frame_visualizer.set_current_frame(
+                    self.frame_data.get_joint_state(), 1.0, 0.0)
+                self.frame_visualizer.reset_next_frame()
+                self.frame_visualizer.play_previous_trajectory()
 
         if self.trajectory_commander:
             self.trajectory_commander.send_joint_state(msg, duration=1.0)
