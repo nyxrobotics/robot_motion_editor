@@ -110,28 +110,8 @@ class AnimationVisualizer:
                     return True
         return False
 
-    def _get_start_block(self):
-        for block in self.animation_flow_scene.block_objects.values():
-            if isinstance(block, StartBlockItem):
-                return self._get_next_block(block)
-        return None
-
-    def _get_next_block(self, block):
-        if isinstance(block, FrameBlockItem):
-            return block.output_arrows[0].end_item if block.output_arrows else None
-        elif isinstance(block, (IfBlockItem, SwitchBlockItem)):
-            idx = block.preview_output_index
-            outputs = list(block.output_sub_blocks.values())
-            if 0 <= idx < len(outputs):
-                sub = outputs[idx]
-                if sub.output_arrows:
-                    return sub.output_arrows[0].end_item
-        elif isinstance(block, StartBlockItem):
-            return block.output_arrows[0].end_item if block.output_arrows else None
-        return None
-
     def _run(self, start_block=None):
-        self.current_block = start_block or self._get_start_block()
+        self.current_block = start_block or self.animation_flow_scene.get_start_frame_block()
         previous_joint_state = self.initial_joint_state
 
         while self.current_block and not self._stop_event.is_set():
@@ -151,7 +131,7 @@ class AnimationVisualizer:
                         self.current_block.setSelected(True)
 
             if not isinstance(self.current_block, FrameBlockItem):
-                self.current_block = self._get_next_block(self.current_block)
+                self.current_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
                 continue
 
             frame_name = self.current_block.filename
@@ -188,7 +168,7 @@ class AnimationVisualizer:
                 elapsed = time.perf_counter() - start_time
 
             previous_joint_state = target_joint_state
-            self.current_block = self._get_next_block(self.current_block)
+            self.current_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
 
             if self.animation_flow_scene is not None:
                 for item in self.animation_flow_scene.selectedItems():

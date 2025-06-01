@@ -492,49 +492,108 @@ class AnimationEditorWidget(QGraphicsScene):
                 self.removeItem(arrow)
                 if arrow.name in self.arrow_objects:
                     del self.arrow_objects[arrow.name]
-
         # 新しく増えたケースについては矢印なしの状態（何もしない）
 
-    def find_previous_frame_block(self, block):
-        input_sources = []
-        for arrow in self.arrow_objects.values():
-            if arrow.end_item == block:
-                input_sources.append(arrow.start_item)
+    def get_previous_frame_block(self, block):
+        """
+        Find the previous FrameBlockItem connected to the given block,
+        preferring those reachable from StartBlockItem.
+        Traverses through if/switch blocks if necessary.
+        """
+        visited = set()
+        stack = [block]
 
-        if not input_sources:
-            return None
+        while stack:
+            current = stack.pop()
+            if current in visited:
+                continue
+            visited.add(current)
 
-        # 入力が1本ならそれだけをたどればよい
-        if len(input_sources) == 1:
-            source = input_sources[0]
-            if isinstance(source, FrameBlockItem):
-                return source
-            return self.find_previous_frame_block(source)
+            input_sources = [arrow.start_item for arrow in self.arrow_objects.values() if arrow.end_item == current]
 
-        # 複数入力がある場合
-        for source in input_sources:
-            if isinstance(source, FrameBlockItem) and self._is_reachable_from_start(source):
-                return source
+            for source in input_sources:
+                candidate = source
+                steps = 0
+                while candidate and steps < 100:
+                    steps += 1
+                    if isinstance(candidate, FrameBlockItem):
+                        if self._is_reachable_from_start(candidate):
+                            return candidate
+                        break
+                    elif isinstance(candidate, (IfBlockItem, SwitchBlockItem)):
+                        subs = list(candidate.output_sub_blocks.values())
+                        if not subs:
+                            break
+                        sub = subs[0]  # assume deterministic structure
+                        if not sub.output_arrows:
+                            break
+                        candidate = sub.output_arrows[0].end_item
+                    else:
+                        next_sources = [arrow.start_item for arrow in self.arrow_objects.values()
+                                        if arrow.end_item == candidate]
+                        if not next_sources:
+                            break
+                        candidate = next_sources[0]
 
-        # どれも Start からつながっていなければ最初のFrameを返す
-        for source in input_sources:
-            if isinstance(source, FrameBlockItem):
-                return source
-            result = self.find_previous_frame_block(source)
-            if result:
-                return result
         return None
 
-    def find_next_frame_block(self, block):
-        for arrow in self.arrow_objects.values():
-            if arrow.start_item == block:
-                target = arrow.end_item
-                if isinstance(target, FrameBlockItem):
-                    return target
-                else:
-                    result = self.find_next_frame_block(target)
-                    if result:
-                        return result
+    def get_next_frame_block(self, block):
+        """
+        Find the next FrameBlockItem connected from the given block,
+        traversing through if/switch sub-blocks or intermediate nodes.
+        """
+        visited = set()
+        stack = [block]
+
+        while stack:
+            current = stack.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+
+            output_targets = [arrow.end_item for arrow in self.arrow_objects.values() if arrow.start_item == current]
+
+            for target in output_targets:
+                candidate = target
+                steps = 0
+                while candidate and steps < 100:
+                    steps += 1
+                    if isinstance(candidate, FrameBlockItem):
+                        return candidate
+                    elif isinstance(candidate, (IfBlockItem, SwitchBlockItem)):
+                        idx = getattr(candidate, 'preview_output_index', 0)
+                        subs = list(candidate.output_sub_blocks.values())
+                        if 0 <= idx < len(subs):
+                            sub = subs[idx]
+                            if sub.output_arrows:
+                                candidate = sub.output_arrows[0].end_item
+                                continue
+                        break
+                    else:
+                        next_targets = [arrow.end_item for arrow in self.arrow_objects.values()
+                                        if arrow.start_item == candidate]
+                        if not next_targets:
+                            break
+                        candidate = next_targets[0]
+
+        return None
+
+    def get_start_block(self):
+        """
+        Find and return the StartBlockItem from block_objects.
+        """
+        for block in self.block_objects.values():
+            if isinstance(block, StartBlockItem):
+                return block
+        return None
+
+    def get_start_frame_block(self):
+        """
+        Find the first FrameBlockItem connected from the StartBlockItem.
+        """
+        for block in self.block_objects.values():
+            if isinstance(block, StartBlockItem):
+                return self.get_next_frame_block(block)
         return None
 
     def _is_reachable_from_start(self, block, visited=None):
