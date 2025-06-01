@@ -221,13 +221,14 @@ class InitialFrameEditorDialog(QDialog):
             cb.blockSignals(False)
 
     def reset_all_positions(self):
-        for slider, spin, _ in self.joint_widgets.values():
-            slider.blockSignals(True)
-            spin.blockSignals(True)
-            slider.setValue(0)
-            spin.setValue(0.0)
-            slider.blockSignals(False)
-            spin.blockSignals(False)
+        try:
+            path = self.motion_directory_manager.resolve_initial_pose_path()
+            if os.path.exists(path):
+                self.frame_data.load_from_file(path)
+                self.set_frame_to_ui()
+                return
+        except Exception as e:
+            rospy.logwarn(f"[InitialFrameEditorDialog] Failed to reset from initial_pose.yaml: {e}")
 
     def open_pid_dialog(self, joint_name, button):
         current = self.frame_data.get_pid(joint_name)
