@@ -76,7 +76,7 @@ class AnimationCommander:
             self._pause_event.set()
 
     def _run(self, start_block=None):
-        self.current_block = start_block or self.animation_flow_scene.get_start_frame_block()
+        self.current_block = start_block or self.animation_flow_scene.get_first_frame_block()
         previous_joint_state = self.initial_joint_state
 
         while self.current_block and not self._stop_event.is_set():

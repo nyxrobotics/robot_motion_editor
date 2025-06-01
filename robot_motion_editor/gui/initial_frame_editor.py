@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import QWidget
 from sensor_msgs.msg import JointState
 
 from ..logic.frame_file_manager import FrameData
+from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
@@ -34,8 +35,6 @@ class InitialFrameEditorDialog(QDialog):
         self,
         joint_data_manager: JointDataManager,
         motion_directory_manager: MotionDirectoryManager,
-        filename: str = "",
-        frame_block: FrameBlockItem = None,
         animation_flow_scene=None,
         trajectory_visualizer: TrajectoryVisualizer = None,
         trajectory_commander: TrajectoryCommander = None,
@@ -51,23 +50,16 @@ class InitialFrameEditorDialog(QDialog):
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
         self.animation_flow_scene = animation_flow_scene
-        self.frame_block = frame_block
 
-        # Use filename from frame_block if available
-        self.filename = frame_block.filename if frame_block else filename
+        # Automatically detect the StartBlockItem from the scene
+        self.start_block = None
+        if self.animation_flow_scene:
+            for item in self.animation_flow_scene.items():
+                if hasattr(item, "type") and item.type == "start":
+                    self.start_block = item
+                    break
 
-        # Automatically detect the corresponding FrameBlockItem from animation_flow_scene
-        # if frame_block is not explicitly provided
-        if self.frame_block is None and self.animation_flow_scene and self.filename:
-            matches = [
-                b for b in self.animation_flow_scene.items()
-                if isinstance(b, FrameBlockItem) and b.filename == self.filename
-            ]
-            if matches:
-                # If multiple matches, use the first one found
-                self.frame_block = matches[0]
-
-        # Frame data initialization
+        # Frame data and visualizer setup
         self.frame_data = FrameData()
         self.frame_data.set_joint_names(joint_data_manager.get_joint_names())
         self.joint_widgets = {}
@@ -76,6 +68,7 @@ class InitialFrameEditorDialog(QDialog):
 
         self.init_ui()
 
+        # Load frame data from initial_frame.yaml
         self.filepath = self.motion_directory_manager.resolve_initial_frame_path()
         if os.path.exists(self.filepath):
             self.frame_data.load_from_file(self.filepath)
@@ -349,48 +342,8 @@ class InitialFrameEditorDialog(QDialog):
         super().accept()
 
     def _get_prev_frame_data(self):
+        # Always return initial pose regardless of scene connections
         try:
-            if self.animation_flow_scene and self.frame_block:
-                prev_block = self.animation_flow_scene.get_previous_frame_block(self.frame_block)
-                if prev_block:
-                    path = self.motion_directory_manager.resolve_frame_path(prev_block.filename)
-                    if os.path.exists(path):
-                        data = FrameData()
-                        data.set_joint_names(self.joint_data_manager.get_joint_names())
-                        data.load_from_file(path)
-                        return data
-        except Exception as e:
-            rospy.logwarn(f"[InitialFrameEditorDialog] Failed to load previous frame: {e}")
-        return self._get_initial_frame_data()
-
-    def _get_next_frame_data(self):
-        try:
-            if self.animation_flow_scene and self.frame_block:
-                next_block = self.animation_flow_scene.get_next_frame_block(self.frame_block)
-                if next_block:
-                    path = self.motion_directory_manager.resolve_frame_path(next_block.filename)
-                    if os.path.exists(path):
-                        data = FrameData()
-                        data.set_joint_names(self.joint_data_manager.get_joint_names())
-                        data.load_from_file(path)
-                        return data
-        except Exception as e:
-            rospy.logwarn(f"[InitialFrameEditorDialog] Failed to load next frame: {e}")
-        return self._get_initial_frame_data()
-
-    def _get_initial_frame_data(self):
-        try:
-            path = self.motion_directory_manager.resolve_initial_frame_path()
-            if os.path.exists(path):
-                data = FrameData()
-                data.set_joint_names(self.joint_data_manager.get_joint_names())
-                data.load_from_file(path)
-                return data
-        except Exception as e:
-            rospy.logwarn(f"[InitialFrameEditorDialog] Failed to load initial_frame: {e}")
-
-        try:
-            from ..logic.initial_pose_file_manager import InitialPoseData
             path = self.motion_directory_manager.resolve_initial_pose_path()
             if os.path.exists(path):
                 pose_data = InitialPoseData()
@@ -412,3 +365,20 @@ class InitialFrameEditorDialog(QDialog):
         frame.move_duration = 1.0
         frame.wait_duration = 0.0
         return frame
+
+    def _get_next_frame_data(self):
+        # Return the frame data from the block connected to the StartBlock
+        try:
+            if self.animation_flow_scene:
+                next_block = self.animation_flow_scene.get_first_frame_block()
+                if next_block:
+                    path = self.motion_directory_manager.resolve_frame_path(next_block.filename)
+                    if os.path.exists(path):
+                        data = FrameData()
+                        data.set_joint_names(self.joint_data_manager.get_joint_names())
+                        data.load_from_file(path)
+                        return data
+        except Exception as e:
+            rospy.logwarn(f"[InitialFrameEditorDialog] Failed to load next frame: {e}")
+
+        return self._get_prev_frame_data()

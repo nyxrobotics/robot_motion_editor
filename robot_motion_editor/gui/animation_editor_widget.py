@@ -587,7 +587,7 @@ class AnimationEditorWidget(QGraphicsScene):
                 return block
         return None
 
-    def get_start_frame_block(self):
+    def get_first_frame_block(self):
         """
         Find the first FrameBlockItem connected from the StartBlockItem.
         """
