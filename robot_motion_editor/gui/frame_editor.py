@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import QSizePolicy
 from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
+from sensor_msgs.msg import JointState
 
 from ..logic.frame_file_manager import FrameData
 from ..logic.joint_data_manager import JointDataManager
@@ -96,11 +97,11 @@ class FrameEditorDialog(QDialog):
         self.loop_checkbox.stateChanged.connect(self.on_loop_checkbox_changed)
         playback_row.addWidget(self.loop_checkbox)
 
-        self.play_prev_current_btn = QPushButton("Previous-Current")
-        self.play_prev_current_next_btn = QPushButton("Previous-Current-Next")
+        self.play_previous_current_btn = QPushButton("Previous-Current")
+        self.play_full_btn = QPushButton("Previous-Current-Next")
         self.play_current_next_btn = QPushButton("Current-Next")
 
-        for btn in [self.play_prev_current_btn, self.play_prev_current_next_btn, self.play_current_next_btn]:
+        for btn in [self.play_previous_current_btn, self.play_full_btn, self.play_current_next_btn]:
             btn.setCheckable(True)
             btn.clicked.connect(self.handle_play_button)
             playback_row.addWidget(btn)
@@ -252,12 +253,13 @@ class FrameEditorDialog(QDialog):
 
     def handle_play_button(self):
         sender = self.sender()
-        for btn in [self.play_prev_current_btn, self.play_prev_current_next_btn, self.play_current_next_btn]:
+        for btn in [self.play_previous_current_btn, self.play_full_btn, self.play_current_next_btn]:
             if btn != sender:
                 btn.setChecked(False)
         if not self.loop_checkbox.isChecked():
             sender.setChecked(False)
 
+        # Update current frame from GUI values
         self.frame_data.move_duration = self.duration_spin.value()
         self.frame_data.wait_duration = self.wait_spin.value()
         for joint_name in self.joint_data_manager.get_joint_names():
@@ -270,30 +272,28 @@ class FrameEditorDialog(QDialog):
         prev_frame = self._get_prev_frame_data()
         next_frame = self._get_next_frame_data()
 
-        self.frame_visualizer.set_prev_frame(
-            prev_frame.get_joint_state(),
-            prev_frame.move_duration,
-            prev_frame.wait_duration)
+        # Set frame data into visualizer
+        self.frame_visualizer.set_previous_frame(
+            prev_frame.get_joint_state(), prev_frame.move_duration, prev_frame.wait_duration)
         self.frame_visualizer.set_current_frame(
-            current_frame.get_joint_state(),
-            current_frame.move_duration,
-            current_frame.wait_duration)
+            current_frame.get_joint_state(), current_frame.move_duration, current_frame.wait_duration)
         self.frame_visualizer.set_next_frame(
-            next_frame.get_joint_state(),
-            next_frame.move_duration,
-            next_frame.wait_duration)
+            next_frame.get_joint_state(), next_frame.move_duration, next_frame.wait_duration)
+
+        # Publish current frame goal state
         self.trajectory_visualizer.publish_goal_state(current_frame.get_joint_state())
 
-        if sender == self.play_prev_current_btn:
-            self.frame_visualizer.play_prev_trajectory()
-        elif sender == self.play_prev_current_next_btn:
-            self.frame_visualizer.play_prev_next_trajectory()
+        # Execute playback
+        if sender == self.play_previous_current_btn:
+            self.frame_visualizer.play_previous_trajectory()
+        elif sender == self.play_full_btn:
+            self.frame_visualizer.play_full_trajectory()
         elif sender == self.play_current_next_btn:
             self.frame_visualizer.play_next_trajectory()
 
     def on_loop_checkbox_changed(self, state):
         if state == Qt.Unchecked:
-            for btn in [self.play_in_current_btn, self.play_in_current_out_btn, self.play_current_out_btn]:
+            for btn in [self.play_previous_current_btn, self.play_full_btn, self.play_current_next_btn]:
                 btn.setChecked(False)
 
     def publish_goal_state_from_gui(self):
@@ -341,3 +341,68 @@ class FrameEditorDialog(QDialog):
 
         self.frame_data.save_to_file(self.filepath)
         super().accept()
+
+    def _get_prev_frame_data(self):
+        try:
+            if self.animation_flow_scene and self.frame_block:
+                prev_block = self.animation_flow_scene.get_previous_frame_block(self.frame_block)
+                if prev_block:
+                    path = self.motion_directory_manager.resolve_frame_path(prev_block.filename)
+                    if os.path.exists(path):
+                        data = FrameData()
+                        data.set_joint_names(self.joint_data_manager.get_joint_names())
+                        data.load_from_file(path)
+                        return data
+        except Exception as e:
+            rospy.logwarn(f"[FrameEditorDialog] Failed to load previous frame: {e}")
+        return self._get_initial_frame_data()
+
+    def _get_next_frame_data(self):
+        try:
+            if self.animation_flow_scene and self.frame_block:
+                next_block = self.animation_flow_scene.get_next_frame_block(self.frame_block)
+                if next_block:
+                    path = self.motion_directory_manager.resolve_frame_path(next_block.filename)
+                    if os.path.exists(path):
+                        data = FrameData()
+                        data.set_joint_names(self.joint_data_manager.get_joint_names())
+                        data.load_from_file(path)
+                        return data
+        except Exception as e:
+            rospy.logwarn(f"[FrameEditorDialog] Failed to load next frame: {e}")
+        return self._get_initial_frame_data()
+
+    def _get_initial_frame_data(self):
+        try:
+            path = self.motion_directory_manager.resolve_initial_frame_path()
+            if os.path.exists(path):
+                data = FrameData()
+                data.set_joint_names(self.joint_data_manager.get_joint_names())
+                data.load_from_file(path)
+                return data
+        except Exception as e:
+            rospy.logwarn(f"[FrameEditorDialog] Failed to load initial_frame: {e}")
+
+        try:
+            from ..logic.initial_pose_file_manager import InitialPoseData
+            path = self.motion_directory_manager.resolve_initial_pose_path()
+            if os.path.exists(path):
+                pose_data = InitialPoseData()
+                pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
+                pose_data.load_from_file(path)
+                frame = FrameData()
+                frame.set_joint_names(self.joint_data_manager.get_joint_names())
+                frame.set_joint_state(pose_data.get_joint_state())
+                frame.move_duration = 1.0
+                frame.wait_duration = 0.0
+                return frame
+        except Exception as e:
+            rospy.logwarn(f"[FrameEditorDialog] Failed to load initial_pose: {e}")
+
+        frame = FrameData()
+        joint_names = self.joint_data_manager.get_joint_names()
+        frame.set_joint_names(joint_names)
+        frame.set_joint_state(JointState(name=joint_names, position=[0.0] * len(joint_names)))
+        frame.move_duration = 1.0
+        frame.wait_duration = 0.0
+        return frame
