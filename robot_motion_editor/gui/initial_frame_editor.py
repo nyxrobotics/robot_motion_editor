@@ -100,17 +100,17 @@ class InitialFrameEditorDialog(QDialog):
 
         form.addRow(playback_row)
 
-        self.duration_spin = QDoubleSpinBox()
-        self.duration_spin.setDecimals(2)
-        self.duration_spin.setRange(0.0, 10.0)
-        self.duration_spin.setSingleStep(0.1)
+        self.move_spin = QDoubleSpinBox()
+        self.move_spin.setDecimals(2)
+        self.move_spin.setRange(0.0, 10.0)
+        self.move_spin.setSingleStep(0.1)
 
         self.wait_spin = QDoubleSpinBox()
         self.wait_spin.setDecimals(2)
         self.wait_spin.setRange(0.0, 10.0)
         self.wait_spin.setSingleStep(0.1)
 
-        form.addRow("Move (sec)", self.duration_spin)
+        form.addRow("Move (sec)", self.move_spin)
         form.addRow("Wait (sec)", self.wait_spin)
 
         all_enable_row = QHBoxLayout()
@@ -252,7 +252,7 @@ class InitialFrameEditorDialog(QDialog):
             sender.setChecked(False)
 
         # Update current frame from GUI values
-        self.frame_data.move_duration = self.duration_spin.value()
+        self.frame_data.move_duration = self.move_spin.value()
         self.frame_data.wait_duration = self.wait_spin.value()
         for joint_name in self.joint_data_manager.get_joint_names():
             _, spin, vel_spin = self.joint_widgets[joint_name]
@@ -310,7 +310,7 @@ class InitialFrameEditorDialog(QDialog):
             self.trajectory_commander.send_joint_state(msg, duration=1.0)
 
     def set_frame_to_ui(self):
-        self.duration_spin.setValue(self.frame_data.move_duration)
+        self.move_spin.setValue(self.frame_data.move_duration)
         self.wait_spin.setValue(self.frame_data.wait_duration)
         for joint_name in self.frame_data.get_joint_names():
             if joint_name not in self.joint_widgets:
@@ -329,7 +329,7 @@ class InitialFrameEditorDialog(QDialog):
             self.enable_checkbox_widgets[joint_name].setChecked(self.frame_data.get_enable(joint_name))
 
     def accept(self):
-        self.frame_data.move_duration = self.duration_spin.value()
+        self.frame_data.move_duration = self.move_spin.value()
         self.frame_data.wait_duration = self.wait_spin.value()
 
         for joint_name in self.joint_data_manager.get_joint_names():
