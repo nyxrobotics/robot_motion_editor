@@ -13,49 +13,49 @@ class FrameVisualizer:
     def __init__(self, trajectory_visualizer: TrajectoryVisualizer):
         self.trajectory_visualizer = trajectory_visualizer
         self._lock = threading.Lock()
-        self.in_frame = None
+        self.previous_frame = None
         self.current_frame = None
-        self.out_frame = None
+        self.next_frame = None
         self.initial_frame = None
 
     def set_initial_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
         with self._lock:
             self.initial_frame = (joint_state, move_duration, wait_duration)
 
-    def set_in_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
+    def set_previous_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
         with self._lock:
-            self.in_frame = (joint_state, move_duration, wait_duration)
+            self.previous_frame = (joint_state, move_duration, wait_duration)
 
     def set_current_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
         with self._lock:
             self.current_frame = (joint_state, move_duration, wait_duration)
 
-    def set_out_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
+    def set_next_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
         with self._lock:
-            self.out_frame = (joint_state, move_duration, wait_duration)
+            self.next_frame = (joint_state, move_duration, wait_duration)
 
-    def reset_in_frame(self):
+    def reset_previous_frame(self):
         with self._lock:
-            self.in_frame = None
+            self.previous_frame = None
 
     def reset_current_frame(self):
         with self._lock:
             self.current_frame = None
 
-    def reset_out_frame(self):
+    def reset_next_frame(self):
         with self._lock:
-            self.out_frame = None
+            self.next_frame = None
 
-    def play_prev_trajectory(self):
-        traj = self._make_trajectory_sequence([self.in_frame, self.current_frame])
+    def play_previous_trajectory(self):
+        traj = self._make_trajectory_sequence([self.previous_frame, self.current_frame])
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
     def play_next_trajectory(self):
-        traj = self._make_trajectory_sequence([self.current_frame, self.out_frame])
+        traj = self._make_trajectory_sequence([self.current_frame, self.next_frame])
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
-    def play_prev_next_trajectory(self):
-        traj = self._make_trajectory_sequence([self.in_frame, self.current_frame, self.out_frame])
+    def play_full_trajectory(self):
+        traj = self._make_trajectory_sequence([self.previous_frame, self.current_frame, self.next_frame])
         self.trajectory_visualizer.visualize_joint_trajectory(traj)
 
     def _make_trajectory_sequence(self, frame_data_list) -> JointTrajectory:
