@@ -98,10 +98,12 @@ class FrameVisualizer:
             point_start = JointTrajectoryPoint()
             point_start.time_from_start = rospy.Duration(current_time)
             point_start.positions = aligned_start
-            point_start.velocities = [
-                (b - a) / move_duration
-                for a, b in zip(aligned_start, aligned_end)
-            ]
+            if move_duration > 0.001:
+                point_start.velocities = [
+                    (b - a) / move_duration for a, b in zip(aligned_start, aligned_end)
+                ]
+            else:
+                point_start.velocities = [0.0] * len(aligned_start)
 
             point_end = JointTrajectoryPoint()
             point_end.time_from_start = rospy.Duration(current_time + wait_duration + move_duration)
