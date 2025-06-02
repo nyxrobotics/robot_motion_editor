@@ -37,6 +37,27 @@ class FrameVisualizer:
     def set_next_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
         self.set_frame("next_frame", joint_state, move_duration, wait_duration)
 
+    def play_previous_trajectory(self):
+        self.visualize_frame_sequence(["previous_frame", "current_frame"])
+
+    def play_full_trajectory(self):
+        self.visualize_frame_sequence(["previous_frame", "current_frame", "next_frame"])
+
+    def play_next_trajectory(self):
+        self.visualize_frame_sequence(["current_frame", "next_frame"])
+
+    def reset_initial_frame(self):
+        self.reset_frame("initial_frame")
+
+    def reset_previous_frame(self):
+        self.reset_frame("previous_frame")
+
+    def reset_current_frame(self):
+        self.reset_frame("current_frame")
+
+    def reset_next_frame(self):
+        self.reset_frame("next_frame")
+
     def visualize_frame_sequence(self, sequence_names):
         frame_list = [getattr(self, name, None) for name in sequence_names]
         traj = self._build_trajectory(frame_list)

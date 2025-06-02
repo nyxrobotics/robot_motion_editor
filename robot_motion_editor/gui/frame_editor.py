@@ -285,7 +285,7 @@ class FrameEditorDialog(QDialog):
             next_frame.get_joint_state(), next_frame.move_duration, next_frame.wait_duration)
 
         # Publish current frame goal state
-        self.trajectory_visualizer.publish_goal_state(current_frame.get_joint_state())
+        self.trajectory_visualizer.visualize_goal_state(current_frame.get_joint_state())
 
         # Execute playback
         if sender == self.play_previous_current_btn:
@@ -316,7 +316,7 @@ class FrameEditorDialog(QDialog):
         msg.header.stamp = rospy.Time.now()
 
         if self.trajectory_visualizer:
-            self.trajectory_visualizer.publish_goal_state(msg)
+            self.trajectory_visualizer.visualize_goal_state(msg)
             if self.loaded_frame_data:
                 self.frame_visualizer.set_previous_frame(
                     self.loaded_frame_data.get_joint_state(), 0.0, 0.0)
@@ -326,7 +326,7 @@ class FrameEditorDialog(QDialog):
                 self.frame_visualizer.play_previous_trajectory()
 
         if self.trajectory_commander:
-            self.trajectory_commander.send_joint_state(msg, duration=1.0)
+            self.trajectory_commander.send_goal_state(msg, duration=1.0)
 
     def set_frame_to_ui(self):
         self.move_spin.setValue(self.frame_data.move_duration)
