@@ -96,7 +96,7 @@ class FrameEditorDialog(QDialog):
 
         playback_row = QHBoxLayout()
         self.loop_checkbox = QCheckBox("Loop")
-        self.loop_checkbox.setChecked(False)
+        self.loop_checkbox.setChecked(True)
         self.loop_checkbox.stateChanged.connect(self.on_loop_checkbox_changed)
         playback_row.addWidget(self.loop_checkbox)
 
