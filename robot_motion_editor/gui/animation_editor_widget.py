@@ -497,45 +497,72 @@ class AnimationEditorWidget(QGraphicsScene):
         # 新しく増えたケースについては矢印なしの状態（何もしない）
 
     def get_previous_frame_block(self, block):
-        """
-        Find the previous FrameBlockItem connected to the given block,
-        preferring those reachable from StartBlockItem.
-        Traverses through if/switch blocks if necessary.
-        """
-        visited = set()
-        stack = [block]
+        candidates = self._find_frame_block_inputs(block)
+        if not candidates:
+            return None
+        candidates.sort(key=self._frame_block_priority)
+        return candidates[0]
 
-        while stack:
-            current = stack.pop()
+    def _find_frame_block_inputs(self, block, visited=None):
+        """
+        Recursively find all reachable FrameBlockItem instances from input arrows.
+        """
+
+        if visited is None:
+            visited = set()
+        if block in visited:
+            return []
+        visited.add(block)
+
+        results = []
+
+        for arrow in getattr(block, 'input_arrows', []):
+            source = arrow.start_item
+
+            if isinstance(source, FrameBlockItem):
+                results.append(source)
+
+            elif isinstance(source, OutputSubBlockItem):
+                parent = getattr(source, 'parent_block', None)
+                if parent:
+                    results.extend(self._find_frame_block_inputs(parent, visited))
+
+            else:
+                results.extend(self._find_frame_block_inputs(source, visited))
+
+        return results
+
+    def _frame_block_priority(self, block):
+        """
+        Priority:
+        (1) reachable path length from StartBlockItem (shorter is better),
+        (2) zValue (smaller is better) if unreachable or equal distance.
+        """
+        length = self._distance_from_start(block)
+        return (length if length is not None else float('inf'), block.zValue())
+
+    def _distance_from_start(self, block):
+        """
+        Use BFS to find the shortest path length from the given block to StartBlockItem.
+        """
+        from collections import deque
+
+        from .animation_editor_items import StartBlockItem
+
+        queue = deque([(block, 0)])
+        visited = set()
+
+        while queue:
+            current, depth = queue.popleft()
             if current in visited:
                 continue
             visited.add(current)
 
-            input_sources = [arrow.start_item for arrow in self.arrow_objects.values() if arrow.end_item == current]
+            if isinstance(current, StartBlockItem):
+                return depth
 
-            for source in input_sources:
-                candidate = source
-                steps = 0
-                while candidate and steps < 100:
-                    steps += 1
-                    if isinstance(candidate, FrameBlockItem):
-                        if self._is_reachable_from_start(candidate):
-                            return candidate
-                        break
-                    elif isinstance(candidate, (IfBlockItem, SwitchBlockItem)):
-                        subs = list(candidate.output_sub_blocks.values())
-                        if not subs:
-                            break
-                        sub = subs[0]  # assume deterministic structure
-                        if not sub.output_arrows:
-                            break
-                        candidate = sub.output_arrows[0].end_item
-                    else:
-                        next_sources = [arrow.start_item for arrow in self.arrow_objects.values()
-                                        if arrow.end_item == candidate]
-                        if not next_sources:
-                            break
-                        candidate = next_sources[0]
+            for arrow in getattr(current, 'input_arrows', []):
+                queue.append((arrow.start_item, depth + 1))
 
         return None
 
