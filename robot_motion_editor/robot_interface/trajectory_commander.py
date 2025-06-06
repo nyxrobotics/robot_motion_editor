@@ -118,6 +118,10 @@ class TrajectoryCommander:
 
     def _align_positions(self, source: JointState, reference: Union[JointState, list]) -> list:
         source_dict = dict(zip(source.name, source.position))
+        if isinstance(reference, JointState):
+            reference_names = reference.name
+        else:
+            reference_names = reference
         return [source_dict.get(name, 0.0) for name in reference_names]
 
     def _start_position_playback(self, trajectory: JointTrajectory):
