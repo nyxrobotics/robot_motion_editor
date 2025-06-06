@@ -21,10 +21,7 @@ from ..logic.frame_file_manager import FrameData
 from ..logic.if_condition_file_manager import IfConditionData
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..logic.switch_condition_file_manager import SwitchConditionData
-from .frame_editor import FrameEditorDialog
-from .if_condition_editor import IfConditionEditorDialog
-from .initial_frame_editor import InitialFrameEditorDialog
-from .switch_condition_editor import SwitchConditionEditorDialog
+from .animation_item_editor_launcher import AnimationItemEditorLauncher
 
 
 class AnimationFileWidget(QTreeWidget):
@@ -36,7 +33,7 @@ class AnimationFileWidget(QTreeWidget):
         joint_data_manager=None,
         trajectory_visualizer=None,
         trajectory_commander=None,
-        animation_flow_scene=None,
+        editor_launcher: AnimationItemEditorLauncher = None,
         parent=None
     ):
         super().__init__(parent)
@@ -45,7 +42,7 @@ class AnimationFileWidget(QTreeWidget):
         self.joint_data_manager = joint_data_manager
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
-        self.animation_flow_scene = animation_flow_scene
+        self.editor_launcher = editor_launcher
         self.setHeaderLabel("Animations")
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
@@ -57,6 +54,26 @@ class AnimationFileWidget(QTreeWidget):
 
     def on_item_double_clicked(self, item, column):
         self.itemDoubleClickedSignal.emit(item)
+
+        animation_item = item
+        while animation_item.parent():
+            animation_item = animation_item.parent()
+        animation_name = animation_item.text(0)
+        self.motion_directory_manager.set_current_animation(animation_name)
+
+        label = item.text(0)
+        parent = item.parent().text(0) if item.parent() else ""
+
+        if label == "initial_frame":
+            self.editor_launcher.open_editor_by_type("initial_frame")
+        elif parent == "frames":
+            self.editor_launcher.open_editor_by_type("frame", label)
+        elif parent == "if":
+            self.editor_launcher.open_editor_by_type("if", label)
+        elif parent == "switch":
+            self.editor_launcher.open_editor_by_type("switch", label)
+        else:
+            rospy.logwarn("[AnimationFileWidget] Unknown tree item type")
 
     def show_context_menu(self, pos: QPoint):
         item = self.itemAt(pos)
@@ -182,8 +199,6 @@ class AnimationFileWidget(QTreeWidget):
                 self.motion_directory_manager.set_current_animation(None)
 
             self.reload_animation_list()
-            if hasattr(self, "animation_flow_scene"):
-                self.animation_flow_scene.clear()
 
     def rename_yaml_file(self, category, old_name, new_name, item_widget):
         # animation_name の決定
@@ -281,8 +296,6 @@ class AnimationFileWidget(QTreeWidget):
 
         anim_data = AnimationData()
         anim_data.load_from_file(yaml_path)
-        if hasattr(self.animation_flow_scene, "set_animation_data"):
-            self.animation_flow_scene.set_animation_data(anim_data)
 
     def mouseMoveEvent(self, event):
         item = self.currentItem()
@@ -454,53 +467,6 @@ class AnimationFileWidget(QTreeWidget):
         switch_item = QTreeWidgetItem(conditions_item, ["switch"])
         for cond in self.motion_directory_manager.list_switch_condition_files():
             QTreeWidgetItem(switch_item, [cond])
-
-    def open_editor_by_type(self, type: str, name: str = ""):
-        key = f"{type}:{name}" if name else type
-        if key in self.open_editors and self.open_editors[key].isVisible():
-            self.open_editors[key].raise_()
-            self.open_editors[key].activateWindow()
-            return
-
-        if type == "initial_frame":
-            dlg = InitialFrameEditorDialog(
-                joint_data_manager=self.joint_data_manager,
-                motion_directory_manager=self.motion_directory_manager,
-                trajectory_visualizer=self.trajectory_visualizer,
-                trajectory_commander=self.trajectory_commander
-            )
-        elif type == "frame":
-            dlg = FrameEditorDialog(
-                joint_data_manager=self.joint_data_manager,
-                motion_directory_manager=self.motion_directory_manager,
-                filename=name,
-                trajectory_visualizer=self.trajectory_visualizer,
-                trajectory_commander=self.trajectory_commander
-            )
-        elif type == "if":
-            dlg = IfConditionEditorDialog(
-                joint_data_manager=self.joint_data_manager,
-                motion_directory_manager=self.motion_directory_manager,
-                filename=name
-            )
-        elif type == "switch":
-            dlg = SwitchConditionEditorDialog(
-                joint_data_manager=self.joint_data_manager,
-                motion_directory_manager=self.motion_directory_manager,
-                filename=name
-            )
-            dlg.finished.connect(lambda result_code: (
-                self.animation_flow_scene.update_switch_block(name, dlg.result.get("num_cases", 2))
-                if result_code == QDialog.Accepted and dlg.result else None
-            ))
-        else:
-            rospy.logwarn(f"[AnimaitonWidget] Unknown editor type: {type}")
-            return
-
-        dlg.setAttribute(Qt.WA_DeleteOnClose)
-        dlg.show()
-        self.open_editors[key] = dlg
-        dlg.destroyed.connect(lambda: self.open_editors.pop(key, None))
 
     def create_new_animation(self):
         name, ok = QInputDialog.getText(self, "New Animation", "Enter animation name:")

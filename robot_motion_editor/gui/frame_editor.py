@@ -37,7 +37,6 @@ class FrameEditorDialog(QDialog):
         motion_directory_manager: MotionDirectoryManager,
         filename: str = "",
         frame_block: FrameBlockItem = None,
-        animation_flow_scene=None,
         trajectory_visualizer: TrajectoryVisualizer = None,
         trajectory_commander: TrajectoryCommander = None,
         parent=None,
@@ -51,7 +50,6 @@ class FrameEditorDialog(QDialog):
         self.motion_directory_manager = motion_directory_manager
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
-        self.animation_flow_scene = animation_flow_scene
         self.frame_block = frame_block
 
         # Use filename from frame_block if available
@@ -74,6 +72,8 @@ class FrameEditorDialog(QDialog):
         self.joint_widgets = {}
         self.enable_checkbox_widgets = {}
         self.frame_visualizer = FrameVisualizer(trajectory_visualizer)
+        self.prev_frame_data = None
+        self.next_frame_data = None
 
         self.init_ui()
 
@@ -360,34 +360,20 @@ class FrameEditorDialog(QDialog):
         self.frame_data.save_to_file(self.filepath)
         super().accept()
 
+    def set_prev_frame_data(self, frame_data: FrameData):
+        self.prev_frame_data = frame_data
+
+    def set_next_frame_data(self, frame_data: FrameData):
+        self.next_frame_data = frame_data
+
     def _get_prev_frame_data(self):
-        try:
-            if self.animation_flow_scene and self.frame_block:
-                prev_block = self.animation_flow_scene.get_previous_frame_block(self.frame_block)
-                if prev_block:
-                    path = self.motion_directory_manager.resolve_frame_path(prev_block.filename)
-                    if os.path.exists(path):
-                        data = FrameData()
-                        data.set_joint_names(self.joint_data_manager.get_joint_names())
-                        data.load_from_file(path)
-                        return data
-        except Exception as e:
-            rospy.logwarn(f"[FrameEditorDialog] Failed to load previous frame: {e}")
+        if self.prev_frame_data:
+            return self.prev_frame_data
         return self._get_initial_frame_data()
 
     def _get_next_frame_data(self):
-        try:
-            if self.animation_flow_scene and self.frame_block:
-                next_block = self.animation_flow_scene.get_next_frame_block(self.frame_block)
-                if next_block:
-                    path = self.motion_directory_manager.resolve_frame_path(next_block.filename)
-                    if os.path.exists(path):
-                        data = FrameData()
-                        data.set_joint_names(self.joint_data_manager.get_joint_names())
-                        data.load_from_file(path)
-                        return data
-        except Exception as e:
-            rospy.logwarn(f"[FrameEditorDialog] Failed to load next frame: {e}")
+        if self.next_frame_data:
+            return self.next_frame_data
         return self._get_initial_frame_data()
 
     def _get_initial_frame_data(self):

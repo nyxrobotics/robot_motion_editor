@@ -27,18 +27,20 @@ from .animation_editor_items import OutputSubBlockItem
 from .animation_editor_items import StartBlockItem
 from .animation_editor_items import SwitchBlockItem
 from .animation_editor_items import WaypointItem
+from .animation_item_editor_launcher import AnimationItemEditorLauncher
 
 
 class AnimationEditorWidget(QGraphicsScene):
-    def __init__(self, motion_directory_manager: MotionDirectoryManager, parent=None):
+    def __init__(self, motion_directory_manager: MotionDirectoryManager,
+                 editor_launcher: AnimationItemEditorLauncher, parent=None):
         super().__init__(parent)
 
         self.motion_directory_manager = motion_directory_manager
+        self.editor_launcher = editor_launcher
         self.setBackgroundBrush(QColor("#111111"))
         self.block_objects = {}
         self.arrow_objects = {}
         self.setSceneRect(0, 0, 1000, 1000)
-        self.editor_widget = None
 
     def _generate_block_id(self):
         used_ids = {block.id for block in self.block_objects.values()}
@@ -657,3 +659,35 @@ class AnimationEditorWidget(QGraphicsScene):
 
     def dragMoveEvent(self, event):
         event.acceptProposedAction()
+
+    def on_start_block_double_clicked(self, block: StartBlockItem):
+        self.editor_launcher.open_editor_by_block(block)
+
+    def on_frame_block_double_clicked(self, block: FrameBlockItem):
+        prev_block = block.scene().get_previous_frame_block(block)
+        next_block = block.scene().get_next_frame_block(block)
+
+        prev_data = None
+        next_data = None
+
+        if prev_block:
+            prev_path = self.motion_directory_manager.resolve_frame_path(prev_block.filename)
+            if os.path.exists(prev_path):
+                prev_data = FrameData()
+                prev_data.set_joint_names(self.editor_launcher.joint_data_manager.get_joint_names())
+                prev_data.load_from_file(prev_path)
+
+        if next_block:
+            next_path = self.motion_directory_manager.resolve_frame_path(next_block.filename)
+            if os.path.exists(next_path):
+                next_data = FrameData()
+                next_data.set_joint_names(self.editor_launcher.joint_data_manager.get_joint_names())
+                next_data.load_from_file(next_path)
+
+        self.editor_launcher.open_editor_by_block(block, prev_data, next_data)
+
+    def on_if_block_double_clicked(self, block: IfBlockItem):
+        self.editor_launcher.open_editor_by_block(block)
+
+    def on_switch_block_double_clicked(self, block: SwitchBlockItem):
+        self.editor_launcher.open_editor_by_block(block)

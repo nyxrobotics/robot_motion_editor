@@ -64,7 +64,7 @@ class StartBlockItem(QGraphicsRectItem):
 
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
-        self.scene().editor_widget.on_start_block_double_clicked()
+        self.scene().on_start_block_double_clicked(self)
 
 
 class FrameBlockItem(QGraphicsRectItem):
@@ -142,7 +142,7 @@ class FrameBlockItem(QGraphicsRectItem):
 
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
-        self.scene().editor_widget.on_frame_block_double_clicked(self.filename)
+        self.scene().on_frame_block_double_clicked(self)
 
     def remove_from_scene(self):
         scene = self.scene()
@@ -431,7 +431,7 @@ class IfBlockItem(QGraphicsRectItem):
 
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
-        self.scene().editor_widget.on_if_block_double_clicked(self.filename)
+        self.scene().on_if_block_double_clicked(self)
 
     def remove_from_scene(self):
         scene = self.scene()
@@ -565,7 +565,7 @@ class SwitchBlockItem(QGraphicsRectItem):
 
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
-        self.scene().editor_widget.on_switch_block_double_clicked(self.filename)
+        self.scene().on_switch_block_double_clicked(self)
 
     def remove_from_scene(self):
         scene = self.scene()

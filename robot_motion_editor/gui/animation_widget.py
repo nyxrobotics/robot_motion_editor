@@ -19,6 +19,7 @@ from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .animation_editor_widget import AnimationEditorWidget
 from .animation_file_widget import AnimationFileWidget
 from .animation_graphics_view import AnimatioGraphicsView
+from .animation_item_editor_launcher import AnimationItemEditorLauncher
 from .animation_preview_button_widget import AnimationPreviewButtonWidget
 
 
@@ -35,8 +36,15 @@ class AnimaitonWidget(QWidget):
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
 
-        self.animation_flow_scene = AnimationEditorWidget(motion_directory_manager=self.motion_directory_manager)
-        self.animation_flow_scene.editor_widget = self
+        self.editor_launcher = AnimationItemEditorLauncher(
+            joint_data_manager=self.joint_data_manager,
+            motion_directory_manager=self.motion_directory_manager,
+            trajectory_visualizer=self.trajectory_visualizer,
+            trajectory_commander=self.trajectory_commander,
+        )
+        self.animation_flow_scene = AnimationEditorWidget(
+            motion_directory_manager=self.motion_directory_manager,
+            editor_launcher=self.editor_launcher)
         self.view = AnimatioGraphicsView(self.animation_flow_scene)
 
         self.animation_tree = AnimationFileWidget(
@@ -44,7 +52,7 @@ class AnimaitonWidget(QWidget):
             joint_data_manager=self.joint_data_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander,
-            animation_flow_scene=self.animation_flow_scene,
+            editor_launcher=self.editor_launcher,
             parent=self)
         self.animation_visualizer = AnimationVisualizer(
             animation_flow_scene=self.animation_flow_scene,
@@ -206,18 +214,6 @@ class AnimaitonWidget(QWidget):
             self.animation_tree.open_editor_by_type("if", label)
         elif parent == "switch":
             self.animation_tree.open_editor_by_type("switch", label)
-
-    def on_start_block_double_clicked(self):
-        self.animation_tree.open_editor_by_type("initial_frame", "")
-
-    def on_frame_block_double_clicked(self, filename: str):
-        self.animation_tree.open_editor_by_type("frame", filename)
-
-    def on_if_block_double_clicked(self, filename: str):
-        self.animation_tree.open_editor_by_type("if", filename)
-
-    def on_switch_block_double_clicked(self, filename: str):
-        self.animation_tree.open_editor_by_type("switch", filename)
 
     def load_animation_by_name(self, animation_name):
         if not self.confirm_save_if_unsaved_changes():
