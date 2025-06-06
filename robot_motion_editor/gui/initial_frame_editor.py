@@ -67,6 +67,22 @@ class InitialFrameEditorDialog(QDialog):
 
         self.setWindowTitle(f"InitialFrame: {os.path.basename(self.filepath)}")
 
+        # Set initial pose data to prev and next frames
+        self.prev_frame_data = None
+        self.next_frame_data = None
+        path = self.motion_directory_manager.resolve_initial_pose_path()
+        if os.path.exists(path):
+            pose_data = InitialPoseData()
+            pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
+            pose_data.load_from_file(path)
+            frame = FrameData()
+            frame.set_joint_names(self.joint_data_manager.get_joint_names())
+            frame.set_joint_state(pose_data.get_joint_state())
+            frame.move_duration = 1.0
+            frame.wait_duration = 0.0
+            self.prev_frame_data = frame
+            self.next_frame_data = frame
+
     def init_ui(self):
         layout = QVBoxLayout()
         scroll = QScrollArea()
@@ -361,7 +377,6 @@ class InitialFrameEditorDialog(QDialog):
             rospy.logwarn(f"[FrameEditorDialog] Failed to load initial_frame: {e}")
 
         try:
-            from ..logic.initial_pose_file_manager import InitialPoseData
             path = self.motion_directory_manager.resolve_initial_pose_path()
             if os.path.exists(path):
                 pose_data = InitialPoseData()

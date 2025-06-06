@@ -79,6 +79,18 @@ class AnimationItemEditorLauncher:
             dlg.set_next_frame_data(next_frame_data)
         self._register_editor(key, dlg)
 
+    def _open_initial_frame_editor(self):
+        key = "initial_frame"
+        if self._already_open(key):
+            return
+        dlg = InitialFrameEditorDialog(
+            joint_data_manager=self.joint_data_manager,
+            motion_directory_manager=self.motion_directory_manager,
+            trajectory_visualizer=self.trajectory_visualizer,
+            trajectory_commander=self.trajectory_commander
+        )
+        self._register_editor(key, dlg)
+
     def _open_if_editor(self, block):
         key = f"if:{block.filename}"
         if self._already_open(key):
@@ -104,18 +116,6 @@ class AnimationItemEditorLauncher:
                 block.scene().update_switch_block(block.filename, dlg.result.get("num_cases", 2))
                 if result_code == QDialog.Accepted and dlg.result else None
             ))
-        self._register_editor(key, dlg)
-
-    def _open_initial_frame_editor(self):
-        key = "initial_frame"
-        if self._already_open(key):
-            return
-        dlg = InitialFrameEditorDialog(
-            joint_data_manager=self.joint_data_manager,
-            motion_directory_manager=self.motion_directory_manager,
-            trajectory_visualizer=self.trajectory_visualizer,
-            trajectory_commander=self.trajectory_commander
-        )
         self._register_editor(key, dlg)
 
     def _already_open(self, key):
