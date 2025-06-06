@@ -44,7 +44,7 @@ class AnimaitonWidget(QWidget):
             joint_data_manager=self.joint_data_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander,
-            editor_scene=self.animation_flow_scene,
+            animation_flow_scene=self.animation_flow_scene,
             parent=self)
         self.animation_visualizer = AnimationVisualizer(
             animation_flow_scene=self.animation_flow_scene,

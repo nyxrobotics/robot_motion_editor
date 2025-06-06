@@ -36,7 +36,7 @@ class AnimationFileWidget(QTreeWidget):
         joint_data_manager=None,
         trajectory_visualizer=None,
         trajectory_commander=None,
-        editor_scene=None,
+        animation_flow_scene=None,
         parent=None
     ):
         super().__init__(parent)
@@ -45,7 +45,7 @@ class AnimationFileWidget(QTreeWidget):
         self.joint_data_manager = joint_data_manager
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
-        self.editor_scene = editor_scene
+        self.animation_flow_scene = animation_flow_scene
         self.setHeaderLabel("Animations")
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
@@ -182,8 +182,8 @@ class AnimationFileWidget(QTreeWidget):
                 self.motion_directory_manager.set_current_animation(None)
 
             self.reload_animation_list()
-            if hasattr(self, "editor_scene"):
-                self.editor_scene.clear()
+            if hasattr(self, "animation_flow_scene"):
+                self.animation_flow_scene.clear()
 
     def rename_yaml_file(self, category, old_name, new_name, item_widget):
         # animation_name の決定
@@ -281,8 +281,8 @@ class AnimationFileWidget(QTreeWidget):
 
         anim_data = AnimationData()
         anim_data.load_from_file(yaml_path)
-        if hasattr(self.editor_scene, "set_animation_data"):
-            self.editor_scene.set_animation_data(anim_data)
+        if hasattr(self.animation_flow_scene, "set_animation_data"):
+            self.animation_flow_scene.set_animation_data(anim_data)
 
     def mouseMoveEvent(self, event):
         item = self.currentItem()
