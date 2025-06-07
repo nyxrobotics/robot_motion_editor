@@ -7,6 +7,7 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
 
+from ..gui.animation_editor_items import FrameBlockItem
 from ..gui.animation_editor_items import StartBlockItem
 from ..gui.animation_editor_widget import FrameBlockItem
 from ..logic.frame_file_manager import FrameData
@@ -112,12 +113,11 @@ class AnimationCommander:
 
     def _run(self, start_block=None):
         self.current_block = start_block or self.animation_flow_scene.get_start_block()
+        start_target, move_duration, wait_duration = self.extract_joint_state_and_duration(self.current_block)
 
-        if self.previous_target_joint_state and self.initial_joint_state and \
-           not joint_states_equal(self.previous_target_joint_state, self.initial_joint_state):
-            self.trajectory_commander.send_movement(
-                self.previous_target_joint_state, self.initial_joint_state, duration=1.0)
-            self.previous_target_joint_state = self.initial_joint_state
+        if self.previous_target_joint_state and start_target and \
+                not joint_states_equal(self.previous_target_joint_state, start_target):
+            self.trajectory_commander.send_movement(self.previous_target_joint_state, start_target, duration=1.0)
             time.sleep(1.0)
 
         while self.current_block and not self._stop_event.is_set() and not rospy.is_shutdown():
@@ -211,3 +211,18 @@ class AnimationCommander:
             self.trajectory_commander.send_movement(current_joint_state, target_joint_state, move_duration)
             self.previous_target_joint_state = current_joint_state
             rospy.loginfo("[Commander] Played StartBlockItem with initial_joint_state.")
+
+    def extract_joint_state_and_duration(self, block):
+
+        if isinstance(block, FrameBlockItem):
+            path = self.motion_directory_manager.resolve_frame_path(block.filename)
+        elif isinstance(block, StartBlockItem):
+            path = self.motion_directory_manager.resolve_initial_frame_path()
+        else:
+            return None, 0.0, 0.0
+
+        frame_data = FrameData()
+        frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
+        frame_data.load_from_file(path)
+
+        return frame_data.get_joint_state(), frame_data.move_duration, frame_data.wait_duration

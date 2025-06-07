@@ -113,9 +113,10 @@ class AnimationVisualizer:
 
     def _run(self, start_block=None):
         self.current_block = start_block or self.animation_flow_scene.get_start_block()
+        start_target, move_duration, wait_duration = self.extract_joint_state_and_duration(self.current_block)
 
-        if self.previous_target_joint_state and self.initial_joint_state and \
-           not joint_states_equal(self.previous_target_joint_state, self.initial_joint_state):
+        if self.previous_target_joint_state and start_target and \
+                not joint_states_equal(self.previous_target_joint_state, start_target):
             self.visualizer.send_movement(
                 self.previous_target_joint_state, self.initial_joint_state, duration=1.0)
             self.visualizer.visualize_goal_state(self.initial_joint_state)
@@ -230,3 +231,18 @@ class AnimationVisualizer:
             self.visualizer.visualize_goal_state(target_joint_state)
             self.previous_target_joint_state = target_joint_state
             rospy.loginfo("[Visualizer] Played StartBlockItem with initial_joint_state.")
+
+    def extract_joint_state_and_duration(self, block):
+
+        if isinstance(block, FrameBlockItem):
+            path = self.motion_directory_manager.resolve_frame_path(block.filename)
+        elif isinstance(block, StartBlockItem):
+            path = self.motion_directory_manager.resolve_initial_frame_path()
+        else:
+            return None, 0.0, 0.0
+
+        frame_data = FrameData()
+        frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
+        frame_data.load_from_file(path)
+
+        return frame_data.get_joint_state(), frame_data.move_duration, frame_data.wait_duration
