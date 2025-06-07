@@ -73,6 +73,12 @@ class AnimationCommander:
         self.state = 'stopped'
         if self._thread:
             self._thread.join()
+        if isinstance(self.current_block, (FrameBlockItem, StartBlockItem)):
+            try:
+                joint_state, _, _ = self.extract_joint_state_and_duration(self.current_block)
+                self.previous_target_joint_state = joint_state
+            except Exception as e:
+                rospy.logwarn(f"[AnimationCommander] Failed to extract joint state at stop: {e}")
 
     def pause(self):
         with self._lock:
