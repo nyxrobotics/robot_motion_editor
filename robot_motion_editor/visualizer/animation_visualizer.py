@@ -119,8 +119,8 @@ class AnimationVisualizer:
             self.visualizer.visualize_movement(
                 self.previous_target_joint_state, self.initial_joint_state, duration=1.0)
             self.visualizer.visualize_goal_state(self.initial_joint_state)
-            time.sleep(1.0)
             self.previous_target_joint_state = self.initial_joint_state
+            time.sleep(1.0)
 
         while self.current_block and not self._stop_event.is_set() and not rospy.is_shutdown():
             self._pause_event.wait()
@@ -200,8 +200,9 @@ class AnimationVisualizer:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
                 return
 
-            current_joint_state = self.initial_joint_state
+            current_joint_state = self.previous_target_joint_state or self.initial_joint_state
             if current_joint_state is None:
+                rospy.logwarn("[AnimationVisualizer] No initial_joint_state set for FrameBlockItem visualization.")
                 return
 
             self.visualizer.visualize_movement(current_joint_state, target_joint_state, move_duration)
@@ -216,13 +217,16 @@ class AnimationVisualizer:
                 frame_data = FrameData()
                 frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
                 frame_data.load_from_file(frame_path)
-                current_joint_state = frame_data.get_joint_state()
+                target_joint_state = frame_data.get_joint_state()
             except Exception as e:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load initial frame: {e}")
 
+            current_joint_state = self.previous_target_joint_state or self.initial_joint_state
             if current_joint_state is None:
                 rospy.logwarn("[AnimationVisualizer] No initial_joint_state set for StartBlockItem visualization.")
                 return
 
-            self.visualizer.visualize_goal_state(current_joint_state)
+            self.visualizer.visualize_movement(current_joint_state, target_joint_state, move_duration)
+            self.visualizer.visualize_goal_state(target_joint_state)
+            self.previous_target_joint_state = target_joint_state
             rospy.loginfo("[Visualizer] Played StartBlockItem with initial_joint_state.")

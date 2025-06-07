@@ -7,6 +7,7 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
 
+from ..gui.animation_editor_items import StartBlockItem
 from ..gui.animation_editor_widget import FrameBlockItem
 from ..logic.frame_file_manager import FrameData
 from ..logic.initial_pose_file_manager import InitialPoseData
@@ -87,8 +88,8 @@ class AnimationCommander:
            not joint_states_equal(self.previous_target_joint_state, self.initial_joint_state):
             self.trajectory_commander.send_movement(
                 self.previous_target_joint_state, self.initial_joint_state, duration=1.0)
-            time.sleep(1.0)
             self.previous_target_joint_state = self.initial_joint_state
+            time.sleep(1.0)
 
         while self.current_block and not self._stop_event.is_set() and not rospy.is_shutdown():
             self._pause_event.wait()
@@ -134,3 +135,45 @@ class AnimationCommander:
             self.current_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
 
         self.state = 'stopped'
+
+    def play_single_block(self, block):
+        if isinstance(block, FrameBlockItem):
+            frame_name = block.filename
+            try:
+                frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
+                frame_data = FrameData()
+                frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
+                frame_data.load_from_file(frame_path)
+                target_joint_state = frame_data.get_joint_state()
+                move_duration = frame_data.move_duration
+            except Exception as e:
+                rospy.logwarn(f"[AnimationCommander] Failed to load frame '{frame_name}': {e}")
+                return
+
+            current_joint_state = self.previous_target_joint_state or self.initial_joint_state
+            if current_joint_state is None:
+                rospy.logwarn("[AnimationCommander] Cannot determine current joint state.")
+                return
+
+            self.trajectory_commander.send_movement(current_joint_state, target_joint_state, move_duration)
+            self.previous_target_joint_state = target_joint_state
+            rospy.loginfo(f"[Commander] Played single frame: {frame_name}")
+
+        elif isinstance(block, StartBlockItem):
+            try:
+                frame_path = self.motion_directory_manager.resolve_initial_frame_path()
+                frame_data = FrameData()
+                frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
+                frame_data.load_from_file(frame_path)
+                target_joint_state = frame_data.get_joint_state()
+            except Exception as e:
+                rospy.logwarn(f"[AnimationCommander] Failed to load initial frame: {e}")
+
+            current_joint_state = self.previous_target_joint_state or self.initial_joint_state
+            if current_joint_state is None:
+                rospy.logwarn("[AnimationCommander] No initial_joint_state set for StartBlockItem execution.")
+                return
+
+            self.trajectory_commander.send_movement(current_joint_state, target_joint_state, move_duration)
+            self.previous_target_joint_state = current_joint_state
+            rospy.loginfo("[Commander] Played StartBlockItem with initial_joint_state.")

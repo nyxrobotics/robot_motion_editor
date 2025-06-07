@@ -117,12 +117,9 @@ class TrajectoryCommander:
         return self._last_goal_state
 
     def _align_positions(self, source: JointState, reference: Union[JointState, list]) -> list:
-        source_dict = dict(zip(source.name, source.position))
-        if isinstance(reference, JointState):
-            reference_names = reference.name
-        else:
-            reference_names = reference
-        return [source_dict.get(name, 0.0) for name in reference_names]
+        ref_names = reference.name if isinstance(reference, JointState) else reference
+        pos_dict = dict(zip(source.name, source.position))
+        return [pos_dict.get(name, 0.0) for name in ref_names]
 
     def _start_position_playback(self, trajectory: JointTrajectory):
         with self._playback_lock:
