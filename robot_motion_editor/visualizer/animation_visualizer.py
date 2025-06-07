@@ -67,6 +67,13 @@ class AnimationVisualizer:
             self._thread = threading.Thread(target=self._run, args=(start_block,))
             self._thread.start()
 
+    def stop(self):
+        self._stop_event.set()
+        self._pause_event.set()
+        self.state = 'stopped'
+        if self._thread:
+            self._thread.join()
+
     def pause(self):
         with self._lock:
             self.state = 'paused'
@@ -76,13 +83,6 @@ class AnimationVisualizer:
         with self._lock:
             self.state = 'playing'
             self._pause_event.set()
-
-    def stop(self):
-        self._stop_event.set()
-        self._pause_event.set()
-        self.state = 'stopped'
-        if self._thread:
-            self._thread.join()
 
     def _get_scene_snapshot(self):
         snapshot = {}

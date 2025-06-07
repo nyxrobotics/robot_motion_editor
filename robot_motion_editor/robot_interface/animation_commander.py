@@ -52,6 +52,7 @@ class AnimationCommander:
         self.state = 'stopped'
         self.current_block = None
         self.previous_target_joint_state = self.initial_joint_state
+        self._prev_snapshot = self._get_scene_snapshot()
         self._pause_event.set()
 
     def start(self, start_block=None):
@@ -61,6 +62,7 @@ class AnimationCommander:
             self._stop_event.clear()
             self._pause_event.set()
             self.state = 'playing'
+            self._prev_snapshot = self._get_scene_snapshot()
             self._thread = threading.Thread(target=self._run, args=(start_block,))
             self._thread.start()
 
@@ -80,6 +82,33 @@ class AnimationCommander:
         with self._lock:
             self.state = 'playing'
             self._pause_event.set()
+
+    def _get_scene_snapshot(self):
+        snapshot = {}
+        for name, block in self.animation_flow_scene.block_objects.items():
+            snapshot[name] = {
+                'id': getattr(block, 'id', None),
+                'type': type(block).__name__,
+                'filename': getattr(block, 'filename', ''),
+                'preview_output_index': getattr(block, 'preview_output_index', None),
+                'num_outputs': len(getattr(block, 'output_arrows', [])),
+                'subblock_keys': sorted(block.output_sub_blocks.keys()) if hasattr(block, 'output_sub_blocks') else [],
+            }
+        return snapshot
+
+    def _scene_changed(self):
+        current = self._get_scene_snapshot()
+        if current.keys() != self._prev_snapshot.keys():
+            return True
+        for name in current:
+            prev = self._prev_snapshot[name]
+            curr = current[name]
+            for key in curr:
+                if key == 'preview_output_index':
+                    continue
+                if curr[key] != prev.get(key):
+                    return True
+        return False
 
     def _run(self, start_block=None):
         self.current_block = start_block or self.animation_flow_scene.get_start_block()
