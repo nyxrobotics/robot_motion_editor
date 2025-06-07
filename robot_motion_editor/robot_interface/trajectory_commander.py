@@ -9,11 +9,11 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 
 
 class TrajectoryCommander:
-    def __init__(self, robot_name: str, joint_names: list, mode: str = 'position', rate: float = 30.0):
+    def __init__(self, robot_name: str, joint_names: list, mode: str = 'position', playback_rate: float = 30.0):
         self.robot_name = robot_name
         self.joint_names = joint_names
         self.mode = mode.lower()
-        self.rate = rate
+        self.playback_rate = playback_rate
 
         self._enabled = False
         self._torque_on = False
@@ -82,22 +82,24 @@ class TrajectoryCommander:
         if not self._enabled or not self._torque_on:
             return
 
-        traj = JointTrajectory()
-        traj.joint_names = end.name
-
-        point0 = JointTrajectoryPoint()
-        point0.time_from_start = rospy.Duration(0.0)
-        point0.positions = self._align_positions(start, end.name)
-        point0.velocities = [
-            (b - a) / duration if duration > 0.0 else 0.0
-            for a, b in zip(point0.positions, end.position)
-        ]
-
-        point1 = JointTrajectoryPoint()
-        point1.time_from_start = rospy.Duration(duration)
-        point1.positions = end.position
-        point1.velocities = [0.0] * len(end.position)
-
+        aligned_start = JointState(
+            name=end.name,
+            position=self._align_positions(start, end)
+        )
+        traj = JointTrajectory(joint_names=end.name)
+        point0 = JointTrajectoryPoint(
+            time_from_start=rospy.Duration(0.0),
+            positions=aligned_start.position,
+            velocities=[
+                (b - a) / duration if duration > 0 else 0.0 for a,
+                b in zip(
+                    aligned_start.position,
+                    end.position)])
+        point1 = JointTrajectoryPoint(
+            time_from_start=rospy.Duration(duration),
+            positions=end.position,
+            velocities=[0.0] * len(end.position)
+        )
         traj.points = [point0, point1]
         self.send_trajectory(traj)
 
@@ -105,13 +107,14 @@ class TrajectoryCommander:
         if not self._enabled or not self._torque_on:
             return
 
+        interpolated_traj = self._interpolate(trajectory, self.playback_rate)
         if self.mode == 'trajectory':
-            self.trajectory_publisher.publish(trajectory)
+            self.trajectory_publisher.publish(interpolated_traj)
             if trajectory.points:
                 last = trajectory.points[-1]
                 self._last_goal_state = JointState(name=trajectory.joint_names[:], position=last.positions[:])
         else:
-            self._start_position_playback(trajectory)
+            self._start_position_playback(interpolated_traj)
 
     def get_last_goal_state(self) -> JointState:
         return self._last_goal_state
@@ -120,6 +123,36 @@ class TrajectoryCommander:
         ref_names = reference.name if isinstance(reference, JointState) else reference
         pos_dict = dict(zip(source.name, source.position))
         return [pos_dict.get(name, 0.0) for name in ref_names]
+
+    def _interpolate(self, trajectory: JointTrajectory, rate: float) -> JointTrajectory:
+        if len(trajectory.points) < 2:
+            return trajectory
+
+        result = JointTrajectory(joint_names=trajectory.joint_names)
+        for i in range(len(trajectory.points) - 1):
+            p0 = trajectory.points[i]
+            p1 = trajectory.points[i + 1]
+            t0, t1 = p0.time_from_start.to_sec(), p1.time_from_start.to_sec()
+            dt = t1 - t0
+            steps = max(int(dt * rate), 1)
+
+            for step in range(steps):
+                t = step / steps
+                time_sec = t0 + t * dt
+                interpolated_pos = [a + v * (time_sec - t0) for a, v in zip(p0.positions, p0.velocities)]
+                bounded_pos = [
+                    min(max(p1_i, p0_i), pi) if p0_i < p1_i else max(min(p1_i, p0_i), pi)
+                    for pi, p0_i, p1_i in zip(interpolated_pos, p0.positions, p1.positions)
+                ]
+                pt = JointTrajectoryPoint(
+                    time_from_start=rospy.Duration.from_sec(time_sec),
+                    positions=bounded_pos,
+                    velocities=p0.velocities
+                )
+                result.points.append(pt)
+
+        result.points.append(trajectory.points[-1])
+        return result
 
     def _start_position_playback(self, trajectory: JointTrajectory):
         with self._playback_lock:
@@ -137,7 +170,7 @@ class TrajectoryCommander:
         if len(trajectory.points) < 2:
             return
 
-        rate = rospy.Rate(self.rate)
+        rate = rospy.Rate(self.playback_rate)
         joint_names = trajectory.joint_names
 
         for i in range(len(trajectory.points) - 1):
@@ -147,7 +180,7 @@ class TrajectoryCommander:
             t0 = p0.time_from_start.to_sec()
             t1 = p1.time_from_start.to_sec()
             dt = t1 - t0
-            steps = max(1, int(dt * self.rate))
+            steps = max(1, int(dt * self.playback_rate))
 
             for step in range(steps):
                 if self._cancel_event.is_set() or not self._torque_on:

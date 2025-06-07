@@ -61,7 +61,7 @@ class FrameVisualizer:
     def visualize_frame_sequence(self, sequence_names):
         frame_list = [getattr(self, name, None) for name in sequence_names]
         traj = self._build_trajectory(frame_list)
-        self.trajectory_visualizer.visualize_trajectory(traj)
+        self.trajectory_visualizer.send_trajectory(traj)
 
     def _build_trajectory(self, frame_data_list):
         traj = JointTrajectory()

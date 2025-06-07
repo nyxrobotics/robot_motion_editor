@@ -58,7 +58,7 @@ class TrajectoryVisualizer:
     def get_last_goal_state(self) -> JointState:
         return self._last_goal_state
 
-    def visualize_movement(self, start: JointState, end: JointState, duration: float = 1.0):
+    def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
         if not self._enabled:
             return
 
@@ -82,9 +82,9 @@ class TrajectoryVisualizer:
             velocities=[0.0] * len(end.position)
         )
         traj.points = [point0, point1]
-        self.visualize_trajectory(traj)
+        self.send_trajectory(traj)
 
-    def visualize_trajectory(self, trajectory: JointTrajectory):
+    def send_trajectory(self, trajectory: JointTrajectory):
         if not self._enabled:
             return
 
