@@ -137,6 +137,7 @@ class AnimationVisualizer:
                         item.setSelected(False)
                     if hasattr(self.current_block, 'setSelected'):
                         self.current_block.setSelected(True)
+                        self.current_block.update()
 
             if not isinstance(self.current_block, FrameBlockItem):
                 self.current_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
