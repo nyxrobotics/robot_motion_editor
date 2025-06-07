@@ -94,6 +94,11 @@ class AnimationCommander:
         while self.current_block and not self._stop_event.is_set() and not rospy.is_shutdown():
             self._pause_event.wait()
 
+            if self._scene_changed():
+                rospy.logwarn("[AnimationCommander] Scene changed. Stopping.")
+                self.stop()
+                return
+
             if not isinstance(self.current_block, FrameBlockItem):
                 self.current_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
                 continue
