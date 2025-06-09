@@ -12,6 +12,10 @@ from PyQt5.QtWidgets import QGraphicsPathItem
 from PyQt5.QtWidgets import QGraphicsRectItem
 from PyQt5.QtWidgets import QGraphicsTextItem
 
+# TODO: The process of loading a yaml file for each frame during animation
+# playback is time consuming, so we want to load the data into the item
+# and hold it in memory.
+
 
 class StartBlockItem(QGraphicsRectItem):
     def __init__(self, id):
