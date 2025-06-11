@@ -154,6 +154,7 @@ class AnimationCommander:
                 return
 
             if self.previous_target_joint_state is None:
+                rospy.logwarn("[AnimationCommander] No previous_target_joint_state available.")
                 self.previous_target_joint_state = target_joint_state
 
             self.trajectory_commander.send_movement(
@@ -213,7 +214,7 @@ class AnimationCommander:
 
             current_joint_state = self.previous_target_joint_state
             if current_joint_state is None:
-                rospy.logwarn("[AnimationCommander] No previous target joint state available.")
+                rospy.logwarn("[AnimationCommander] No previous_target_joint_state available.")
                 self.previous_target_joint_state = target_joint_state
                 return
 

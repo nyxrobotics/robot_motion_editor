@@ -166,6 +166,7 @@ class AnimationVisualizer:
                 return
 
             if self.previous_target_joint_state is None:
+                rospy.logwarn("[AnimationVisualizer] No previous_target_joint_state set for playback.")
                 self.previous_target_joint_state = target_joint_state
 
             self.visualizer.send_movement(
