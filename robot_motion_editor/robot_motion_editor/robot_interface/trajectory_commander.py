@@ -172,13 +172,15 @@ class TrajectoryCommander:
             self._playback_thread.start()
 
     def _playback_trajectory_thread(self, trajectory: JointTrajectory):
-        if len(trajectory.points) < 2:
+        if len(trajectory.points) < 2 or rospy.is_shutdown():
             return
 
         rate = rospy.Rate(self.playback_rate)
         joint_names = trajectory.joint_names
 
         for i in range(len(trajectory.points) - 1):
+            if rospy.is_shutdown():
+                return
             p0 = trajectory.points[i]
             p1 = trajectory.points[i + 1]
 

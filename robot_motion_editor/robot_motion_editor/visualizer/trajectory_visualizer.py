@@ -51,6 +51,8 @@ class TrajectoryVisualizer:
     def visualize_goal_state(self, joint_state: JointState):
         if not self._enabled:
             return
+        if not joint_state.name or not joint_state.position:
+            return
         state_msg = RobotState(joint_state=joint_state)
         self.goal_state_pub.publish(DisplayRobotState(state=state_msg))
         self._last_goal_state = joint_state
@@ -60,6 +62,8 @@ class TrajectoryVisualizer:
 
     def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
         if not self._enabled:
+            return
+        if not start.name or not start.position or not end.name or not end.position:
             return
 
         aligned_start = JointState(

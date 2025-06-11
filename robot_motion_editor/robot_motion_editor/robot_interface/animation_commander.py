@@ -45,6 +45,9 @@ class AnimationCommander:
         except Exception as e:
             rospy.logwarn(f"[AnimationCommander] Failed to load initial pose: {e}")
 
+        self.previous_target_joint_state = self.initial_joint_state
+        self._prev_snapshot = self._get_scene_snapshot()
+
         self._thread = None
         self._stop_event = threading.Event()
         self._pause_event = threading.Event()
@@ -52,8 +55,6 @@ class AnimationCommander:
 
         self.state = 'stopped'
         self.current_block = None
-        self.previous_target_joint_state = self.initial_joint_state
-        self._prev_snapshot = self._get_scene_snapshot()
         self._pause_event.set()
 
     def start(self, start_block=None):
@@ -190,12 +191,13 @@ class AnimationCommander:
                 rospy.logwarn(f"[AnimationCommander] Failed to load frame '{frame_name}': {e}")
                 return
 
-            current_joint_state = self.previous_target_joint_state or self.initial_joint_state
-            if current_joint_state is None:
-                rospy.logwarn("[AnimationCommander] Cannot determine current joint state.")
+            if self.previous_target_joint_state is None:
+                rospy.logwarn("[AnimationCommander] No previous target joint state available.")
+                self.previous_target_joint_state = target_joint_state
                 return
 
-            self.trajectory_commander.send_movement(current_joint_state, target_joint_state, move_duration)
+            self.trajectory_commander.send_movement(
+                self.previous_target_joint_state, target_joint_state, move_duration)
             self.previous_target_joint_state = target_joint_state
             rospy.loginfo(f"[Commander] Played single frame: {frame_name}")
 
@@ -209,14 +211,15 @@ class AnimationCommander:
             except Exception as e:
                 rospy.logwarn(f"[AnimationCommander] Failed to load initial frame: {e}")
 
-            current_joint_state = self.previous_target_joint_state or self.initial_joint_state
+            current_joint_state = self.previous_target_joint_state
             if current_joint_state is None:
-                rospy.logwarn("[AnimationCommander] No initial_joint_state set for StartBlockItem execution.")
+                rospy.logwarn("[AnimationCommander] No previous target joint state available.")
+                self.previous_target_joint_state = target_joint_state
                 return
 
             self.trajectory_commander.send_movement(current_joint_state, target_joint_state, move_duration)
             self.previous_target_joint_state = current_joint_state
-            rospy.loginfo("[Commander] Played StartBlockItem with initial_joint_state.")
+            rospy.loginfo("[Commander] Played StartBlockItem")
 
     def extract_joint_state_and_duration(self, block):
 

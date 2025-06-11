@@ -43,6 +43,9 @@ class AnimationVisualizer:
         except Exception as e:
             rospy.logwarn(f"[AnimationVisualizer] Failed to load initial pose: {e}")
 
+        self.previous_target_joint_state = self.initial_joint_state
+        self._prev_snapshot = self._get_scene_snapshot()
+
         self._thread = None
         self._stop_event = threading.Event()
         self._pause_event = threading.Event()
@@ -50,8 +53,6 @@ class AnimationVisualizer:
 
         self.state = 'stopped'
         self.current_block = None
-        self.previous_target_joint_state = self.initial_joint_state
-        self._prev_snapshot = self._get_scene_snapshot()
 
         self._pause_event.set()
 
@@ -124,9 +125,9 @@ class AnimationVisualizer:
         if self.previous_target_joint_state and start_target and \
                 not joint_states_equal(self.previous_target_joint_state, start_target):
             self.visualizer.send_movement(
-                self.previous_target_joint_state, self.initial_joint_state, duration=1.0)
-            self.visualizer.visualize_goal_state(self.initial_joint_state)
-            self.previous_target_joint_state = self.initial_joint_state
+                self.previous_target_joint_state, start_target, duration=1.0)
+            self.visualizer.visualize_goal_state(start_target)
+            self.previous_target_joint_state = start_target
             time.sleep(1.0)
 
         while self.current_block and not self._stop_event.is_set() and not rospy.is_shutdown():
@@ -207,18 +208,17 @@ class AnimationVisualizer:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
                 return
 
-            current_joint_state = self.previous_target_joint_state or self.initial_joint_state
-            if current_joint_state is None:
-                rospy.logwarn("[AnimationVisualizer] No initial_joint_state set for FrameBlockItem visualization.")
+            if self.previous_target_joint_state is None:
+                rospy.logwarn("[AnimationVisualizer] No previous_target_joint_state set for single frame playback.")
+                self.previous_target_joint_state = target_joint_state
                 return
 
-            self.visualizer.send_movement(current_joint_state, target_joint_state, move_duration)
+            self.visualizer.send_movement(self.previous_target_joint_state, target_joint_state, move_duration)
             self.visualizer.visualize_goal_state(target_joint_state)
             self.previous_target_joint_state = target_joint_state
             rospy.loginfo(f"[Visualizer] Played single frame: {frame_name}")
 
         elif isinstance(block, StartBlockItem):
-            current_joint_state = self.initial_joint_state
             try:
                 frame_path = self.motion_directory_manager.resolve_initial_frame_path()
                 frame_data = FrameData()
@@ -228,15 +228,15 @@ class AnimationVisualizer:
             except Exception as e:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load initial frame: {e}")
 
-            current_joint_state = self.previous_target_joint_state or self.initial_joint_state
-            if current_joint_state is None:
-                rospy.logwarn("[AnimationVisualizer] No initial_joint_state set for StartBlockItem visualization.")
+            if self.previous_target_joint_state is None:
+                rospy.logwarn("[AnimationVisualizer] No previous_target_joint_state set for StartBlockItem playback.")
+                self.previous_target_joint_state = target_joint_state
                 return
 
-            self.visualizer.send_movement(current_joint_state, target_joint_state, move_duration)
+            self.visualizer.send_movement(self.previous_target_joint_state, target_joint_state, move_duration)
             self.visualizer.visualize_goal_state(target_joint_state)
             self.previous_target_joint_state = target_joint_state
-            rospy.loginfo("[Visualizer] Played StartBlockItem with initial_joint_state.")
+            rospy.loginfo("[Visualizer] Played StartBlockItem.")
 
     def extract_joint_state_and_duration(self, block):
 

@@ -231,5 +231,6 @@ class AnimaitonWidget(QWidget):
             frame_data.load_from_file(self.motion_directory_manager.resolve_initial_frame_path())
             self.initial_joint_state = frame_data.get_joint_state()
             self.animation_visualizer.initial_joint_state = self.initial_joint_state
+            self.animation_commander.initial_joint_state = self.initial_joint_state
         except Exception as e:
             rospy.logwarn(f"[MotionEditor] Failed to load initial_frame: {e}")
