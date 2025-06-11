@@ -37,10 +37,11 @@ class AnimationPreviewButtonWidget(QWidget):
                 selected_block = item
                 break
 
-        if self.animation_visualizer.state == 'paused':
-            self.animation_visualizer.resume()
-        else:
-            self.animation_visualizer.start(start_block=selected_block)
+        if self.animation_visualizer:
+            if self.animation_visualizer.state == 'paused':
+                self.animation_visualizer.resume()
+            else:
+                self.animation_visualizer.start(start_block=selected_block)
 
         if self.animation_commander:
             if self.animation_commander.state == 'paused':
@@ -49,16 +50,23 @@ class AnimationPreviewButtonWidget(QWidget):
                 self.animation_commander.start(start_block=selected_block)
 
     def pause(self):
-        if self.animation_visualizer.state == 'playing':
-            self.animation_visualizer.pause()
-        elif self.animation_visualizer.state == 'stopped':
-            selected = self.animation_visualizer.animation_flow_scene.selectedItems()
-            if len(selected) == 1:
-                block = selected[0]
-                self.animation_visualizer.play_single_block(block)
+        if self.animation_visualizer:
+            if self.animation_visualizer.state == 'playing':
+                self.animation_visualizer.pause()
+            elif self.animation_visualizer.state == 'stopped':
+                selected = self.animation_visualizer.animation_flow_scene.selectedItems()
+                if len(selected) == 1:
+                    block = selected[0]
+                    self.animation_visualizer.play_single_block(block)
 
-        if self.animation_commander and self.animation_commander.state == 'playing':
-            self.animation_commander.pause()
+        if self.animation_commander:
+            if self.animation_commander and self.animation_commander.state == 'playing':
+                self.animation_commander.pause()
+            elif self.animation_commander.state == 'stopped':
+                selected = self.animation_commander.animation_flow_scene.selectedItems()
+                if len(selected) == 1:
+                    block = selected[0]
+                    self.animation_commander.play_single_block(block)
 
     def stop(self):
         self.animation_visualizer.stop()

@@ -61,6 +61,8 @@ class TrajectoryCommander:
     def send_goal_state(self, joint_state: JointState, duration: float = 1.0):
         if not self._enabled or not self._torque_on:
             return
+        if not joint_state.name or not joint_state.position:
+            return
 
         if self.mode == 'trajectory':
             traj = JointTrajectory()
@@ -80,6 +82,8 @@ class TrajectoryCommander:
 
     def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
         if not self._enabled or not self._torque_on:
+            return
+        if not start.name or not start.position or not end.name or not end.position:
             return
 
         aligned_start = JointState(
@@ -106,13 +110,14 @@ class TrajectoryCommander:
     def send_trajectory(self, trajectory: JointTrajectory):
         if not self._enabled or not self._torque_on:
             return
+        if not trajectory.joint_names or not trajectory.points:
+            return
 
         interpolated_traj = self._interpolate(trajectory, self.playback_rate)
         if self.mode == 'trajectory':
             self.trajectory_publisher.publish(interpolated_traj)
-            if trajectory.points:
-                last = trajectory.points[-1]
-                self._last_goal_state = JointState(name=trajectory.joint_names[:], position=last.positions[:])
+            self._last_goal_state = JointState(
+                name=trajectory.joint_names[:], position=trajectory.points[-1].positions[:])
         else:
             self._start_position_playback(interpolated_traj)
 
@@ -193,9 +198,5 @@ class TrajectoryCommander:
                     if name in self.position_publishers:
                         self.position_publishers[name].publish(Float64(pos))
 
+                self._last_goal_state = JointState(name=joint_names[:], position=interpolated_pos[:])
                 rate.sleep()
-
-        self._last_goal_state = JointState(
-            name=joint_names[:],
-            position=trajectory.points[-1].positions[:]
-        )

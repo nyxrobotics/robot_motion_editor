@@ -143,7 +143,10 @@ class InitialPoseEditor(QWidget):
             spin.setValue(pos_deg)
             self.enable_checkboxes[joint_name].setChecked(self.initial_pose_data.get_enable(joint_name))
 
-        self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
+        if self.initial_pose_visualizer:
+            self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
+        if self.trajectory_commander:
+            self.trajectory_commander.send_goal_state(self.initial_pose_data.get_joint_state(), duration=1.0)
 
     def save_pose(self):
         for joint_name in self.initial_pose_data.get_joint_names():
