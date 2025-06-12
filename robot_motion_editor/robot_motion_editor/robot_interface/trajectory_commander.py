@@ -17,7 +17,7 @@ class TrajectoryCommander:
 
         self._enabled = False
         self._torque_on = False
-        self._last_goal_joint_state = None
+        self._current_joint_state = None
 
         self._playback_thread = None
         self._playback_lock = threading.Lock()
@@ -63,8 +63,8 @@ class TrajectoryCommander:
             return
         if not joint_state.name or not joint_state.position:
             return
-        if not self._last_goal_joint_state:
-            self._last_goal_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+        if not self._current_joint_state:
+            self._current_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
             traj = JointTrajectory(joint_names=joint_state.name)
             point = JointTrajectoryPoint(
                 time_from_start=rospy.Duration(0),
@@ -77,7 +77,7 @@ class TrajectoryCommander:
 
         aligned_start = JointState(
             name=joint_state.name,
-            position=self._align_positions(self._last_goal_joint_state, joint_state)
+            position=self._align_positions(self._current_joint_state, joint_state)
         )
         traj = JointTrajectory(joint_names=joint_state.name)
         point0 = JointTrajectoryPoint(
@@ -93,7 +93,7 @@ class TrajectoryCommander:
         )
         traj.points = [point0, point1]
         self.send_trajectory(traj)
-        self._last_goal_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+        self._current_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
 
     def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
         if not self._enabled or not self._torque_on:
@@ -102,7 +102,7 @@ class TrajectoryCommander:
             return
 
         aligned_start = JointState(name=end.name, position=self._align_positions(start, end))
-        self._last_goal_joint_state = aligned_start
+        self._current_joint_state = aligned_start
 
         traj = JointTrajectory(joint_names=end.name)
         point0 = JointTrajectoryPoint(
@@ -130,18 +130,18 @@ class TrajectoryCommander:
         interpolated_traj = self._interpolate(trajectory, self.playback_rate)
         if self.mode == 'trajectory':
             self.trajectory_publisher.publish(interpolated_traj)
-            self._last_goal_joint_state = JointState(
+            self._current_joint_state = JointState(
                 name=trajectory.joint_names[:], position=trajectory.points[-1].positions[:])
         else:
             self._start_position_playback(interpolated_traj)
 
-    def set_last_goal_joint_state(self, joint_state: JointState):
+    def set_current_joint_state(self, joint_state: JointState):
         if not joint_state.name or not joint_state.position:
             return
-        self._last_goal_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+        self._current_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
 
-    def get_last_goal_joint_state(self) -> JointState:
-        return self._last_goal_joint_state
+    def get_current_joint_state(self) -> JointState:
+        return self._current_joint_state
 
     def _align_positions(self, source: JointState, reference: Union[JointState, list]) -> list:
         ref_names = reference.name if isinstance(reference, JointState) else reference
@@ -186,11 +186,11 @@ class TrajectoryCommander:
 
             self._cancel_event.clear()
             self._playback_thread = threading.Thread(
-                target=self._playback_trajectory_thread, args=(trajectory,)
+                target=self._playback_thread, args=(trajectory,)
             )
             self._playback_thread.start()
 
-    def _playback_trajectory_thread(self, trajectory: JointTrajectory):
+    def _playback_thread(self, trajectory: JointTrajectory):
         if len(trajectory.points) < 2 or rospy.is_shutdown():
             return
 
@@ -219,5 +219,5 @@ class TrajectoryCommander:
                     if name in self.position_publishers:
                         self.position_publishers[name].publish(Float64(pos))
 
-                self._last_goal_joint_state = JointState(name=joint_names[:], position=interpolated_pos[:])
+                self._current_joint_state = JointState(name=joint_names[:], position=interpolated_pos[:])
                 rate.sleep()
