@@ -43,7 +43,6 @@ class AnimationVisualizer:
         except Exception as e:
             rospy.logwarn(f"[AnimationVisualizer] Failed to load initial pose: {e}")
 
-        self._current_target_state = self.initial_joint_state
         self._prev_snapshot = self._get_scene_snapshot()
 
         self._thread = None
@@ -66,13 +65,6 @@ class AnimationVisualizer:
             self.state = 'playing'
             self._prev_snapshot = self._get_scene_snapshot()
 
-            if self._current_target_state is None:
-                if self.initial_joint_state is not None:
-                    rospy.loginfo("[AnimationVisualizer] Setting current state to initial pose.")
-                    self._current_target_state = self.initial_joint_state
-                else:
-                    rospy.logwarn("[AnimationVisualizer] No initial pose found. Will use first frame as starting point.")
-
             self._thread = threading.Thread(target=self._run, args=(start_block,))
             self._thread.start()
 
@@ -82,12 +74,6 @@ class AnimationVisualizer:
         self.state = 'stopped'
         if self._thread:
             self._thread.join()
-        if isinstance(self.current_block, (FrameBlockItem, StartBlockItem)):
-            try:
-                joint_state, _, _ = self.extract_joint_state_and_duration(self.current_block)
-                self._current_target_state = joint_state
-            except Exception as e:
-                rospy.logwarn(f"[AnimationVisualizer] Failed to extract joint state: {e}")
 
     def pause(self):
         with self._lock:
@@ -130,24 +116,9 @@ class AnimationVisualizer:
         self.current_block = start_block or self.animation_flow_scene.get_start_block()
         start_target, move_duration, wait_duration = self.extract_joint_state_and_duration(self.current_block)
 
-        if self._current_target_state is None:
-            if self.initial_joint_state is not None:
-                rospy.loginfo("[AnimationVisualizer] No current state, using initial pose.")
-                self._current_target_state = self.initial_joint_state
-            else:
-                rospy.logwarn("[AnimationVisualizer] No current state or initial pose. Skipping transition.")
-                self._current_target_state = start_target  # fallback to target
-                # ⚠ ここで return すると送信自体スキップ可能
-                return
-
-        # 必ず両者ともに有効でなければ送らない
-        if self._current_target_state.name and start_target and start_target.name and \
-                not joint_states_equal(self._current_target_state, start_target):
-            self.visualizer.send_movement(
-                self._current_target_state, start_target, duration=1.0)
-            self.visualizer.visualize_goal_state(start_target)
-            self._current_target_state = start_target
-            time.sleep(1.0)
+        self.visualizer.send_joint_state(start_target, 1.0)
+        self.visualizer.visualize_goal_state(start_target)
+        time.sleep(1.0)
 
         while self.current_block and not self._stop_event.is_set() and not rospy.is_shutdown():
             self._pause_event.wait()
@@ -184,12 +155,7 @@ class AnimationVisualizer:
                 self.stop()
                 return
 
-            if self._current_target_state is None:
-                rospy.logwarn("[AnimationVisualizer] No previous_target_joint_state set for playback.")
-                self._current_target_state = target_joint_state
-
-            self.visualizer.send_movement(
-                self._current_target_state, target_joint_state, move_duration)
+            self.visualizer.send_joint_state(target_joint_state, move_duration)
             self.visualizer.visualize_goal_state(target_joint_state)
 
             total_duration = move_duration + wait_duration
@@ -205,7 +171,6 @@ class AnimationVisualizer:
                 time.sleep(0.001)
                 elapsed = time.perf_counter() - start_time
 
-            self._current_target_state = target_joint_state
             self.current_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
 
             if self.animation_flow_scene is not None:
@@ -228,14 +193,8 @@ class AnimationVisualizer:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
                 return
 
-            if self._current_target_state is None:
-                rospy.logwarn("[AnimationVisualizer] No previous_target_joint_state set for single frame playback.")
-                self._current_target_state = target_joint_state
-                return
-
-            self.visualizer.send_movement(self._current_target_state, target_joint_state, move_duration)
+            self.visualizer.send_joint_state(target_joint_state, move_duration)
             self.visualizer.visualize_goal_state(target_joint_state)
-            self._current_target_state = target_joint_state
             rospy.loginfo(f"[Visualizer] Played single frame: {frame_name}")
 
         elif isinstance(block, StartBlockItem):
@@ -248,14 +207,8 @@ class AnimationVisualizer:
             except Exception as e:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load initial frame: {e}")
 
-            if self._current_target_state is None:
-                rospy.logwarn("[AnimationVisualizer] No previous_target_joint_state set for StartBlockItem playback.")
-                self._current_target_state = target_joint_state
-                return
-
-            self.visualizer.send_movement(self._current_target_state, target_joint_state, move_duration)
+            self.visualizer.send_joint_state(target_joint_state, move_duration)
             self.visualizer.visualize_goal_state(target_joint_state)
-            self._current_target_state = target_joint_state
             rospy.loginfo("[Visualizer] Played StartBlockItem.")
 
     def extract_joint_state_and_duration(self, block):
