@@ -65,6 +65,14 @@ class AnimationCommander:
             self._pause_event.set()
             self.state = 'playing'
             self._prev_snapshot = self._get_scene_snapshot()
+
+            if self._current_target_state is None:
+                if self.initial_joint_state is not None:
+                    self._current_target_state = self.initial_joint_state
+                    rospy.loginfo("[AnimationCommander] Setting current state to initial pose.")
+                else:
+                    rospy.logwarn("[AnimationCommander] No initial pose found.")
+
             self._thread = threading.Thread(target=self._run, args=(start_block,))
             self._thread.start()
 

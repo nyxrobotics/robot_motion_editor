@@ -65,6 +65,14 @@ class AnimationVisualizer:
             self._pause_event.set()
             self.state = 'playing'
             self._prev_snapshot = self._get_scene_snapshot()
+
+            if self._current_target_state is None:
+                if self.initial_joint_state is not None:
+                    rospy.loginfo("[AnimationVisualizer] Setting current state to initial pose.")
+                    self._current_target_state = self.initial_joint_state
+                else:
+                    rospy.logwarn("[AnimationVisualizer] No initial pose found. Will use first frame as starting point.")
+
             self._thread = threading.Thread(target=self._run, args=(start_block,))
             self._thread.start()
 
