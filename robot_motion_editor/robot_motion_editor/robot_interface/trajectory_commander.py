@@ -17,7 +17,7 @@ class TrajectoryCommander:
 
         self._enabled = False
         self._torque_on = False
-        self._current_joint_state = None
+        self._current_target_state = None
 
         self._playback_lock = threading.Lock()
         self._cancel_event = threading.Event()
@@ -64,7 +64,7 @@ class TrajectoryCommander:
         if not joint_state.name or not joint_state.position:
             return
 
-        if not self._current_joint_state:
+        if not self._current_target_state:
             # No current state yet, do not interpolate — treat target as current directly
             traj = JointTrajectory(joint_names=joint_state.name)
             point = JointTrajectoryPoint(
@@ -76,10 +76,10 @@ class TrajectoryCommander:
             self.send_trajectory(traj)
 
             # Set current joint state immediately
-            self._current_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+            self._current_target_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
 
         else:
-            self.send_movement(self._current_joint_state, joint_state, duration)
+            self.send_movement(self._current_target_state, joint_state, duration)
 
     def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
         if not self._enabled or not self._torque_on:
@@ -117,7 +117,7 @@ class TrajectoryCommander:
 
         # Update current joint state to the final position of the trajectory
         if interpolated_traj.points:
-            self._current_joint_state = JointState(
+            self._current_target_state = JointState(
                 name=interpolated_traj.joint_names[:],
                 position=interpolated_traj.points[-1].positions[:]
             )
@@ -127,13 +127,13 @@ class TrajectoryCommander:
         else:
             self._start_position_playback(interpolated_traj)
 
-    def set_current_joint_state(self, joint_state: JointState):
+    def set_current_target_state(self, joint_state: JointState):
         if not joint_state.name or not joint_state.position:
             return
-        self._current_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+        self._current_target_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
 
-    def get_current_joint_state(self) -> JointState:
-        return self._current_joint_state
+    def get_current_target_state(self) -> JointState:
+        return self._current_target_state
 
     def _align_positions(self, source: JointState, reference: Union[JointState, list]) -> list:
         ref_names = reference.name if isinstance(reference, JointState) else reference
@@ -211,5 +211,5 @@ class TrajectoryCommander:
                     if name in self.position_publishers:
                         self.position_publishers[name].publish(Float64(pos))
 
-                self._current_joint_state = JointState(name=joint_names[:], position=interpolated_pos[:])
+                self._current_target_state = JointState(name=joint_names[:], position=interpolated_pos[:])
                 rate.sleep()

@@ -17,7 +17,7 @@ class TrajectoryVisualizer:
         self.playback_rate = playback_rate
 
         self._enabled = True
-        self._current_joint_state = None
+        self._current_target_state = None
 
         self._playback_lock = threading.Lock()
         self._cancel_event = threading.Event()
@@ -52,12 +52,12 @@ class TrajectoryVisualizer:
         else:
             rospy.logwarn("Looping is only supported in state mode.")
 
-    def set_current_joint_state(self, joint_state: JointState):
+    def set_current_target_state(self, joint_state: JointState):
         if joint_state.name and joint_state.position:
-            self._current_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+            self._current_target_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
 
-    def get_current_joint_state(self) -> JointState:
-        return self._current_joint_state
+    def get_current_target_state(self) -> JointState:
+        return self._current_target_state
 
     def visualize_goal_state(self, joint_state: JointState):
         if not self._enabled or not joint_state.name or not joint_state.position:
@@ -69,7 +69,7 @@ class TrajectoryVisualizer:
         if not self._enabled or not joint_state.name or not joint_state.position:
             return
 
-        if not self._current_joint_state:
+        if not self._current_target_state:
             # No current state yet, do not interpolate — treat target as current directly
             traj = JointTrajectory(joint_names=joint_state.name)
             point = JointTrajectoryPoint(
@@ -81,10 +81,10 @@ class TrajectoryVisualizer:
             self.send_trajectory(traj)
 
             # Set current joint state immediately
-            self._current_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+            self._current_target_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
 
         else:
-            self.send_movement(self._current_joint_state, joint_state, duration)
+            self.send_movement(self._current_target_state, joint_state, duration)
             self.visualize_goal_state(joint_state)
 
     def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
@@ -112,7 +112,7 @@ class TrajectoryVisualizer:
         self.send_trajectory(traj)
 
         # Update current joint state to the goal after sending trajectory
-        self._current_joint_state = JointState(name=end.name[:], position=end.position[:])
+        self._current_target_state = JointState(name=end.name[:], position=end.position[:])
 
     def send_trajectory(self, trajectory: JointTrajectory):
         if not self._enabled:
@@ -125,7 +125,7 @@ class TrajectoryVisualizer:
 
         # Update current_joint_state using the final trajectory point
         if interpolated_traj.points:
-            self._current_joint_state = JointState(
+            self._current_target_state = JointState(
                 name=interpolated_traj.joint_names[:],
                 position=interpolated_traj.points[-1].positions[:]
             )
