@@ -58,26 +58,41 @@ class TrajectoryCommander:
     def is_torque_on(self) -> bool:
         return self._torque_on
 
-    def send_goal_state(self, joint_state: JointState, duration: float = 1.0):
+    def send_joint_state(self, joint_state: JointState, duration: float = 1.0):
         if not self._enabled or not self._torque_on:
             return
         if not joint_state.name or not joint_state.position:
             return
-
-        if self.mode == 'trajectory':
-            traj = JointTrajectory()
-            traj.joint_names = joint_state.name
-            point = JointTrajectoryPoint()
-            point.positions = joint_state.position
-            point.velocities = [0.0] * len(joint_state.position)
-            point.time_from_start = rospy.Duration(duration)
+        if not self._last_goal_state:
+            self._last_goal_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+            traj = JointTrajectory(joint_names=joint_state.name)
+            point = JointTrajectoryPoint(
+                time_from_start=rospy.Duration(duration),
+                positions=joint_state.position,
+                velocities=[0.0] * len(joint_state.position)
+            )
             traj.points = [point]
-            self.trajectory_publisher.publish(traj)
-        else:
-            for name, pos in zip(joint_state.name, joint_state.position):
-                if name in self.position_publishers:
-                    self.position_publishers[name].publish(Float64(pos))
+            self.send_trajectory(traj)
+            return
 
+        aligned_start = JointState(
+            name=joint_state.name,
+            position=self._align_positions(self._last_goal_state, joint_state)
+        )
+        traj = JointTrajectory(joint_names=joint_state.name)
+        point0 = JointTrajectoryPoint(
+            time_from_start=rospy.Duration(0.0),
+            positions=aligned_start.position,
+            velocities=[
+                (b - a) / duration if duration > 0 else 0.0 for a, b in zip(
+                    aligned_start.position, joint_state.position)])
+        point1 = JointTrajectoryPoint(
+            time_from_start=rospy.Duration(duration),
+            positions=joint_state.position,
+            velocities=[0.0] * len(joint_state.position)
+        )
+        traj.points = [point0, point1]
+        self.send_trajectory(traj)
         self._last_goal_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
 
     def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
@@ -86,10 +101,9 @@ class TrajectoryCommander:
         if not start.name or not start.position or not end.name or not end.position:
             return
 
-        aligned_start = JointState(
-            name=end.name,
-            position=self._align_positions(start, end)
-        )
+        aligned_start = JointState(name=end.name, position=self._align_positions(start, end))
+        self._last_goal_state = aligned_start
+
         traj = JointTrajectory(joint_names=end.name)
         point0 = JointTrajectoryPoint(
             time_from_start=rospy.Duration(0.0),
@@ -120,6 +134,11 @@ class TrajectoryCommander:
                 name=trajectory.joint_names[:], position=trajectory.points[-1].positions[:])
         else:
             self._start_position_playback(interpolated_traj)
+
+    def set_last_goal_state(self, joint_state: JointState):
+        if not joint_state.name or not joint_state.position:
+            return
+        self._last_goal_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
 
     def get_last_goal_state(self) -> JointState:
         return self._last_goal_state

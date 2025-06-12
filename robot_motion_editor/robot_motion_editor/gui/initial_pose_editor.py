@@ -146,7 +146,7 @@ class InitialPoseEditor(QWidget):
         if self.initial_pose_visualizer:
             self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
         if self.trajectory_commander:
-            self.trajectory_commander.send_goal_state(self.initial_pose_data.get_joint_state(), duration=1.0)
+            self.trajectory_commander.send_joint_state(self.initial_pose_data.get_joint_state(), duration=1.0)
 
     def save_pose(self):
         for joint_name in self.initial_pose_data.get_joint_names():
@@ -174,7 +174,7 @@ class InitialPoseEditor(QWidget):
             if self.initial_pose_visualizer:
                 self.initial_pose_visualizer.set_goal_pose(self.goal_pose)
             if self.trajectory_commander:
-                self.trajectory_commander.send_goal_state(self.goal_pose, duration=1.0)
+                self.trajectory_commander.send_joint_state(self.goal_pose, duration=1.0)
 
     def update_all_enable_checkbox(self):
         checked = [cb.isChecked() for cb in self.enable_checkboxes.values()]

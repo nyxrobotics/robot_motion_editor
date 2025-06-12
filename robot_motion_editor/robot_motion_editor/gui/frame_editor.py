@@ -341,7 +341,7 @@ class FrameEditorDialog(QDialog):
                 self.frame_visualizer.play_previous_trajectory()
 
         if self.trajectory_commander:
-            self.trajectory_commander.send_goal_state(msg, duration=1.0)
+            self.trajectory_commander.send_joint_state(msg, duration=1.0)
 
     def set_frame_to_ui(self):
         self.move_spin.setValue(self.frame_data.move_duration)

@@ -57,8 +57,50 @@ class TrajectoryVisualizer:
         self.goal_state_pub.publish(DisplayRobotState(state=state_msg))
         self._last_goal_state = joint_state
 
+    def set_last_goal_state(self, joint_state: JointState):
+        if not joint_state.name or not joint_state.position:
+            return
+        self._last_goal_state = joint_state
+
     def get_last_goal_state(self) -> JointState:
         return self._last_goal_state
+
+    def send_joint_state(self, joint_state: JointState, duration: float = 1.0):
+        if not self._enabled:
+            return
+        if not joint_state.name or not joint_state.position:
+            return
+        if not self._last_goal_state:
+            self._last_goal_state = joint_state
+            self.visualize_goal_state(joint_state)
+            traj = JointTrajectory(joint_names=joint_state.name)
+            point = JointTrajectoryPoint(
+                time_from_start=rospy.Duration(duration),
+                positions=joint_state.position,
+                velocities=[0.0] * len(joint_state.position)
+            )
+            traj.points = [point]
+            self.send_trajectory(traj)
+            return
+
+        aligned_start = JointState(
+            name=joint_state.name,
+            position=self._align_positions(self._last_goal_state, joint_state))
+        traj = JointTrajectory(joint_names=joint_state.name)
+        point0 = JointTrajectoryPoint(
+            time_from_start=rospy.Duration(0.0),
+            positions=aligned_start.position,
+            velocities=[
+                (b - a) / duration if duration > 0 else 0.0 for a, b in zip(
+                    aligned_start.position, joint_state.position)])
+        point1 = JointTrajectoryPoint(
+            time_from_start=rospy.Duration(duration),
+            positions=joint_state.position,
+            velocities=[0.0] * len(joint_state.position)
+        )
+        traj.points = [point0, point1]
+        self.send_trajectory(traj)
+        self.visualize_goal_state(joint_state)
 
     def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
         if not self._enabled:
@@ -66,10 +108,8 @@ class TrajectoryVisualizer:
         if not start.name or not start.position or not end.name or not end.position:
             return
 
-        aligned_start = JointState(
-            name=end.name,
-            position=self._align_positions(start, end)
-        )
+        aligned_start = JointState(name=end.name, position=self._align_positions(start, end))
+        self._last_goal_state = aligned_start
 
         traj = JointTrajectory(joint_names=end.name)
         point0 = JointTrajectoryPoint(
