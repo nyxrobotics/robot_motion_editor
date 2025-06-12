@@ -18,7 +18,7 @@ class TrajectoryVisualizer:
         self._lock = threading.Lock()
         self._trajectory = None
         self._enabled = True
-        self._last_goal_state = None
+        self._last_goal_joint_state = None
 
         if self.use_state_mode:
             self.state_pub = rospy.Publisher("/display_planned_state", DisplayRobotState, queue_size=1)
@@ -55,23 +55,23 @@ class TrajectoryVisualizer:
             return
         state_msg = RobotState(joint_state=joint_state)
         self.goal_state_pub.publish(DisplayRobotState(state=state_msg))
-        self._last_goal_state = joint_state
+        self._last_goal_joint_state = joint_state
 
-    def set_last_goal_state(self, joint_state: JointState):
+    def set_last_goal_joint_state(self, joint_state: JointState):
         if not joint_state.name or not joint_state.position:
             return
-        self._last_goal_state = joint_state
+        self._last_goal_joint_state = joint_state
 
-    def get_last_goal_state(self) -> JointState:
-        return self._last_goal_state
+    def get_last_goal_joint_state(self) -> JointState:
+        return self._last_goal_joint_state
 
     def send_joint_state(self, joint_state: JointState, duration: float = 1.0):
         if not self._enabled:
             return
         if not joint_state.name or not joint_state.position:
             return
-        if not self._last_goal_state:
-            self._last_goal_state = joint_state
+        if not self._last_goal_joint_state:
+            self._last_goal_joint_state = joint_state
             self.visualize_goal_state(joint_state)
             traj = JointTrajectory(joint_names=joint_state.name)
             point = JointTrajectoryPoint(
@@ -85,7 +85,7 @@ class TrajectoryVisualizer:
 
         aligned_start = JointState(
             name=joint_state.name,
-            position=self._align_positions(self._last_goal_state, joint_state))
+            position=self._align_positions(self._last_goal_joint_state, joint_state))
         traj = JointTrajectory(joint_names=joint_state.name)
         point0 = JointTrajectoryPoint(
             time_from_start=rospy.Duration(0.0),
@@ -109,7 +109,7 @@ class TrajectoryVisualizer:
             return
 
         aligned_start = JointState(name=end.name, position=self._align_positions(start, end))
-        self._last_goal_state = aligned_start
+        self._last_goal_joint_state = aligned_start
 
         traj = JointTrajectory(joint_names=end.name)
         point0 = JointTrajectoryPoint(

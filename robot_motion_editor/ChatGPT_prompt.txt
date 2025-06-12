@@ -9,7 +9,7 @@ Simulink風の状態遷移形式による視覚的な操作で、実機および
 
 ## 2. GUI共通構成（`main_window.py`）
 - モーション保存ディレクトリ入力（Browse可能）
-- 「Use Real Robot」チェックボックス（Gazeboと切替）
+- 「Use Real Robot」チェックボックス（ROSトピック有効化）
 - 「Torque ON」チェックボックス
 - 「初期姿勢に移動」ボタン（現在姿勢→初期姿勢に3秒で遷移）
 
@@ -103,7 +103,6 @@ joints:
 
 - スライダーとの関係：
   - 数式あり：スライダーは薄色
-  - 編集時、自動で `+定数` を付与することあり
 
 ---
 
@@ -113,7 +112,7 @@ joints:
 ```
 <motion_dir>/<animation_name>/
 ├── animation.yaml            # 全体レイアウト・接続情報
-├── initial_frame.yaml               # 初期姿勢との差分
+├── initial_frame.yaml        # 開始フレーム（このアニメーションでのデフォルト姿勢）
 ├── frames/
 │   ├── pose0.yaml            # フレーム個別定義
 │   └── pose2.yaml
