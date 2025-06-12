@@ -141,8 +141,10 @@ class TrajectoryCommander:
 
     def _align_positions(self, source: JointState, reference: Union[JointState, list]) -> list:
         ref_names = reference.name if isinstance(reference, JointState) else reference
+        ref_positions = reference.position if isinstance(reference, JointState) else [0.0] * len(ref_names)
         pos_dict = dict(zip(source.name, source.position))
-        return [pos_dict.get(name, 0.0) for name in ref_names]
+        ref_dict = dict(zip(ref_names, ref_positions))
+        return [pos_dict.get(name, ref_dict.get(name, 0.0)) for name in ref_names]
 
     def _interpolate(self, trajectory: JointTrajectory, rate: float) -> JointTrajectory:
         if len(trajectory.points) < 2:
