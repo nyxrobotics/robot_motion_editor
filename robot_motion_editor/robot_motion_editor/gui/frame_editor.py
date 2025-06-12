@@ -191,8 +191,8 @@ class FrameEditorDialog(QDialog):
             vel_spin.setDecimals(2)
             vel_spin.setSingleStep(0.1)
             vel_spin.setRange(0.0, 5.0)
-            vel_spin.setValue(self.frame_data.get_velocity_scale(joint_name))
-            vel_spin.valueChanged.connect(lambda val, j=joint_name: self.frame_data.set_velocity_scale(j, val))
+            vel_spin.setValue(self.frame_data.get_speed_scale(joint_name))
+            vel_spin.valueChanged.connect(lambda val, j=joint_name: self.frame_data.set_speed_scale(j, val))
 
             pid_btn = QPushButton("PID")
             pid_btn.setFixedWidth(50)
@@ -284,7 +284,7 @@ class FrameEditorDialog(QDialog):
         for joint_name in self.joint_data_manager.get_joint_names():
             _, spin, vel_spin = self.joint_widgets[joint_name]
             self.frame_data.set_pose(joint_name, math.radians(spin.value()))
-            self.frame_data.set_velocity_scale(joint_name, vel_spin.value())
+            self.frame_data.set_speed_scale(joint_name, vel_spin.value())
             self.frame_data.set_enable(joint_name, self.enable_checkbox_widgets[joint_name].isChecked())
 
         current_frame = self.frame_data
@@ -359,7 +359,7 @@ class FrameEditorDialog(QDialog):
             spin.blockSignals(False)
             slider.blockSignals(False)
 
-            vel_spin.setValue(self.frame_data.get_velocity_scale(joint_name))
+            vel_spin.setValue(self.frame_data.get_speed_scale(joint_name))
             self.enable_checkbox_widgets[joint_name].setChecked(self.frame_data.get_enable(joint_name))
 
     def accept(self):
@@ -369,7 +369,7 @@ class FrameEditorDialog(QDialog):
         for joint_name in self.joint_data_manager.get_joint_names():
             _, spin, vel_spin = self.joint_widgets[joint_name]
             self.frame_data.set_pose(joint_name, math.radians(spin.value()))
-            self.frame_data.set_velocity_scale(joint_name, vel_spin.value())
+            self.frame_data.set_speed_scale(joint_name, vel_spin.value())
             self.frame_data.set_enable(joint_name, self.enable_checkbox_widgets[joint_name].isChecked())
 
         self.frame_data.save_to_file(self.filepath)

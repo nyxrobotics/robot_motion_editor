@@ -88,7 +88,7 @@ joints:
   - トルクON/OFF
   - PIDゲイン設定
   - フィードバック式（Python式）
-  - 速度倍率（velocity_scale）
+  - 速度倍率（speed_scale）
 
 ---
 
@@ -173,7 +173,7 @@ time:
   duration: 2.0
   wait: 1.0
 
-velocity_scale:
+speed_scale:
   head_joint_1: 1.0
   head_joint_2: 1.0
 

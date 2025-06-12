@@ -11,7 +11,7 @@ from sensor_msgs.msg import JointState
 @dataclass
 class JointData:
     position: float = 0.0  # in radians
-    velocity_scale: float = 1.0
+    speed_scale: float = 1.0
     enable: bool = True
     pid: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
     feedback: str = ""
@@ -29,7 +29,7 @@ class FrameData:
         self.wait_duration = data.get("time", {}).get("wait_duration", 0.0)
 
         joints_raw = data.get("joints", {})
-        velocity_raw = data.get("velocity_scale", {})
+        velocity_raw = data.get("speed_scale", {})
 
         if not self.joint_names:
             self.joint_names = list(joints_raw.keys())
@@ -39,7 +39,7 @@ class FrameData:
             vscale = velocity_raw.get(name, 1.0)
             self.joints[name] = JointData(
                 position=j.get("position", 0.0),
-                velocity_scale=vscale,
+                speed_scale=vscale,
                 enable=j.get("enable", True),
                 pid=j.get("pid", [0.0, 0.0, 0.0]),
                 feedback=j.get("feedback", "")
@@ -49,7 +49,7 @@ class FrameData:
 
     def get_dict(self) -> dict:
         joints_dict = {}
-        velocity_scale_dict = {}
+        speed_scale_dict = {}
 
         for name, data in self.joints.items():
             joints_dict[name] = {
@@ -58,7 +58,7 @@ class FrameData:
                 "enable": data.enable,
                 "feedback": data.feedback
             }
-            velocity_scale_dict[name] = data.velocity_scale
+            speed_scale_dict[name] = data.speed_scale
 
         return {
             "joints": joints_dict,
@@ -66,7 +66,7 @@ class FrameData:
                 "move_duration": self.move_duration,
                 "wait_duration": self.wait_duration
             },
-            "velocity_scale": velocity_scale_dict
+            "speed_scale": speed_scale_dict
         }
 
     def set_joint_names(self, joint_names: List[str]):
@@ -105,11 +105,11 @@ class FrameData:
     def get_feedback(self, joint_name: str) -> str:
         return self.joints.get(joint_name, JointData()).feedback
 
-    def set_velocity_scale(self, joint_name: str, scale: float):
-        self.joints.setdefault(joint_name, JointData()).velocity_scale = scale
+    def set_speed_scale(self, joint_name: str, scale: float):
+        self.joints.setdefault(joint_name, JointData()).speed_scale = scale
 
-    def get_velocity_scale(self, joint_name: str) -> float:
-        return self.joints.get(joint_name, JointData()).velocity_scale
+    def get_speed_scale(self, joint_name: str) -> float:
+        return self.joints.get(joint_name, JointData()).speed_scale
 
     def set_joint_state(self, joint_state_msg: JointState):
         if not self.joint_names:
