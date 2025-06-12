@@ -88,7 +88,13 @@ class TrajectoryVisualizer:
             self.visualize_goal_state(joint_state)
 
     def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
-        if not self._enabled or not start.name or not start.position or not end.name or not end.position:
+        if not self._enabled:
+            return
+        if not start or not start.name or not start.position:
+            rospy.logwarn("[TrajectoryVisualizer] Start joint state is invalid.")
+            return
+        if not end or not end.name or not end.position:
+            rospy.logwarn("[TrajectoryVisualizer] End joint state is invalid.")
             return
 
         aligned_start = JointState(name=end.name, position=self._align_positions(start, end))

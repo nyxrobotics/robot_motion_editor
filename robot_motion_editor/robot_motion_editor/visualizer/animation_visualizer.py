@@ -130,7 +130,18 @@ class AnimationVisualizer:
         self.current_block = start_block or self.animation_flow_scene.get_start_block()
         start_target, move_duration, wait_duration = self.extract_joint_state_and_duration(self.current_block)
 
-        if self._current_target_state and start_target and \
+        if self._current_target_state is None:
+            if self.initial_joint_state is not None:
+                rospy.loginfo("[AnimationVisualizer] No current state, using initial pose.")
+                self._current_target_state = self.initial_joint_state
+            else:
+                rospy.logwarn("[AnimationVisualizer] No current state or initial pose. Skipping transition.")
+                self._current_target_state = start_target  # fallback to target
+                # ⚠ ここで return すると送信自体スキップ可能
+                return
+
+        # 必ず両者ともに有効でなければ送らない
+        if self._current_target_state.name and start_target and start_target.name and \
                 not joint_states_equal(self._current_target_state, start_target):
             self.visualizer.send_movement(
                 self._current_target_state, start_target, duration=1.0)
