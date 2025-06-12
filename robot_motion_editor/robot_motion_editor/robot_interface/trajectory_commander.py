@@ -19,9 +19,9 @@ class TrajectoryCommander:
         self._torque_on = False
         self._current_joint_state = None
 
-        self._playback_thread = None
         self._playback_lock = threading.Lock()
         self._cancel_event = threading.Event()
+        self._playback_thread = None
 
         self.position_publishers = {}
         self.trajectory_publisher = None
@@ -63,8 +63,9 @@ class TrajectoryCommander:
             return
         if not joint_state.name or not joint_state.position:
             return
+
         if not self._current_joint_state:
-            self._current_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+            # No current state yet, do not interpolate — treat target as current directly
             traj = JointTrajectory(joint_names=joint_state.name)
             point = JointTrajectoryPoint(
                 time_from_start=rospy.Duration(0),
@@ -73,27 +74,12 @@ class TrajectoryCommander:
             )
             traj.points = [point]
             self.send_trajectory(traj)
-            return
 
-        aligned_start = JointState(
-            name=joint_state.name,
-            position=self._align_positions(self._current_joint_state, joint_state)
-        )
-        traj = JointTrajectory(joint_names=joint_state.name)
-        point0 = JointTrajectoryPoint(
-            time_from_start=rospy.Duration(0.0),
-            positions=aligned_start.position,
-            velocities=[
-                (b - a) / duration if duration > 0 else 0.0 for a, b in zip(
-                    aligned_start.position, joint_state.position)])
-        point1 = JointTrajectoryPoint(
-            time_from_start=rospy.Duration(duration),
-            positions=joint_state.position,
-            velocities=[0.0] * len(joint_state.position)
-        )
-        traj.points = [point0, point1]
-        self.send_trajectory(traj)
-        self._current_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+            # Set current joint state immediately
+            self._current_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+
+        else:
+            self.send_movement(self._current_joint_state, joint_state, duration)
 
     def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
         if not self._enabled or not self._torque_on:
@@ -102,9 +88,8 @@ class TrajectoryCommander:
             return
 
         aligned_start = JointState(name=end.name, position=self._align_positions(start, end))
-        self._current_joint_state = aligned_start
-
         traj = JointTrajectory(joint_names=end.name)
+
         point0 = JointTrajectoryPoint(
             time_from_start=rospy.Duration(0.0),
             positions=aligned_start.position,
@@ -118,6 +103,7 @@ class TrajectoryCommander:
             positions=end.position,
             velocities=[0.0] * len(end.position)
         )
+
         traj.points = [point0, point1]
         self.send_trajectory(traj)
 
@@ -128,10 +114,16 @@ class TrajectoryCommander:
             return
 
         interpolated_traj = self._interpolate(trajectory, self.playback_rate)
+
+        # Update current joint state to the final position of the trajectory
+        if interpolated_traj.points:
+            self._current_joint_state = JointState(
+                name=interpolated_traj.joint_names[:],
+                position=interpolated_traj.points[-1].positions[:]
+            )
+
         if self.mode == 'trajectory':
             self.trajectory_publisher.publish(interpolated_traj)
-            self._current_joint_state = JointState(
-                name=trajectory.joint_names[:], position=trajectory.points[-1].positions[:])
         else:
             self._start_position_playback(interpolated_traj)
 
@@ -186,11 +178,11 @@ class TrajectoryCommander:
 
             self._cancel_event.clear()
             self._playback_thread = threading.Thread(
-                target=self._playback_thread, args=(trajectory,)
+                target=self._playback_thread_fn, args=(trajectory,)
             )
             self._playback_thread.start()
 
-    def _playback_thread(self, trajectory: JointTrajectory):
+    def _playback_thread_fn(self, trajectory: JointTrajectory):
         if len(trajectory.points) < 2 or rospy.is_shutdown():
             return
 

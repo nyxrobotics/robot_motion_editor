@@ -70,17 +70,19 @@ class TrajectoryVisualizer:
             return
 
         if not self._current_joint_state:
-            # First time: treat goal as both current and goal state
-            self._current_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
-            self.visualize_goal_state(joint_state)
+            # No current state yet, do not interpolate — treat target as current directly
             traj = JointTrajectory(joint_names=joint_state.name)
             point = JointTrajectoryPoint(
-                time_from_start=rospy.Duration(duration),
+                time_from_start=rospy.Duration(0),
                 positions=joint_state.position,
                 velocities=[0.0] * len(joint_state.position)
             )
             traj.points = [point]
             self.send_trajectory(traj)
+
+            # Set current joint state immediately
+            self._current_joint_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+
         else:
             self.send_movement(self._current_joint_state, joint_state, duration)
             self.visualize_goal_state(joint_state)
