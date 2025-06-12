@@ -15,21 +15,25 @@ class TrajectoryVisualizer:
     def __init__(self, use_state_mode: bool, playback_rate: float = 30.0):
         self.use_state_mode = use_state_mode
         self.playback_rate = playback_rate
-        self._lock = threading.Lock()
-        self._trajectory = None
+
         self._enabled = True
         self._current_joint_state = None
 
+        self._playback_lock = threading.Lock()
+        self._cancel_event = threading.Event()
+
         if self.use_state_mode:
-            self.state_pub = rospy.Publisher("/display_planned_state", DisplayRobotState, queue_size=1)
-            self._cancel_event = threading.Event()
             self._loop_enabled = True
-            self._thread = threading.Thread(target=self._playback_thread, daemon=True)
-            self._thread.start()
+            self.state_pub = rospy.Publisher("/display_planned_state", DisplayRobotState, queue_size=1)
+            self._playback_thread = threading.Thread(target=self._state_mode_thread, daemon=True)
+            self._playback_thread.start()
+            rospy.loginfo("[TrajectoryVisualizer] Initialized in STATE mode.")
         else:
             self.path_pub = rospy.Publisher("/move_group/display_planned_path", DisplayTrajectory, queue_size=1)
+            rospy.loginfo("[TrajectoryVisualizer] Initialized in PATH mode.")
 
         self.goal_state_pub = rospy.Publisher("/display_robot_state", DisplayRobotState, queue_size=1)
+        self._trajectory = None
 
     def enable(self):
         self._enabled = True
@@ -48,27 +52,22 @@ class TrajectoryVisualizer:
         else:
             rospy.logwarn("Looping is only supported in state mode.")
 
+    def set_current_joint_state(self, joint_state: JointState):
+        if joint_state.name and joint_state.position:
+            self._current_joint_state = joint_state
+
+    def get_current_joint_state(self) -> JointState:
+        return self._current_joint_state
+
     def visualize_goal_state(self, joint_state: JointState):
-        if not self._enabled:
-            return
-        if not joint_state.name or not joint_state.position:
+        if not self._enabled or not joint_state.name or not joint_state.position:
             return
         state_msg = RobotState(joint_state=joint_state)
         self.goal_state_pub.publish(DisplayRobotState(state=state_msg))
         self._current_joint_state = joint_state
 
-    def set_current_joint_state(self, joint_state: JointState):
-        if not joint_state.name or not joint_state.position:
-            return
-        self._current_joint_state = joint_state
-
-    def get_current_joint_state(self) -> JointState:
-        return self._current_joint_state
-
     def send_joint_state(self, joint_state: JointState, duration: float = 1.0):
-        if not self._enabled:
-            return
-        if not joint_state.name or not joint_state.position:
+        if not self._enabled or not joint_state.name or not joint_state.position:
             return
         if not self._current_joint_state:
             self._current_joint_state = joint_state
@@ -83,34 +82,14 @@ class TrajectoryVisualizer:
             self.send_trajectory(traj)
             return
 
-        aligned_start = JointState(
-            name=joint_state.name,
-            position=self._align_positions(self._current_joint_state, joint_state))
-        traj = JointTrajectory(joint_names=joint_state.name)
-        point0 = JointTrajectoryPoint(
-            time_from_start=rospy.Duration(0.0),
-            positions=aligned_start.position,
-            velocities=[
-                (b - a) / duration if duration > 0 else 0.0 for a, b in zip(
-                    aligned_start.position, joint_state.position)])
-        point1 = JointTrajectoryPoint(
-            time_from_start=rospy.Duration(duration),
-            positions=joint_state.position,
-            velocities=[0.0] * len(joint_state.position)
-        )
-        traj.points = [point0, point1]
-        self.send_trajectory(traj)
+        self.send_movement(self._current_joint_state, joint_state, duration)
         self.visualize_goal_state(joint_state)
 
     def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
-        if not self._enabled:
-            return
-        if not start.name or not start.position or not end.name or not end.position:
+        if not self._enabled or not start.name or not start.position or not end.name or not end.position:
             return
 
         aligned_start = JointState(name=end.name, position=self._align_positions(start, end))
-        self._current_joint_state = aligned_start
-
         traj = JointTrajectory(joint_names=end.name)
         point0 = JointTrajectoryPoint(
             time_from_start=rospy.Duration(0.0),
@@ -126,15 +105,14 @@ class TrajectoryVisualizer:
             velocities=[0.0] * len(end.position)
         )
         traj.points = [point0, point1]
+        self._current_joint_state = end
         self.send_trajectory(traj)
 
     def send_trajectory(self, trajectory: JointTrajectory):
         if not self._enabled:
             return
-
         interpolated_traj = self._interpolate(trajectory, self.playback_rate)
-
-        with self._lock:
+        with self._playback_lock:
             self._trajectory = interpolated_traj
 
         if self.use_state_mode:
@@ -179,13 +157,13 @@ class TrajectoryVisualizer:
         result.points.append(trajectory.points[-1])
         return result
 
-    def _playback_thread(self):
+    def _state_mode_thread(self):
         while not rospy.is_shutdown():
             self._cancel_event.wait()
             self._cancel_event.clear()
 
             while not rospy.is_shutdown():
-                with self._lock:
+                with self._playback_lock:
                     traj = self._trajectory
 
                 if not self._enabled:
