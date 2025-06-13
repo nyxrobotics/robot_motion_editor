@@ -278,7 +278,7 @@ class FrameEditorDialog(QDialog):
         if not self.loop_checkbox.isChecked():
             sender.setChecked(False)
 
-        # Update current frame from GUI values
+        # (1) Update current frame from GUI values
         self.frame_data.move_duration = self.move_spin.value()
         self.frame_data.wait_duration = self.wait_spin.value()
         for joint_name in self.joint_data_manager.get_joint_names():
@@ -291,24 +291,30 @@ class FrameEditorDialog(QDialog):
         prev_frame = self._get_prev_frame_data()
         next_frame = self._get_next_frame_data()
 
-        # Set frame data into visualizer
-        self.frame_visualizer.set_previous_frame(
-            prev_frame.get_joint_state(), prev_frame.move_duration, prev_frame.wait_duration)
-        self.frame_visualizer.set_current_frame(
-            current_frame.get_joint_state(), current_frame.move_duration, current_frame.wait_duration)
-        self.frame_visualizer.set_next_frame(
-            next_frame.get_joint_state(), next_frame.move_duration, next_frame.wait_duration)
+        # (2) Set frame data into visualizer
+        self.frame_visualizer.set_previous_frame(prev_frame)
+        self.frame_visualizer.set_current_frame(current_frame)
+        self.frame_visualizer.set_next_frame(next_frame)
 
-        # Publish current frame goal state
+        # (3) Publish current frame goal state
         self.trajectory_visualizer.visualize_goal_state(current_frame.get_joint_state())
 
-        # Execute playback
+        # (4) Playback
         if sender == self.play_previous_current_btn:
             self.frame_visualizer.play_previous_trajectory()
+            if self.trajectory_commander:
+                self.trajectory_commander.send_frame2frame(prev_frame, current_frame)
+
         elif sender == self.play_full_btn:
             self.frame_visualizer.play_full_trajectory()
+            if self.trajectory_commander:
+                self.trajectory_commander.send_frame2frame(prev_frame, current_frame)
+                self.trajectory_commander.send_frame2frame(current_frame, next_frame)
+
         elif sender == self.play_current_next_btn:
             self.frame_visualizer.play_next_trajectory()
+            if self.trajectory_commander:
+                self.trajectory_commander.send_frame2frame(current_frame, next_frame)
 
     def on_loop_checkbox_changed(self, state):
         loop_enabled = state == Qt.Checked
