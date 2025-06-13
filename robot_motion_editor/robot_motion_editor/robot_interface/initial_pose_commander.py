@@ -23,7 +23,7 @@ class InitialPoseCommander:
             self.goal_pose = joint_state
             if self.start_pose is None:
                 self.start_pose = joint_state
-            self.send_movement(self.start_pose, self.goal_pose)
+            self.send_state2state(self.start_pose, self.goal_pose)
 
     def get_goal_pose(self):
         return self.goal_pose
@@ -31,5 +31,5 @@ class InitialPoseCommander:
     def send_joint_state(self, joint_state: JointState):
         self.trajectory_commander.send_joint_state(joint_state, duration=self.duration)
 
-    def send_movement(self, start: JointState, end: JointState):
-        self.trajectory_commander.send_movement(start, end, duration=self.duration)
+    def send_state2state(self, start: JointState, end: JointState):
+        self.trajectory_commander.send_state2state(start, end, duration=self.duration)

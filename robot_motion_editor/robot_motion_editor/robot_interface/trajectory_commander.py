@@ -7,6 +7,8 @@ from std_msgs.msg import Float64
 from trajectory_msgs.msg import JointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
 
+from ..logic.frame_file_manager import FrameData
+
 
 class TrajectoryCommander:
     def __init__(self, robot_name: str, joint_names: list, mode: str = 'position', playback_rate: float = 30.0):
@@ -79,9 +81,9 @@ class TrajectoryCommander:
             self._current_target_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
 
         else:
-            self.send_movement(self._current_target_state, joint_state, duration)
+            self.send_state2state(self._current_target_state, joint_state, duration)
 
-    def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
+    def send_state2state(self, start: JointState, end: JointState, duration: float = 1.0):
         if not self._enabled or not self._torque_on:
             return
         if not start or not start.name or not start.position:

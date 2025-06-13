@@ -84,10 +84,10 @@ class TrajectoryVisualizer:
             self._current_target_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
 
         else:
-            self.send_movement(self._current_target_state, joint_state, duration)
+            self.send_state2state(self._current_target_state, joint_state, duration)
             self.visualize_goal_state(joint_state)
 
-    def send_movement(self, start: JointState, end: JointState, duration: float = 1.0):
+    def send_state2state(self, start: JointState, end: JointState, duration: float = 1.0):
         if not self._enabled:
             return
         if not start or not start.name or not start.position:

@@ -32,7 +32,7 @@ class InitialPoseVisualizer:
                 self.goal_pose = joint_state_msg
                 if self.start_pose is None:
                     self.start_pose = joint_state_msg
-                self.send_movement(self.start_pose, self.goal_pose)
+                self.send_state2state(self.start_pose, self.goal_pose)
 
     def get_goal_pose(self):
         with self.lock:
@@ -41,5 +41,5 @@ class InitialPoseVisualizer:
     def visualize_goal_state(self, joint_state):
         self.trajectory_visualizer.visualize_goal_state(joint_state)
 
-    def send_movement(self, start, end):
-        self.trajectory_visualizer.send_movement(start, end, self.duration)
+    def send_state2state(self, start, end):
+        self.trajectory_visualizer.send_state2state(start, end, self.duration)
