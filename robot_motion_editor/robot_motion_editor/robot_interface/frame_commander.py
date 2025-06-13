@@ -63,29 +63,30 @@ class FrameCommander:
             start_state, _, _ = start_data
             end_state, move_duration, wait_duration = end_data
 
-            aligned_start = self._align_positions(start_state, reference_names)
-            aligned_end = self._align_positions(end_state, reference_names)
+            aligned_start = self.trajectory_visualizer._align_positions(start_state, reference_names)
+            aligned_end = self.trajectory_visualizer._align_positions(end_state, reference_names)
 
+            # point_start
             point_start = JointTrajectoryPoint()
             point_start.time_from_start = rospy.Duration(current_time)
             point_start.positions = aligned_start
-            point_start.velocities = [
-                (b - a) / move_duration if move_duration > 0 else 0.0
-                for a, b in zip(aligned_start, aligned_end)
-            ]
+            point_start.velocities = []
 
+            for j, (a, b) in enumerate(zip(aligned_start, aligned_end)):
+                joint_name = reference_names[j]
+                scale = getattr(end_state, 'speed_scale', {}).get(joint_name, 1.0)
+                scale = 1000.0 if scale <= 0.0 else scale
+                v = ((b - a) / move_duration) * scale if move_duration > 0.0 else 0.0
+                point_start.velocities.append(v)
+
+            # point_end
             point_end = JointTrajectoryPoint()
-            point_end.time_from_start = rospy.Duration(current_time + move_duration)
+            point_end.time_from_start = rospy.Duration(current_time + move_duration + wait_duration)
             point_end.positions = aligned_end
-            point_end.velocities = [0.0] * len(reference_names)
+            point_end.velocities = [0.0] * len(aligned_end)
 
             traj.points.append(point_start)
             traj.points.append(point_end)
-
-            current_time += move_duration + wait_duration
+            current_time = point_end.time_from_start.to_sec()
 
         return traj
-
-    def _align_positions(self, joint_state: JointState, reference_names):
-        source_dict = dict(zip(joint_state.name, joint_state.position))
-        return [source_dict.get(name, 0.0) for name in reference_names]
