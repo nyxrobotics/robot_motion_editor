@@ -5,6 +5,7 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
 
+from ..logic.frame_file_manager import FrameData
 from .trajectory_visualizer import TrajectoryVisualizer
 
 
@@ -17,34 +18,34 @@ class FrameVisualizer:
         self.current_frame = None
         self.next_frame = None
 
-    def set_frame(self, name, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
+    def set_frame(self, name: str, frame_data: FrameData):
         with self._lock:
-            setattr(self, name, (joint_state, move_duration, wait_duration))
+            setattr(self, name, frame_data)
 
-    def reset_frame(self, name):
+    def reset_frame(self, name: str):
         with self._lock:
             setattr(self, name, None)
 
-    def set_initial_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
-        self.set_frame("initial_frame", joint_state, move_duration, wait_duration)
+    def set_initial_frame(self, frame_data: FrameData):
+        self.set_frame("initial_frame", frame_data)
 
-    def set_previous_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
-        self.set_frame("previous_frame", joint_state, move_duration, wait_duration)
+    def set_previous_frame(self, frame_data: FrameData):
+        self.set_frame("previous_frame", frame_data)
 
-    def set_current_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
-        self.set_frame("current_frame", joint_state, move_duration, wait_duration)
+    def set_current_frame(self, frame_data: FrameData):
+        self.set_frame("current_frame", frame_data)
 
-    def set_next_frame(self, joint_state: JointState, move_duration: float = 1.0, wait_duration: float = 0.0):
-        self.set_frame("next_frame", joint_state, move_duration, wait_duration)
+    def set_next_frame(self, frame_data: FrameData):
+        self.set_frame("next_frame", frame_data)
 
     def play_previous_trajectory(self):
-        self.visualize_frame_sequence(["previous_frame", "current_frame"])
+        self.send_frame_sequence(["previous_frame", "current_frame"])
 
     def play_full_trajectory(self):
-        self.visualize_frame_sequence(["previous_frame", "current_frame", "next_frame"])
+        self.send_frame_sequence(["previous_frame", "current_frame", "next_frame"])
 
     def play_next_trajectory(self):
-        self.visualize_frame_sequence(["current_frame", "next_frame"])
+        self.send_frame_sequence(["current_frame", "next_frame"])
 
     def reset_initial_frame(self):
         self.reset_frame("initial_frame")
@@ -58,61 +59,83 @@ class FrameVisualizer:
     def reset_next_frame(self):
         self.reset_frame("next_frame")
 
-    def visualize_frame_sequence(self, sequence_names):
-        frame_list = [getattr(self, name, None) for name in sequence_names]
-        traj = self._build_trajectory(frame_list)
-        self.trajectory_visualizer.send_trajectory(traj)
+    def send_frame_sequence(self, sequence_names):
+        frames = []
+        for name in sequence_names:
+            frame = getattr(self, name, None)
+            if isinstance(frame, FrameData):
+                frames.append(frame)
+            elif frame is not None:
+                rospy.logwarn(f"[FrameVisualizer] Frame '{name}' is not a FrameData instance.")
+        traj = self._build_trajectory(frames)
+        if traj and traj.points:
+            self.trajectory_visualizer.send_trajectory(traj)
 
-    def _build_trajectory(self, frame_data_list):
+    def _build_trajectory(self, frame_data_list: list) -> JointTrajectory:
         traj = JointTrajectory()
         current_time = 0.0
 
+        # Determine joint_names from the first valid frame
         reference_names = None
-        for data in frame_data_list:
-            if data is not None:
-                reference_names = data[0].name
+        for frame in frame_data_list:
+            if isinstance(frame, FrameData):
+                reference_names = frame.get_joint_names()
                 break
 
-        if reference_names is None and self.initial_frame is not None:
-            reference_names = self.initial_frame[0].name
+        if reference_names is None and isinstance(self.initial_frame, FrameData):
+            reference_names = self.initial_frame.get_joint_names()
         if reference_names is None:
-            return traj
+            return traj  # No valid frame data found
 
         traj.joint_names = reference_names
 
         for i in range(len(frame_data_list) - 1):
-            start_data = frame_data_list[i] or self.initial_frame
-            end_data = frame_data_list[i + 1] or self.initial_frame
-            if start_data is None or end_data is None:
+            start_frame = frame_data_list[i] or self.initial_frame
+            end_frame = frame_data_list[i + 1] or self.initial_frame
+
+            if not isinstance(start_frame, FrameData) or not isinstance(end_frame, FrameData):
                 continue
 
-            start_state, _, _ = start_data
-            end_state, move_duration, wait_duration = end_data
+            # Ensure joint_names are consistent
+            if start_frame.get_joint_names() != reference_names:
+                start_frame.set_joint_names(reference_names)
+            if end_frame.get_joint_names() != reference_names:
+                end_frame.set_joint_names(reference_names)
 
-            aligned_start = self.trajectory_visualizer._align_positions(start_state, reference_names)
-            aligned_end = self.trajectory_visualizer._align_positions(end_state, reference_names)
+            start_state = start_frame.get_joint_state()
+            end_state = end_frame.get_joint_state()
+            move_duration = end_frame.move_duration
+            wait_duration = end_frame.wait_duration
 
-            # point_start
+            start_positions = start_state.position
+            end_positions = end_state.position
+
+            # Retrieve speed_scale for each joint
+            speed_scale_dict = {
+                name: end_frame.get_speed_scale(name) for name in reference_names
+            }
+
             point_start = JointTrajectoryPoint()
             point_start.time_from_start = rospy.Duration(current_time)
-            point_start.positions = aligned_start
+            point_start.positions = start_positions
             point_start.velocities = []
 
-            for j, (a, b) in enumerate(zip(aligned_start, aligned_end)):
-                joint_name = reference_names[j]
-                scale = getattr(end_state, 'speed_scale', {}).get(joint_name, 1.0)
-                scale = 1000.0 if scale <= 0.0 else scale
-                v = ((b - a) / move_duration) * scale if move_duration > 0.0 else 0.0
-                point_start.velocities.append(v)
+            for j, (a, b) in enumerate(zip(start_positions, end_positions)):
+                name = reference_names[j]
+                scale = speed_scale_dict.get(name, 1.0)
+                if scale <= 0.0:
+                    scale = 1000.0
+                velocity = ((b - a) / move_duration) * scale if move_duration > 0.0 else 0.0
+                point_start.velocities.append(velocity)
 
-            # point_end
             point_end = JointTrajectoryPoint()
             point_end.time_from_start = rospy.Duration(current_time + move_duration + wait_duration)
-            point_end.positions = aligned_end
-            point_end.velocities = [0.0] * len(aligned_end)
+            point_end.positions = end_positions
+            point_end.velocities = [0.0] * len(end_positions)
 
             traj.points.append(point_start)
             traj.points.append(point_end)
+
             current_time = point_end.time_from_start.to_sec()
 
         return traj

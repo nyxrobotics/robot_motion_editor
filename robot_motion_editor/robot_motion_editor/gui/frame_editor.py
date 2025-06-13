@@ -190,7 +190,7 @@ class FrameEditorDialog(QDialog):
             vel_spin = QDoubleSpinBox()
             vel_spin.setDecimals(2)
             vel_spin.setSingleStep(0.1)
-            vel_spin.setRange(0.0, 5.0)
+            vel_spin.setRange(-1.0, 1000.0)
             vel_spin.setValue(self.frame_data.get_speed_scale(joint_name))
             vel_spin.valueChanged.connect(lambda val, j=joint_name: self.frame_data.set_speed_scale(j, val))
 
