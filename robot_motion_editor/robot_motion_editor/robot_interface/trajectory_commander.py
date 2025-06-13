@@ -113,6 +113,51 @@ class TrajectoryCommander:
         traj.points = [point0, point1]
         self.send_trajectory(traj)
 
+    def send_frame2frame(self, start: FrameData, end: FrameData):
+        """
+        Build and send a JointTrajectory from start to end FrameData
+        using joint-level speed_scale, for actual robot control.
+        """
+        if not isinstance(start, FrameData) or not isinstance(end, FrameData):
+            rospy.logwarn("[TrajectoryCommander] Invalid FrameData input.")
+            return
+
+        joint_names = end.get_joint_names()
+        if start.get_joint_names() != joint_names:
+            start.set_joint_names(joint_names)
+
+        start_state = start.get_joint_state()
+        end_state = end.get_joint_state()
+        move_duration = end.move_duration
+        wait_duration = end.wait_duration
+
+        speed_scale = {name: end.get_speed_scale(name) for name in joint_names}
+
+        traj = JointTrajectory()
+        traj.joint_names = joint_names
+
+        pt0 = JointTrajectoryPoint()
+        pt0.time_from_start = rospy.Duration(0.0)
+        pt0.positions = start_state.position
+        pt0.velocities = []
+
+        for i, (a, b) in enumerate(zip(start_state.position, end_state.position)):
+            name = joint_names[i]
+            scale = speed_scale.get(name, 1.0)
+            if scale <= 0.0:
+                scale = 1000.0
+            velocity = ((b - a) / move_duration) * scale if move_duration > 0 else 0.0
+            pt0.velocities.append(velocity)
+
+        pt1 = JointTrajectoryPoint()
+        pt1.time_from_start = rospy.Duration(move_duration + wait_duration)
+        pt1.positions = end_state.position
+        pt1.velocities = [0.0] * len(end_state.position)
+
+        traj.points = [pt0, pt1]
+
+        self.send_trajectory(traj)
+
     def send_trajectory(self, trajectory: JointTrajectory):
         if not self._enabled or not self._torque_on:
             return
