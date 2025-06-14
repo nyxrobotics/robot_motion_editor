@@ -56,10 +56,10 @@ class FrameCommander:
             if isinstance(frame, FrameData):
                 frames.append(frame)
             elif frame is not None:
-                rospy.logwarn(f"[FrameVisualizer] Frame '{name}' is not a FrameData instance.")
+                rospy.logwarn(f"[FrameCommander] Frame '{name}' is not a FrameData instance.")
         traj = self._build_trajectory(frames)
         if traj and traj.points:
-            self.trajectory_visualizer.send_trajectory(traj)
+            self.trajectory_commander.send_trajectory(traj)
 
     def _build_trajectory(self, frame_data_list: list) -> JointTrajectory:
         traj = JointTrajectory()
