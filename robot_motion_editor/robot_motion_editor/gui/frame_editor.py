@@ -335,10 +335,8 @@ class FrameEditorDialog(QDialog):
         if self.trajectory_visualizer:
             self.trajectory_visualizer.visualize_goal_state(msg)
             if self.loaded_frame_data:
-                self.frame_visualizer.set_previous_frame(
-                    self.loaded_frame_data.get_joint_state(), 0.0, 0.0)
-                self.frame_visualizer.set_current_frame(
-                    self.frame_data.get_joint_state(), 1.0, 0.0)
+                self.frame_visualizer.set_previous_frame(self.loaded_frame_data)
+                self.frame_visualizer.set_current_frame(self.frame_data)
                 self.frame_visualizer.reset_next_frame()
                 self.frame_visualizer.play_previous_trajectory()
 

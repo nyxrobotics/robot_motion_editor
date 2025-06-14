@@ -273,12 +273,9 @@ class InitialFrameEditorDialog(QDialog):
         next_frame = self._get_next_frame_data()
 
         # Set frame data into visualizer
-        self.frame_visualizer.set_previous_frame(
-            prev_frame.get_joint_state(), prev_frame.move_duration, prev_frame.wait_duration)
-        self.frame_visualizer.set_current_frame(
-            current_frame.get_joint_state(), current_frame.move_duration, current_frame.wait_duration)
-        self.frame_visualizer.set_next_frame(
-            next_frame.get_joint_state(), next_frame.move_duration, next_frame.wait_duration)
+        self.frame_visualizer.set_previous_frame(prev_frame)
+        self.frame_visualizer.set_current_frame(current_frame)
+        self.frame_visualizer.set_next_frame(next_frame)
 
         # Publish current frame goal state
         self.trajectory_visualizer.visualize_goal_state(current_frame.get_joint_state())
