@@ -207,13 +207,13 @@ class AnimaitonWidget(QWidget):
         parent = item.parent().text(0) if item.parent() else ""
 
         if label == "initial_frame":
-            self.animation_tree.open_editor_by_type("initial_frame")
+            self.editor_launcher.open_editor_by_type("initial_frame")
         elif parent == "frames":
-            self.animation_tree.open_editor_by_type("frame", label)
+            self.editor_launcher.open_editor_by_type("frame", label)
         elif parent == "if":
-            self.animation_tree.open_editor_by_type("if", label)
+            self.editor_launcher.open_editor_by_type("if", label)
         elif parent == "switch":
-            self.animation_tree.open_editor_by_type("switch", label)
+            self.editor_launcher.open_editor_by_type("switch", label)
 
     def load_animation_by_name(self, animation_name):
         if not self.confirm_save_if_unsaved_changes():
