@@ -60,6 +60,13 @@ class TrajectoryCommander:
     def is_torque_on(self) -> bool:
         return self._torque_on
 
+    def set_current_target_state(self, joint_state: JointState):
+        if joint_state.name and joint_state.position:
+            self._current_target_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
+
+    def get_current_target_state(self) -> JointState:
+        return self._current_target_state
+
     def send_joint_state(self, joint_state: JointState, duration: float = 1.0):
         if not self._enabled or not self._torque_on:
             return
@@ -112,7 +119,7 @@ class TrajectoryCommander:
 
         traj.points = [point0, point1]
         self.send_trajectory(traj)
-    
+
     def send_frame(self, frame_data: FrameData):
         """
         Build and send a JointTrajectory from FrameData.
@@ -126,7 +133,7 @@ class TrajectoryCommander:
         if not joint_names:
             rospy.logwarn("[TrajectoryCommander] FrameData has no joint names.")
             return
-        
+
         start_state = self._current_target_state
         goal_state = frame_data.get_joint_state()
 
@@ -145,7 +152,7 @@ class TrajectoryCommander:
                 scale = 1000.0
             velocity = ((b - a) / frame_data.move_duration) * scale if frame_data.move_duration > 0 else 0.0
             pt0.velocities.append(velocity)
-        
+
         pt1 = JointTrajectoryPoint()
         pt1.time_from_start = rospy.Duration(frame_data.move_duration + frame_data.wait_duration)
         pt1.positions = goal_state.position
@@ -214,14 +221,6 @@ class TrajectoryCommander:
             self.trajectory_publisher.publish(interpolated_traj)
         else:
             self._start_position_playback(interpolated_traj)
-
-    def set_current_target_state(self, joint_state: JointState):
-        if not joint_state.name or not joint_state.position:
-            return
-        self._current_target_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
-
-    def get_current_target_state(self) -> JointState:
-        return self._current_target_state
 
     def _align_positions(self, source: JointState, reference: Union[JointState, list]) -> list:
         ref_names = reference.name if isinstance(reference, JointState) else reference

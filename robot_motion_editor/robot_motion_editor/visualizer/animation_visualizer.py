@@ -112,13 +112,31 @@ class AnimationVisualizer:
                     return True
         return False
 
+    def check_same_joint_state(self, start_joint_state: JointState, goal_joint_state: JointState, threshold=1e-2):
+        if start_joint_state is None or goal_joint_state is None:
+            rospy.logwarn("[AnimationVisualizer] One of the joint states is None.")
+            return False
+        if start_joint_state.name != goal_joint_state.name:
+            rospy.logwarn("[AnimationVisualizer] Joint names do not match.")
+            return False
+        if len(start_joint_state.position) != len(goal_joint_state.position):
+            rospy.logwarn("[AnimationVisualizer] Joint state lengths do not match.")
+            return False
+        for start_pos, goal_pos in zip(start_joint_state.position, goal_joint_state.position):
+            if abs(start_pos - goal_pos) > threshold:
+                # Joint positions differ beyond threshold
+                return False
+        return True
+
     def _run(self, start_block=None):
         self.current_block = start_block or self.animation_flow_scene.get_start_block()
         start_target, move_duration, wait_duration = self.extract_joint_state_and_duration(self.current_block)
 
-        self.visualizer.send_joint_state(start_target, 1.0)
-        self.visualizer.visualize_goal_state(start_target)
-        time.sleep(1.0)
+        if not self.check_same_joint_state(self.visualizer.get_current_target_state(), start_target):
+            rospy.loginfo("[AnimationCommander] Move to start target before playing animation.")
+            self.visualizer.send_joint_state(start_target, 1.0)
+            self.visualizer.visualize_goal_state(start_target)
+            time.sleep(1.0)
 
         while self.current_block and not self._stop_event.is_set() and not rospy.is_shutdown():
             self._pause_event.wait()
@@ -204,6 +222,7 @@ class AnimationVisualizer:
                 frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
                 frame_data.load_from_file(frame_path)
                 target_joint_state = frame_data.get_joint_state()
+                move_duration = frame_data.move_duration
             except Exception as e:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load initial frame: {e}")
 

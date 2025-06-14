@@ -159,7 +159,7 @@ class TrajectoryVisualizer:
         pt1.velocities = [0.0] * len(goal_state.position)
 
         traj.points = [pt0, pt1]
-        self.send_trajectory(traj) 
+        self.send_trajectory(traj)
 
     def send_frame2frame(self, start: FrameData, end: FrameData):
         """
