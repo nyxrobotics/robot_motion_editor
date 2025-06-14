@@ -1,3 +1,4 @@
+import copy
 import math
 import os
 
@@ -64,6 +65,11 @@ class InitialFrameEditorDialog(QDialog):
         if os.path.exists(self.filepath):
             self.frame_data.load_from_file(self.filepath)
             self.set_frame_to_ui()
+            self.loaded_frame_data = copy.deepcopy(self.frame_data)
+        else:
+            rospy.logwarn(f"Initial frame file not found: {self.filepath}")
+            self.loaded_frame_data = FrameData()
+            self.loaded_frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
 
         self.setWindowTitle(f"InitialFrame: {os.path.basename(self.filepath)}")
 
@@ -92,7 +98,7 @@ class InitialFrameEditorDialog(QDialog):
 
         playback_row = QHBoxLayout()
         self.loop_checkbox = QCheckBox("Loop")
-        self.loop_checkbox.setChecked(False)
+        self.loop_checkbox.setChecked(True)
         self.loop_checkbox.stateChanged.connect(self.on_loop_checkbox_changed)
         playback_row.addWidget(self.loop_checkbox)
 
@@ -259,7 +265,7 @@ class InitialFrameEditorDialog(QDialog):
         if not self.loop_checkbox.isChecked():
             sender.setChecked(False)
 
-        # Update current frame from GUI values
+        # (1) Update current frame from GUI values
         self.frame_data.move_duration = self.move_spin.value()
         self.frame_data.wait_duration = self.wait_spin.value()
         for joint_name in self.joint_data_manager.get_joint_names():
@@ -272,21 +278,26 @@ class InitialFrameEditorDialog(QDialog):
         prev_frame = self._get_prev_frame_data()
         next_frame = self._get_next_frame_data()
 
-        # Set frame data into visualizer
+        # (2) Set frame data into visualizer
         self.frame_visualizer.set_previous_frame(prev_frame)
         self.frame_visualizer.set_current_frame(current_frame)
         self.frame_visualizer.set_next_frame(next_frame)
 
-        # Publish current frame goal state
+        # (3) Publish current frame goal state
         self.trajectory_visualizer.visualize_goal_state(current_frame.get_joint_state())
 
-        # Execute playback
+        # (4) Playback
         if sender == self.play_previous_current_btn:
             self.frame_visualizer.play_previous_trajectory()
+            self.trajectory_commander.send_frame(prev_frame)
+
         elif sender == self.play_full_btn:
             self.frame_visualizer.play_full_trajectory()
+            self.trajectory_commander.send_frame(current_frame)
+
         elif sender == self.play_current_next_btn:
             self.frame_visualizer.play_next_trajectory()
+            self.trajectory_commander.send_frame(next_frame)
 
     def on_loop_checkbox_changed(self, state):
         loop_enabled = state == Qt.Checked
@@ -310,6 +321,11 @@ class InitialFrameEditorDialog(QDialog):
 
         if self.trajectory_visualizer:
             self.trajectory_visualizer.visualize_goal_state(msg)
+            if self.loaded_frame_data:
+                self.frame_visualizer.set_previous_frame(self.loaded_frame_data)
+                self.frame_visualizer.set_current_frame(self.frame_data)
+                self.frame_visualizer.reset_next_frame()
+                self.frame_visualizer.play_previous_trajectory()
 
         if self.trajectory_commander:
             self.trajectory_commander.send_joint_state(msg, duration=1.0)

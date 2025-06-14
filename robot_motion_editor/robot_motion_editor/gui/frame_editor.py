@@ -83,7 +83,10 @@ class FrameEditorDialog(QDialog):
             self.set_frame_to_ui()
             self.loaded_frame_data = copy.deepcopy(self.frame_data)
         else:
-            self.loaded_frame_data = None
+            rospy.logwarn(f"Frame file {self.filepath} does not exist. Creating new frame data.")
+            self.loaded_frame_data = FrameData()
+            self.loaded_frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
+
         self.setWindowTitle(f"Frame: {os.path.basename(self.filepath)}")
 
         # Set initial pose data to prev and next frames
