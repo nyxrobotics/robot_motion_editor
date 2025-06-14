@@ -302,19 +302,15 @@ class FrameEditorDialog(QDialog):
         # (4) Playback
         if sender == self.play_previous_current_btn:
             self.frame_visualizer.play_previous_trajectory()
-            if self.trajectory_commander:
-                self.trajectory_commander.send_frame2frame(prev_frame, current_frame)
+            self.trajectory_commander.send_frame(prev_frame)
 
         elif sender == self.play_full_btn:
             self.frame_visualizer.play_full_trajectory()
-            if self.trajectory_commander:
-                self.trajectory_commander.send_frame2frame(prev_frame, current_frame)
-                self.trajectory_commander.send_frame2frame(current_frame, next_frame)
+            self.trajectory_commander.send_frame(current_frame)
 
         elif sender == self.play_current_next_btn:
             self.frame_visualizer.play_next_trajectory()
-            if self.trajectory_commander:
-                self.trajectory_commander.send_frame2frame(current_frame, next_frame)
+            self.trajectory_commander.send_frame(next_frame)
 
     def on_loop_checkbox_changed(self, state):
         loop_enabled = state == Qt.Checked

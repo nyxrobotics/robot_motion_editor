@@ -112,6 +112,47 @@ class TrajectoryCommander:
 
         traj.points = [point0, point1]
         self.send_trajectory(traj)
+    
+    def send_frame(self, frame_data: FrameData):
+        """
+        Build and send a JointTrajectory from FrameData.
+        This is used for visualizing frames in the editor.
+        """
+        if not isinstance(frame_data, FrameData):
+            rospy.logwarn("[TrajectoryCommander] Invalid FrameData input.")
+            return
+
+        joint_names = frame_data.get_joint_names()
+        if not joint_names:
+            rospy.logwarn("[TrajectoryCommander] FrameData has no joint names.")
+            return
+        
+        start_state = self._current_target_state
+        goal_state = frame_data.get_joint_state()
+
+        traj = JointTrajectory()
+        traj.joint_names = joint_names
+
+        pt0 = JointTrajectoryPoint()
+        pt0.time_from_start = rospy.Duration(0.0)
+        pt0.positions = start_state.position if start_state else [0.0] * len(joint_names)
+        pt0.velocities = []
+
+        for i, (a, b) in enumerate(zip(pt0.positions, goal_state.position)):
+            name = joint_names[i]
+            scale = frame_data.get_speed_scale(name)
+            if scale <= 0.0:
+                scale = 1000.0
+            velocity = ((b - a) / frame_data.move_duration) * scale if frame_data.move_duration > 0 else 0.0
+            pt0.velocities.append(velocity)
+        
+        pt1 = JointTrajectoryPoint()
+        pt1.time_from_start = rospy.Duration(frame_data.move_duration + frame_data.wait_duration)
+        pt1.positions = goal_state.position
+        pt1.velocities = [0.0] * len(goal_state.position)
+
+        traj.points = [pt0, pt1]
+        self.send_trajectory(traj)
 
     def send_frame2frame(self, start: FrameData, end: FrameData):
         """
@@ -128,10 +169,6 @@ class TrajectoryCommander:
 
         start_state = start.get_joint_state()
         end_state = end.get_joint_state()
-        move_duration = end.move_duration
-        wait_duration = end.wait_duration
-
-        speed_scale = {name: end.get_speed_scale(name) for name in joint_names}
 
         traj = JointTrajectory()
         traj.joint_names = joint_names
@@ -143,14 +180,14 @@ class TrajectoryCommander:
 
         for i, (a, b) in enumerate(zip(start_state.position, end_state.position)):
             name = joint_names[i]
-            scale = speed_scale.get(name, 1.0)
+            scale = end.get_speed_scale(name)
             if scale <= 0.0:
                 scale = 1000.0
-            velocity = ((b - a) / move_duration) * scale if move_duration > 0 else 0.0
+            velocity = ((b - a) / end.move_duration) * scale if end.move_duration > 0 else 0.0
             pt0.velocities.append(velocity)
 
         pt1 = JointTrajectoryPoint()
-        pt1.time_from_start = rospy.Duration(move_duration + wait_duration)
+        pt1.time_from_start = rospy.Duration(end.move_duration + end.wait_duration)
         pt1.positions = end_state.position
         pt1.velocities = [0.0] * len(end_state.position)
 
