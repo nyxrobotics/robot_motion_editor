@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import QTabWidget
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
+from ..logic.animation_item_data import AnimationItemData
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
@@ -41,6 +42,7 @@ class MainWindow(QWidget):
         self.trajectory_commander = TrajectoryCommander(
             get_robot_name(), self.joint_data_manager.get_joint_names(), mode="position")
         self.motion_directory_manager = MotionDirectoryManager(motion_directory=".")
+        self.animation_item_data = AnimationItemData(motion_directory_manager=self.motion_directory_manager)
 
         self.init_ui()
 
@@ -115,6 +117,7 @@ class MainWindow(QWidget):
 
         self.animation_widget = AnimaitonWidget(
             motion_directory_manager=self.motion_directory_manager,
+            animation_item_data=self.animation_item_data,
             joint_data_manager=self.joint_data_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander

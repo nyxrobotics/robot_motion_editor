@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
 from ..logic.animation_file_manager import AnimationData
+from ..logic.animation_item_data import AnimationItemData
 from ..logic.frame_file_manager import FrameData
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
@@ -27,11 +28,13 @@ class AnimaitonWidget(QWidget):
     def __init__(
             self,
             motion_directory_manager: MotionDirectoryManager,
+            animation_item_data: AnimationItemData,
             joint_data_manager: JointDataManager,
-            trajectory_visualizer: TrajectoryVisualizer = None,
-            trajectory_commander: TrajectoryCommander = None):
+            trajectory_visualizer: TrajectoryVisualizer,
+            trajectory_commander: TrajectoryCommander):
         super().__init__()
         self.motion_directory_manager = motion_directory_manager
+        self.animation_item_data = animation_item_data
         self.joint_data_manager = joint_data_manager
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
@@ -39,6 +42,7 @@ class AnimaitonWidget(QWidget):
         self.editor_launcher = AnimationItemEditorLauncher(
             joint_data_manager=self.joint_data_manager,
             motion_directory_manager=self.motion_directory_manager,
+            animation_item_data=self.animation_item_data,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander,
         )

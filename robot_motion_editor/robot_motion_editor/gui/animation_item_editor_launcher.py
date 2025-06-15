@@ -2,7 +2,12 @@ import rospy
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialog
 
+from ..logic.animation_item_data import AnimationItemData
 from ..logic.frame_file_manager import FrameData
+from ..logic.joint_data_manager import JointDataManager
+from ..logic.motion_directory_manager import MotionDirectoryManager
+from ..robot_interface.trajectory_commander import TrajectoryCommander
+from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .animation_editor_items import FrameBlockItem
 from .animation_editor_items import IfBlockItem
 from .animation_editor_items import StartBlockItem
@@ -14,10 +19,16 @@ from .switch_condition_editor import SwitchConditionEditorDialog
 
 
 class AnimationItemEditorLauncher:
-    def __init__(self, joint_data_manager, motion_directory_manager,
-                 trajectory_visualizer, trajectory_commander):
+    def __init__(
+            self,
+            joint_data_manager: JointDataManager,
+            motion_directory_manager: MotionDirectoryManager,
+            animtion_item_data: AnimationItemData,
+            trajectory_visualizer: TrajectoryVisualizer,
+            trajectory_commander: TrajectoryCommander):
         self.joint_data_manager = joint_data_manager
         self.motion_directory_manager = motion_directory_manager
+        self.animation_item_data = animtion_item_data
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
         self.open_editors = {}  # key: f"type:filename" or "initial_frame"
