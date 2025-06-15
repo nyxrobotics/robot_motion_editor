@@ -2,11 +2,10 @@ import os
 
 from .frame_file_manager import FrameData
 from .if_condition_file_manager import IfConditionData
-
 from .switch_condition_file_manager import SwitchConditionData
 
 
-class AnimationItemData:
+class ItemFileManager:
     def __init__(self, motion_directory_manager):
         self.motion_directory_manager = motion_directory_manager
         self.frames = {}
