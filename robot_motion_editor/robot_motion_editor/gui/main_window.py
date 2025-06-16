@@ -58,6 +58,8 @@ class MainWindow(QWidget):
         if folder:
             self.path_lineedit.setText(folder)
             self.motion_directory_manager.set_motion_directory(folder)
+            self.motion_directory_manager.clear()
+            self.motion_directory_manager.set_joint_names(self.joint_data_manager.get_joint_names())
 
             if self.initial_pose_editor:
                 self.initial_pose_editor.load_pose()

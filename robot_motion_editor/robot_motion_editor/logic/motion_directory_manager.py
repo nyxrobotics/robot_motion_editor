@@ -139,10 +139,9 @@ class MotionDirectoryManager:
         if not os.path.exists(path):
             return []
         return [f[:-5] for f in os.listdir(path) if f.endswith(".yaml")]
-    
-    
 
     # ======== Frame ========
+
     def get_frame(self, filename):
         if filename in self.frames:
             return self.frames[filename]
