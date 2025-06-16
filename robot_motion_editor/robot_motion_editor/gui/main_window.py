@@ -12,7 +12,6 @@ from PyQt5.QtWidgets import QTabWidget
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
-from ..logic.item_file_manager import ItemFileManager
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
@@ -42,7 +41,6 @@ class MainWindow(QWidget):
         self.trajectory_commander = TrajectoryCommander(
             get_robot_name(), self.joint_data_manager.get_joint_names(), mode="position")
         self.motion_directory_manager = MotionDirectoryManager(motion_directory=".")
-        self.item_file_manager = ItemFileManager(motion_directory_manager=self.motion_directory_manager)
 
         self.init_ui()
 

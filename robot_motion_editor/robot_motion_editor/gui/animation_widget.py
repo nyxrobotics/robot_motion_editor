@@ -10,7 +10,6 @@ from PyQt5.QtWidgets import QWidget
 
 from ..logic.animation_file_manager import AnimationData
 from ..logic.frame_file_manager import FrameData
-from ..logic.item_file_manager import ItemFileManager
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.animation_commander import AnimationCommander
@@ -28,7 +27,6 @@ class AnimaitonWidget(QWidget):
     def __init__(
             self,
             motion_directory_manager: MotionDirectoryManager,
-            item_file_manager: ItemFileManager,
             joint_data_manager: JointDataManager,
             trajectory_visualizer: TrajectoryVisualizer,
             trajectory_commander: TrajectoryCommander):

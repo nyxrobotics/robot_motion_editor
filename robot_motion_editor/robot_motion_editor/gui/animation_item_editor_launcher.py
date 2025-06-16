@@ -3,7 +3,6 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialog
 
 from ..logic.frame_file_manager import FrameData
-from ..logic.item_file_manager import ItemFileManager
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_directory_manager import MotionDirectoryManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
@@ -23,7 +22,6 @@ class AnimationItemEditorLauncher:
             self,
             joint_data_manager: JointDataManager,
             motion_directory_manager: MotionDirectoryManager,
-            animtion_item_data: ItemFileManager,
             trajectory_visualizer: TrajectoryVisualizer,
             trajectory_commander: TrajectoryCommander):
         self.joint_data_manager = joint_data_manager
