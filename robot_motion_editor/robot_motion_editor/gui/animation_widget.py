@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QSplitter
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
+from sensor_msgs.msg import JointState
 
 from ..logic.animation_file_manager import AnimationData
 from ..logic.frame_file_manager import FrameData
@@ -35,6 +36,7 @@ class AnimaitonWidget(QWidget):
         self.joint_data_manager = joint_data_manager
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
+        self.reset_current_target_state()
 
         self.editor_launcher = AnimationItemEditorLauncher(
             joint_data_manager=self.joint_data_manager,
@@ -229,3 +231,28 @@ class AnimaitonWidget(QWidget):
             self.animation_commander.initial_joint_state = self.initial_joint_state
         except Exception as e:
             rospy.logwarn(f"[MotionEditor] Failed to load initial_frame: {e}")
+
+    def set_current_target_state(self, joint_state: JointState):
+        self.trajectory_visualizer.set_current_target_state(joint_state)
+        self.trajectory_commander.set_current_target_state(joint_state)
+
+    def reset_current_target_state(self):
+        initial_joint_state = self.motion_file_manager.get_initial_pose().get_joint_state()
+        self.set_current_target_state(initial_joint_state)
+
+    def get_current_target_state(self) -> JointState:
+        if self.trajectory_commander.is_enabled():
+            return self.trajectory_commander.get_current_target_state()
+        elif self.trajectory_visualizer.is_enabled():
+            return self.trajectory_visualizer.get_current_target_state()
+        else:
+            initial_joint_state = self.motion_file_manager.get_initial_pose().get_joint_state()
+            self.set_current_target_state(initial_joint_state)
+            return initial_joint_state
+
+    def move_initial_pose(self):
+        initial_joint_state = self.motion_file_manager.get_initial_pose().get_joint_state()
+        self.set_current_target_state(initial_joint_state)
+        self.trajectory_visualizer.visualize_goal_state(initial_joint_state)
+        self.trajectory_commander.send_joint_state(initial_joint_state, move_duration=0.0)
+        rospy.loginfo("[MotionEditor] Moved to initial pose.")
