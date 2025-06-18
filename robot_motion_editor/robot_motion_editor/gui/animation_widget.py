@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import QWidget
 from ..logic.animation_file_manager import AnimationData
 from ..logic.frame_file_manager import FrameData
 from ..logic.joint_data_manager import JointDataManager
-from ..logic.motion_directory_manager import MotionDirectoryManager
+from ..logic.motion_file_manager import MotionFileManager
 from ..robot_interface.animation_commander import AnimationCommander
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.animation_visualizer import AnimationVisualizer
@@ -26,12 +26,12 @@ from .animation_preview_button_widget import AnimationPreviewButtonWidget
 class AnimaitonWidget(QWidget):
     def __init__(
             self,
-            motion_directory_manager: MotionDirectoryManager,
+            motion_file_manager: MotionFileManager,
             joint_data_manager: JointDataManager,
             trajectory_visualizer: TrajectoryVisualizer,
             trajectory_commander: TrajectoryCommander):
         super().__init__()
-        self.motion_directory_manager = motion_directory_manager
+        self.motion_file_manager = motion_file_manager
         self.item_file_manager = item_file_manager
         self.joint_data_manager = joint_data_manager
         self.trajectory_visualizer = trajectory_visualizer
@@ -39,18 +39,18 @@ class AnimaitonWidget(QWidget):
 
         self.editor_launcher = AnimationItemEditorLauncher(
             joint_data_manager=self.joint_data_manager,
-            motion_directory_manager=self.motion_directory_manager,
+            motion_file_manager=self.motion_file_manager,
             item_file_manager=self.item_file_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander,
         )
         self.animation_flow_scene = AnimationEditorWidget(
-            motion_directory_manager=self.motion_directory_manager,
+            motion_file_manager=self.motion_file_manager,
             editor_launcher=self.editor_launcher)
         self.view = AnimatioGraphicsView(self.animation_flow_scene)
 
         self.animation_tree = AnimationFileWidget(
-            motion_directory_manager=self.motion_directory_manager,
+            motion_file_manager=self.motion_file_manager,
             joint_data_manager=self.joint_data_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander,
@@ -59,12 +59,12 @@ class AnimaitonWidget(QWidget):
         self.animation_visualizer = AnimationVisualizer(
             animation_flow_scene=self.animation_flow_scene,
             trajectory_visualizer=self.trajectory_visualizer,
-            motion_directory_manager=self.motion_directory_manager,
+            motion_file_manager=self.motion_file_manager,
             joint_data_manager=self.joint_data_manager)
         self.animation_commander = AnimationCommander(
             trajectory_commander=self.trajectory_commander,
             animation_flow_scene=self.animation_flow_scene,
-            motion_directory_manager=self.motion_directory_manager,
+            motion_file_manager=self.motion_file_manager,
             joint_data_manager=self.joint_data_manager)
         self.init_ui()
         self.reload_animation_tree()
@@ -127,25 +127,25 @@ class AnimaitonWidget(QWidget):
         for i in range(self.animation_tree.topLevelItemCount()):
             animation_name = self.animation_tree.topLevelItem(i).text(0)
             self.animation_tree.reload_animation_contents(animation_name)
-        self.motion_directory_manager.set_current_animation(None)
+        self.motion_file_manager.set_current_animation(None)
         self.animation_tree.setCurrentItem(None)
 
     def on_save_anim_btn(self):
-        anim_name = self.motion_directory_manager.get_current_animation()
+        anim_name = self.motion_file_manager.get_current_animation()
         if not anim_name:
             QMessageBox.information(self, "Save", "No animation selected to save.")
             return
         anim_data = self.animation_flow_scene.get_animation_data()
-        anim_data.save_to_file(self.motion_directory_manager.resolve_animation_yaml_path())
+        anim_data.save_to_file(self.motion_file_manager.resolve_animation_yaml_path())
 
     def confirm_save_if_unsaved_changes(self):
-        anim_name = self.motion_directory_manager.get_current_animation()
+        anim_name = self.motion_file_manager.get_current_animation()
         if not anim_name:
             return True
 
         current_data = self.animation_flow_scene.get_animation_data().get_dict()
         tmp_data = AnimationData()
-        tmp_data.load_from_file(self.motion_directory_manager.resolve_animation_yaml_path())
+        tmp_data.load_from_file(self.motion_file_manager.resolve_animation_yaml_path())
         saved_data = tmp_data.get_dict()
 
         if current_data == saved_data:
@@ -170,7 +170,7 @@ class AnimaitonWidget(QWidget):
         self.animation_tree.reload_animation_contents(name)
 
     def on_new_frame_btn(self):
-        animation_name = self.motion_directory_manager.get_current_animation()
+        animation_name = self.motion_file_manager.get_current_animation()
         if not animation_name:
             QMessageBox.information(self, "Delete Frame", "No animation selected.")
             return
@@ -182,7 +182,7 @@ class AnimaitonWidget(QWidget):
         self.reload_animation_tree()
 
     def on_delete_frame_btn(self):
-        animation_name = self.motion_directory_manager.get_current_animation()
+        animation_name = self.motion_file_manager.get_current_animation()
         if not animation_name:
             QMessageBox.information(self, "Delete Frame", "No animation selected.")
             return
@@ -194,7 +194,7 @@ class AnimaitonWidget(QWidget):
         while animation_item.parent():
             animation_item = animation_item.parent()
         name = animation_item.text(0)
-        if name == self.motion_directory_manager.get_current_animation():
+        if name == self.motion_file_manager.get_current_animation():
             return
         self.load_animation_by_name(name)
 
@@ -203,7 +203,7 @@ class AnimaitonWidget(QWidget):
         while animation_item.parent():
             animation_item = animation_item.parent()
         animation_name = animation_item.text(0)
-        self.motion_directory_manager.set_current_animation(animation_name)
+        self.motion_file_manager.set_current_animation(animation_name)
 
         label = item.text(0)
         parent = item.parent().text(0) if item.parent() else ""
@@ -221,16 +221,16 @@ class AnimaitonWidget(QWidget):
         if not self.confirm_save_if_unsaved_changes():
             return
 
-        self.motion_directory_manager.set_current_animation(animation_name)
+        self.motion_file_manager.set_current_animation(animation_name)
 
         anim_data = AnimationData()
-        anim_data.load_from_file(self.motion_directory_manager.resolve_animation_yaml_path())
+        anim_data.load_from_file(self.motion_file_manager.resolve_animation_yaml_path())
         self.animation_flow_scene.set_animation_data(anim_data)
         self.animation_flow_scene.highlight_preview_path()
 
         try:
             frame_data = FrameData(joint_names=self.joint_data_manager.get_joint_names())
-            frame_data.load_from_file(self.motion_directory_manager.resolve_initial_frame_path())
+            frame_data.load_from_file(self.motion_file_manager.resolve_initial_frame_path())
             self.initial_joint_state = frame_data.get_joint_state()
             self.animation_visualizer.initial_joint_state = self.initial_joint_state
             self.animation_commander.initial_joint_state = self.initial_joint_state

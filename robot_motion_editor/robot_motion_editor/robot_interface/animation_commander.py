@@ -13,7 +13,7 @@ from ..gui.animation_editor_widget import FrameBlockItem
 from ..logic.frame_file_manager import FrameData
 from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.joint_data_manager import JointDataManager
-from ..logic.motion_directory_manager import MotionDirectoryManager
+from ..logic.motion_file_manager import MotionFileManager
 from .trajectory_commander import TrajectoryCommander
 
 
@@ -27,16 +27,16 @@ def joint_states_equal(js1, js2, tol=1e-4):
 
 class AnimationCommander:
     def __init__(self, animation_flow_scene, trajectory_commander: TrajectoryCommander,
-                 motion_directory_manager: MotionDirectoryManager,
+                 motion_file_manager: MotionFileManager,
                  joint_data_manager: JointDataManager):
         self.animation_flow_scene = animation_flow_scene
         self.trajectory_commander = trajectory_commander
-        self.motion_directory_manager = motion_directory_manager
+        self.motion_file_manager = motion_file_manager
         self.joint_data_manager = joint_data_manager
 
         self.initial_joint_state = None
         try:
-            pose_path = self.motion_directory_manager.resolve_initial_pose_path()
+            pose_path = self.motion_file_manager.resolve_initial_pose_path()
             if os.path.exists(pose_path):
                 pose_data = InitialPoseData()
                 pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
@@ -150,7 +150,7 @@ class AnimationCommander:
 
             frame_name = self.current_block.filename
             try:
-                frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
+                frame_path = self.motion_file_manager.resolve_frame_path(frame_name)
                 frame_data = FrameData()
                 frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
                 frame_data.load_from_file(frame_path)
@@ -185,7 +185,7 @@ class AnimationCommander:
         if isinstance(block, FrameBlockItem):
             frame_name = block.filename
             try:
-                frame_path = self.motion_directory_manager.resolve_frame_path(frame_name)
+                frame_path = self.motion_file_manager.resolve_frame_path(frame_name)
                 frame_data = FrameData()
                 frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
                 frame_data.load_from_file(frame_path)
@@ -200,7 +200,7 @@ class AnimationCommander:
 
         elif isinstance(block, StartBlockItem):
             try:
-                frame_path = self.motion_directory_manager.resolve_initial_frame_path()
+                frame_path = self.motion_file_manager.resolve_initial_frame_path()
                 frame_data = FrameData()
                 frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
                 frame_data.load_from_file(frame_path)
@@ -215,9 +215,9 @@ class AnimationCommander:
     def extract_joint_state_and_duration(self, block):
 
         if isinstance(block, FrameBlockItem):
-            path = self.motion_directory_manager.resolve_frame_path(block.filename)
+            path = self.motion_file_manager.resolve_frame_path(block.filename)
         elif isinstance(block, StartBlockItem):
-            path = self.motion_directory_manager.resolve_initial_frame_path()
+            path = self.motion_file_manager.resolve_initial_frame_path()
         else:
             return None, 0.0, 0.0
 

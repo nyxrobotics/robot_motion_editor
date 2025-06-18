@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QDialog
 
 from ..logic.frame_file_manager import FrameData
 from ..logic.joint_data_manager import JointDataManager
-from ..logic.motion_directory_manager import MotionDirectoryManager
+from ..logic.motion_file_manager import MotionFileManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
 from .animation_editor_items import FrameBlockItem
@@ -21,11 +21,11 @@ class AnimationItemEditorLauncher:
     def __init__(
             self,
             joint_data_manager: JointDataManager,
-            motion_directory_manager: MotionDirectoryManager,
+            motion_file_manager: MotionFileManager,
             trajectory_visualizer: TrajectoryVisualizer,
             trajectory_commander: TrajectoryCommander):
         self.joint_data_manager = joint_data_manager
-        self.motion_directory_manager = motion_directory_manager
+        self.motion_file_manager = motion_file_manager
         self.item_file_manager = animtion_item_data
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
@@ -76,7 +76,7 @@ class AnimationItemEditorLauncher:
 
         dlg = FrameEditorDialog(
             joint_data_manager=self.joint_data_manager,
-            motion_directory_manager=self.motion_directory_manager,
+            motion_file_manager=self.motion_file_manager,
             filename=block.filename,
             frame_block=block,
             trajectory_visualizer=self.trajectory_visualizer,
@@ -94,7 +94,7 @@ class AnimationItemEditorLauncher:
             return
         dlg = InitialFrameEditorDialog(
             joint_data_manager=self.joint_data_manager,
-            motion_directory_manager=self.motion_directory_manager,
+            motion_file_manager=self.motion_file_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander
         )
@@ -106,7 +106,7 @@ class AnimationItemEditorLauncher:
             return
         dlg = IfConditionEditorDialog(
             joint_data_manager=self.joint_data_manager,
-            motion_directory_manager=self.motion_directory_manager,
+            motion_file_manager=self.motion_file_manager,
             filename=block.filename
         )
         self._register_editor(key, dlg)
@@ -117,7 +117,7 @@ class AnimationItemEditorLauncher:
             return
         dlg = SwitchConditionEditorDialog(
             joint_data_manager=self.joint_data_manager,
-            motion_directory_manager=self.motion_directory_manager,
+            motion_file_manager=self.motion_file_manager,
             filename=block.filename
         )
         if hasattr(block.scene(), "update_switch_block"):

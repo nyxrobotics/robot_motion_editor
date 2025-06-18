@@ -18,7 +18,7 @@ from ..logic.animation_file_manager import BlockData
 from ..logic.animation_file_manager import BlockInfo
 from ..logic.frame_file_manager import FrameData
 from ..logic.if_condition_file_manager import IfConditionData
-from ..logic.motion_directory_manager import MotionDirectoryManager
+from ..logic.motion_file_manager import MotionFileManager
 from ..logic.switch_condition_file_manager import SwitchConditionData
 from .animation_editor_items import ArrowItem
 from .animation_editor_items import FrameBlockItem
@@ -31,11 +31,11 @@ from .animation_item_editor_launcher import AnimationItemEditorLauncher
 
 
 class AnimationEditorWidget(QGraphicsScene):
-    def __init__(self, motion_directory_manager: MotionDirectoryManager,
+    def __init__(self, motion_file_manager: MotionFileManager,
                  editor_launcher: AnimationItemEditorLauncher, parent=None):
         super().__init__(parent)
 
-        self.motion_directory_manager = motion_directory_manager
+        self.motion_file_manager = motion_file_manager
         self.editor_launcher = editor_launcher
         self.setBackgroundBrush(QColor("#111111"))
         self.block_objects = {}
@@ -71,9 +71,7 @@ class AnimationEditorWidget(QGraphicsScene):
         elif item_type == "if":
             item = IfBlockItem(id, name)
         elif item_type == "switch":
-            path = self.motion_directory_manager.resolve_switch_condition_path(name)
-            switch_data = SwitchConditionData()
-            switch_data.load_from_file(path)
+            switch_data = self.motion_file_manager.get_switch(name)
             num_cases = len(switch_data.case) + 1 if switch_data.case else 2
             item = SwitchBlockItem(id, name, num_cases=num_cases)
         elif item_type == "start":
@@ -141,25 +139,25 @@ class AnimationEditorWidget(QGraphicsScene):
             pos = event.scenePos()
 
             if selected_action == new_start_action:
-                # 既に存在していれば拒否
                 if any(isinstance(b, StartBlockItem) for b in self.block_objects.values()):
                     QMessageBox.warning(
                         None,
                         "Start Block Exists",
                         "There is already a Start block in this animation.")
                     return
+
                 id = self._generate_block_id()
                 block = StartBlockItem(id)
                 block.setPos(pos)
                 self.addItem(block)
                 self.block_objects[block.name] = block
+
             elif selected_action == new_frame_action:
                 name, ok = QInputDialog.getText(None, "New Frame", "Enter frame name:")
                 if ok and name.strip():
                     name = name.strip()
                     frame_data = FrameData()
-                    frame_path = self.motion_directory_manager.resolve_frame_path(name)
-                    frame_data.save_to_file(frame_path)
+                    self.motion_file_manager.set_frame(name, frame_data)
 
                     id = self._generate_block_id()
                     block = FrameBlockItem(id, name)
@@ -167,15 +165,12 @@ class AnimationEditorWidget(QGraphicsScene):
                     self.addItem(block)
                     self.block_objects[block.name] = block
 
-                    self.motion_directory_manager.list_animation()
-
             elif selected_action == new_if_action:
                 name, ok = QInputDialog.getText(None, "New If Condition", "Enter condition name:")
                 if ok and name.strip():
                     name = name.strip()
-                    condition_data = IfConditionData(expression="", condition="")
-                    condition_path = self.motion_directory_manager.resolve_if_condition_path(name)
-                    condition_data.save_to_file(condition_path)
+                    if_data = IfConditionData(expression="", condition="")
+                    self.motion_file_manager.set_if(name, if_data)
 
                     id = self._generate_block_id()
                     block = IfBlockItem(id, name)
@@ -183,23 +178,18 @@ class AnimationEditorWidget(QGraphicsScene):
                     self.addItem(block)
                     self.block_objects[block.name] = block
 
-                    self.motion_directory_manager.list_animation()
-
             elif selected_action == new_switch_action:
                 name, ok = QInputDialog.getText(None, "New Switch Condition", "Enter condition name:")
                 if ok and name.strip():
                     name = name.strip()
-                    condition_data = SwitchConditionData(expression="", condition="", case={"case_0": {"value": 0}})
-                    condition_path = self.motion_directory_manager.resolve_switch_condition_path(name)
-                    condition_data.save_to_file(condition_path)
+                    switch_data = SwitchConditionData()
+                    self.motion_file_manager.set_switch(name, switch_data)
 
                     id = self._generate_block_id()
                     block = SwitchBlockItem(id, name, num_cases=2)
                     block.setPos(pos)
                     self.addItem(block)
                     self.block_objects[block.name] = block
-
-                    self.motion_directory_manager.list_animation()
 
             elif selected_action == new_arrow_action:
                 id = self._generate_arrow_id()
@@ -698,18 +688,10 @@ class AnimationEditorWidget(QGraphicsScene):
         next_data = None
 
         if prev_block:
-            prev_path = self.motion_directory_manager.resolve_frame_path(prev_block.filename)
-            if os.path.exists(prev_path):
-                prev_data = FrameData()
-                prev_data.set_joint_names(self.editor_launcher.joint_data_manager.get_joint_names())
-                prev_data.load_from_file(prev_path)
+            prev_data = self.motion_file_manager.get_frame(prev_block.filename)
 
         if next_block:
-            next_path = self.motion_directory_manager.resolve_frame_path(next_block.filename)
-            if os.path.exists(next_path):
-                next_data = FrameData()
-                next_data.set_joint_names(self.editor_launcher.joint_data_manager.get_joint_names())
-                next_data.load_from_file(next_path)
+            next_data = self.motion_file_manager.get_frame(next_block.filename)
 
         self.editor_launcher.open_editor_by_block(block, prev_data, next_data)
 

@@ -18,7 +18,7 @@ from sensor_msgs.msg import JointState
 
 from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.joint_data_manager import JointDataManager
-from ..logic.motion_directory_manager import MotionDirectoryManager
+from ..logic.motion_file_manager import MotionFileManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.initial_pose_visualizer import InitialPoseVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
@@ -31,13 +31,13 @@ class InitialPoseEditor(QWidget):
 
     def __init__(self,
                  joint_data_manager: JointDataManager,
-                 motion_directory_manager: MotionDirectoryManager,
+                 motion_file_manager: MotionFileManager,
                  trajectory_visualizer: TrajectoryVisualizer = None,
                  trajectory_commander: TrajectoryCommander = None):
         super().__init__()
 
         self.joint_data_manager = joint_data_manager
-        self.motion_directory_manager = motion_directory_manager
+        self.motion_file_manager = motion_file_manager
 
         self.initial_pose_data = InitialPoseData()
         self.initial_pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
@@ -53,7 +53,7 @@ class InitialPoseEditor(QWidget):
 
         self.init_ui()
 
-        if os.path.exists(self.motion_directory_manager.resolve_initial_pose_path()):
+        if os.path.exists(self.motion_file_manager.resolve_initial_pose_path()):
             self.load_pose()
 
     def init_ui(self):
@@ -132,7 +132,7 @@ class InitialPoseEditor(QWidget):
         self.setLayout(main_layout)
 
     def load_pose(self):
-        self.initial_pose_data.load_from_file(self.motion_directory_manager.resolve_initial_pose_path())
+        self.initial_pose_data.load_from_file(self.motion_file_manager.resolve_initial_pose_path())
 
         for joint_name in self.initial_pose_data.get_joint_names():
             if joint_name not in self.joint_widgets:
@@ -155,7 +155,7 @@ class InitialPoseEditor(QWidget):
             self.initial_pose_data.set_pose(joint_name, position_rad)
             self.initial_pose_data.set_enable(joint_name, self.enable_checkboxes[joint_name].isChecked())
 
-        self.initial_pose_data.save_to_file(self.motion_directory_manager.resolve_initial_pose_path())
+        self.initial_pose_data.save_to_file(self.motion_file_manager.resolve_initial_pose_path())
         self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
 
     def get_gui_joints(self):

@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
 from ..logic.joint_data_manager import JointDataManager
-from ..logic.motion_directory_manager import MotionDirectoryManager
+from ..logic.motion_file_manager import MotionFileManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..urdf_interface.urdf_joint_extractor import get_joint_limit
 from ..urdf_interface.urdf_joint_extractor import get_robot_name
@@ -40,7 +40,7 @@ class MainWindow(QWidget):
         self.trajectory_visualizer = TrajectoryVisualizer(use_state_mode=True, playback_rate=30.0)
         self.trajectory_commander = TrajectoryCommander(
             get_robot_name(), self.joint_data_manager.get_joint_names(), mode="position")
-        self.motion_directory_manager = MotionDirectoryManager(motion_directory=".")
+        self.motion_file_manager = MotionFileManager(motion_directory=".")
 
         self.init_ui()
 
@@ -57,9 +57,9 @@ class MainWindow(QWidget):
         folder = QFileDialog.getExistingDirectory(self, "Select Motion Directory", os.getcwd())
         if folder:
             self.path_lineedit.setText(folder)
-            self.motion_directory_manager.set_motion_directory(folder)
-            self.motion_directory_manager.clear()
-            self.motion_directory_manager.set_joint_names(self.joint_data_manager.get_joint_names())
+            self.motion_file_manager.set_motion_directory(folder)
+            self.motion_file_manager.clear()
+            self.motion_file_manager.set_joint_names(self.joint_data_manager.get_joint_names())
 
             if self.initial_pose_editor:
                 self.initial_pose_editor.load_pose()
@@ -109,14 +109,14 @@ class MainWindow(QWidget):
         self.tabs = QTabWidget()
         self.initial_pose_editor = InitialPoseEditor(
             joint_data_manager=self.joint_data_manager,
-            motion_directory_manager=self.motion_directory_manager,
+            motion_file_manager=self.motion_file_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander
         )
         self.tabs.addTab(self.initial_pose_editor, "Initial Pose")
 
         self.animation_widget = AnimaitonWidget(
-            motion_directory_manager=self.motion_directory_manager,
+            motion_file_manager=self.motion_file_manager,
             item_file_manager=self.item_file_manager,
             joint_data_manager=self.joint_data_manager,
             trajectory_visualizer=self.trajectory_visualizer,

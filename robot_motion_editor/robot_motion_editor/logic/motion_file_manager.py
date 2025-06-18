@@ -7,7 +7,7 @@ from .if_condition_file_manager import IfConditionData
 from .switch_condition_file_manager import SwitchConditionData
 
 
-class MotionDirectoryManager:
+class MotionFileManager:
     def __init__(self, motion_directory=None, joint_names=None):
         # File manager
         self.motion_directory = motion_directory
@@ -33,13 +33,24 @@ class MotionDirectoryManager:
         return self.current_frame_id
 
     def set_motion_directory(self, directory):
+        if self.motion_directory == directory:
+            return
+        if not os.path.isdir(directory):
+            rospy.logerr(f"Provided motion directory does not exist: {directory}")
+            return
         self.motion_directory = directory
+        self.current_animation_name = None  # Reset current animation when changing directory
+        self.clear()  # Clear cached data when changing directory
 
     def get_motion_directory(self):
         return self.motion_directory
 
     def set_current_animation(self, animation_name):
+        if self.current_animation_name == animation_name:
+            return
         self.current_animation_name = animation_name
+        self.clear()  # Clear cached data when switching animations
+        self.load_all_items()  # Load all items for the new animation
 
     def get_current_animation(self):
         return self.current_animation_name

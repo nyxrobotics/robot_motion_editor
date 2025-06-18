@@ -22,7 +22,7 @@ from sensor_msgs.msg import JointState
 from ..logic.frame_file_manager import FrameData
 from ..logic.initial_pose_file_manager import InitialPoseData
 from ..logic.joint_data_manager import JointDataManager
-from ..logic.motion_directory_manager import MotionDirectoryManager
+from ..logic.motion_file_manager import MotionFileManager
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.frame_visualizer import FrameVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
@@ -35,7 +35,7 @@ class FrameEditorDialog(QDialog):
     def __init__(
         self,
         joint_data_manager: JointDataManager,
-        motion_directory_manager: MotionDirectoryManager,
+        motion_file_manager: MotionFileManager,
         filename: str = "",
         frame_block: FrameBlockItem = None,
         trajectory_visualizer: TrajectoryVisualizer = None,
@@ -48,7 +48,7 @@ class FrameEditorDialog(QDialog):
 
         # Core components
         self.joint_data_manager = joint_data_manager
-        self.motion_directory_manager = motion_directory_manager
+        self.motion_file_manager = motion_file_manager
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
         self.frame_block = frame_block
@@ -77,7 +77,7 @@ class FrameEditorDialog(QDialog):
         self.init_ui()
 
         # Load frame data from file if it exists
-        self.filepath = self.motion_directory_manager.resolve_frame_path(self.filename)
+        self.filepath = self.motion_file_manager.resolve_frame_path(self.filename)
         if os.path.exists(self.filepath):
             self.frame_data.load_from_file(self.filepath)
             self.set_frame_to_ui()
@@ -92,7 +92,7 @@ class FrameEditorDialog(QDialog):
         # Set initial pose data to prev and next frames
         self.prev_frame_data = None
         self.next_frame_data = None
-        path = self.motion_directory_manager.resolve_initial_pose_path()
+        path = self.motion_file_manager.resolve_initial_pose_path()
         if os.path.exists(path):
             pose_data = InitialPoseData()
             pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
@@ -251,7 +251,7 @@ class FrameEditorDialog(QDialog):
 
     def reset_all_positions(self):
         try:
-            path = self.motion_directory_manager.resolve_initial_frame_path()
+            path = self.motion_file_manager.resolve_initial_frame_path()
             if os.path.exists(path):
                 self.frame_data.load_from_file(path)
                 self.set_frame_to_ui()
@@ -396,7 +396,7 @@ class FrameEditorDialog(QDialog):
 
     def _get_initial_frame_data(self):
         try:
-            path = self.motion_directory_manager.resolve_initial_frame_path()
+            path = self.motion_file_manager.resolve_initial_frame_path()
             if os.path.exists(path):
                 data = FrameData()
                 data.set_joint_names(self.joint_data_manager.get_joint_names())
@@ -406,7 +406,7 @@ class FrameEditorDialog(QDialog):
             rospy.logwarn(f"[FrameEditorDialog] Failed to load initial_frame: {e}")
 
         try:
-            path = self.motion_directory_manager.resolve_initial_pose_path()
+            path = self.motion_file_manager.resolve_initial_pose_path()
             if os.path.exists(path):
                 pose_data = InitialPoseData()
                 pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
