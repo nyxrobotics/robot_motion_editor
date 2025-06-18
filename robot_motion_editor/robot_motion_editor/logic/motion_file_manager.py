@@ -142,6 +142,18 @@ class MotionFileManager:
         except Exception as e:
             rospy.logerr(f"Failed to delete animation {current_animation_name}: {e}")
 
+    # === Initial Frame ===
+    def set_initial_frame(self, frame_data):
+        if self.animation_initial_frame and frame_data.get_dict() == self.animation_initial_frame.get_dict():
+            return
+        self.animation_initial_frame = frame_data
+        self._save_initial_frame()
+
+    def get_initial_frame(self):
+        if self.animation_initial_frame:
+            return self.animation_initial_frame
+        return self._load_initial_frame()
+
     # === Frame ===
     def set_frame(self, filename, frame_data):
         old_data = self.animation_frames.get(filename)
@@ -164,18 +176,6 @@ class MotionFileManager:
         if os.path.exists(path):
             os.remove(path)
             self.animation_frames.pop(name, None)
-
-    # === Initial Frame ===
-    def set_initial_frame(self, frame_data):
-        if self.animation_initial_frame and frame_data.get_dict() == self.animation_initial_frame.get_dict():
-            return
-        self.animation_initial_frame = frame_data
-        self._save_initial_frame()
-
-    def get_initial_frame(self):
-        if self.animation_initial_frame:
-            return self.animation_initial_frame
-        return self._load_initial_frame()
 
     # === If Condition ===
     def set_if(self, filename, if_data):
@@ -237,18 +237,24 @@ class MotionFileManager:
         return sorted(animation_dirs)
 
     def list_frame_files(self):
+        if not self.motion_directory or not self.animation_name:
+            return []
         path = os.path.join(self.motion_directory, self.animation_name, "frames")
         if not os.path.exists(path):
             return []
         return [f[:-5] for f in os.listdir(path) if f.endswith(".yaml")]
 
     def list_if_condition_files(self):
+        if not self.motion_directory or not self.animation_name:
+            return []
         path = os.path.join(self.motion_directory, self.animation_name, "conditions", "if")
         if not os.path.exists(path):
             return []
         return [f[:-5] for f in os.listdir(path) if f.endswith(".yaml")]
 
     def list_switch_condition_files(self):
+        if not self.motion_directory or not self.animation_name:
+            return []
         path = os.path.join(self.motion_directory, self.animation_name, "conditions", "switch")
         if not os.path.exists(path):
             return []
@@ -256,8 +262,10 @@ class MotionFileManager:
 
     # === Internal Utilities ===
     def _load_animation(self, name):
-        yaml_path = self._resolve_animation_yaml_path(name)
+        self.animation_name = name
+        yaml_path = self._resolve_animation_yaml_path()
         if not yaml_path or not os.path.exists(yaml_path):
+            self.animation_name = None
             rospy.logwarn(f"Animation file not found: {yaml_path}")
             return
         try:
@@ -269,6 +277,7 @@ class MotionFileManager:
             self._load_animation_items()
             rospy.loginfo(f"Loaded animation: {name}")
         except Exception as e:
+            self.animation_name = None
             rospy.logerr(f"Failed to load animation {name}: {e}")
 
     def _load_animation_items(self):
@@ -410,19 +419,31 @@ class MotionFileManager:
         return os.path.join(self.motion_directory, anim_name)
 
     def _resolve_animation_yaml_path(self):
+        if not self.motion_directory or not self.animation_name:
+            return None
         return os.path.join(self.motion_directory, self.animation_name, "animation.yaml")
 
     def _resolve_initial_pose_path(self):
+        if not self.motion_directory:
+            return None
         return os.path.join(self.motion_directory, "initial_pose.yaml")
 
     def _resolve_initial_frame_path(self):
+        if not self.motion_directory or not self.animation_name:
+            return None
         return os.path.join(self.motion_directory, self.animation_name, "initial_frame.yaml")
 
     def _resolve_frame_path(self, name):
+        if not self.motion_directory or not self.animation_name:
+            return None
         return os.path.join(self.motion_directory, self.animation_name, "frames", f"{name}.yaml")
 
     def _resolve_if_condition_path(self, name):
+        if not self.motion_directory or not self.animation_name:
+            return None
         return os.path.join(self.motion_directory, self.animation_name, "conditions", "if", f"{name}.yaml")
 
     def _resolve_switch_condition_path(self, name):
+        if not self.motion_directory or not self.animation_name:
+            return None
         return os.path.join(self.motion_directory, self.animation_name, "conditions", "switch", f"{name}.yaml")

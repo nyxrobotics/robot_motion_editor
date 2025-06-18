@@ -35,15 +35,8 @@ class AnimationCommander:
         self.joint_data_manager = joint_data_manager
 
         self.initial_joint_state = None
-        try:
-            pose_path = self.motion_file_manager.resolve_initial_pose_path()
-            if os.path.exists(pose_path):
-                pose_data = InitialPoseData()
-                pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
-                pose_data.load_from_file(pose_path)
-                self.initial_joint_state = pose_data.get_joint_state()
-        except Exception as e:
-            rospy.logwarn(f"[AnimationCommander] Failed to load initial pose: {e}")
+        initial_pose_data = self.motion_file_manager.get_initial_pose()
+        self.initial_joint_state = initial_pose_data.get_joint_state()
 
         self._prev_snapshot = self._get_scene_snapshot()
 

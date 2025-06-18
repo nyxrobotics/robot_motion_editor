@@ -63,7 +63,7 @@ class AnimationItemEditorLauncher:
         key = f"frame:{block.filename}"
         if key in self.open_editors:
             dlg = self.open_editors[key]
-            if dlg.isVisible():
+            if isinstance(dlg, FrameEditorDialog) and dlg.isVisible():
                 dlg.raise_()
                 dlg.activateWindow()
                 # Update prev/next frame if they differ
@@ -76,7 +76,6 @@ class AnimationItemEditorLauncher:
         dlg = FrameEditorDialog(
             joint_data_manager=self.joint_data_manager,
             motion_file_manager=self.motion_file_manager,
-            filename=block.filename,
             frame_block=block,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander

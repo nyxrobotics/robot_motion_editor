@@ -52,9 +52,7 @@ class InitialPoseEditor(QWidget):
         self.goal_pose = JointState()
 
         self.init_ui()
-
-        if os.path.exists(self.motion_file_manager.resolve_initial_pose_path()):
-            self.load_pose()
+        self.load_pose()
 
     def init_ui(self):
         main_layout = QVBoxLayout()
@@ -132,7 +130,7 @@ class InitialPoseEditor(QWidget):
         self.setLayout(main_layout)
 
     def load_pose(self):
-        self.initial_pose_data.load_from_file(self.motion_file_manager.resolve_initial_pose_path())
+        self.initial_pose_data = self.motion_file_manager.get_initial_pose()
 
         for joint_name in self.initial_pose_data.get_joint_names():
             if joint_name not in self.joint_widgets:

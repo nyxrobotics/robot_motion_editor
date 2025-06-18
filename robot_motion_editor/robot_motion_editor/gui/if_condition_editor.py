@@ -29,10 +29,8 @@ class IfConditionEditorDialog(QDialog):
         self.filename = filename
         self.condition_data = IfConditionData()
         self.init_ui()
-        self.filepath = self.motion_file_manager.resolve_if_condition_path(self.filename)
-        if os.path.exists(self.filepath):
-            self.load_condition()
-        self.setWindowTitle(f"If: {os.path.basename(self.filepath)}")
+        self.load_condition()
+        self.setWindowTitle(f"If: {self.motion_file_manager._resolve_if_condition_path(self.filename)}")
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -67,8 +65,7 @@ class IfConditionEditorDialog(QDialog):
                 self.joint_data_manager.get_available_variables()))
 
     def load_condition(self):
-        file_path = self.motion_file_manager.resolve_if_condition_path(self.filename)
-        self.condition_data.load_from_file(file_path)
+        self.condition_data = self.motion_file_manager.get_if(self.filename)
         self.expression_edit.setPlainText(self.condition_data.expression)
         self.condition_edit.setPlainText(self.condition_data.condition)
 
@@ -113,7 +110,6 @@ class IfConditionEditorDialog(QDialog):
 
         self.condition_data.expression = expression
         self.condition_data.condition = condition
-        file_path = self.motion_file_manager.resolve_if_condition_path(self.filename)
-        self.condition_data.save_to_file(file_path)
+        self.motion_file_manager.set_if(self.filename, self.condition_data)
 
         self.accept()

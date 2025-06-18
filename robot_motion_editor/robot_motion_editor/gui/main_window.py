@@ -58,7 +58,6 @@ class MainWindow(QWidget):
         if folder:
             self.path_lineedit.setText(folder)
             self.motion_file_manager.set_motion_directory(folder)
-            self.motion_file_manager.clear()
             self.motion_file_manager.set_joint_names(self.joint_data_manager.get_joint_names())
 
             if self.initial_pose_editor:
@@ -117,7 +116,6 @@ class MainWindow(QWidget):
 
         self.animation_widget = AnimaitonWidget(
             motion_file_manager=self.motion_file_manager,
-            item_file_manager=self.item_file_manager,
             joint_data_manager=self.joint_data_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander

@@ -36,8 +36,7 @@ class FrameEditorDialog(QDialog):
         self,
         joint_data_manager: JointDataManager,
         motion_file_manager: MotionFileManager,
-        filename: str = "",
-        frame_block: FrameBlockItem = None,
+        frame_block: FrameBlockItem,
         trajectory_visualizer: TrajectoryVisualizer = None,
         trajectory_commander: TrajectoryCommander = None,
         parent=None,
@@ -54,22 +53,9 @@ class FrameEditorDialog(QDialog):
         self.frame_block = frame_block
 
         # Use filename from frame_block if available
-        self.filename = frame_block.filename if frame_block else filename
-
-        # Automatically detect the corresponding FrameBlockItem from animation_flow_scene
-        # if frame_block is not explicitly provided
-        if self.frame_block is None and self.animation_flow_scene and self.filename:
-            matches = [
-                b for b in self.animation_flow_scene.items()
-                if isinstance(b, FrameBlockItem) and b.filename == self.filename
-            ]
-            if matches:
-                # If multiple matches, use the first one found
-                self.frame_block = matches[0]
+        self.filename = frame_block.filename
 
         # Frame data initialization
-        self.frame_data = FrameData()
-        self.frame_data.set_joint_names(joint_data_manager.get_joint_names())
         self.joint_widgets = {}
         self.enable_checkbox_widgets = {}
         self.frame_visualizer = FrameVisualizer(trajectory_visualizer)
@@ -77,33 +63,18 @@ class FrameEditorDialog(QDialog):
         self.init_ui()
 
         # Load frame data from file if it exists
-        self.filepath = self.motion_file_manager.resolve_frame_path(self.filename)
-        if os.path.exists(self.filepath):
-            self.frame_data.load_from_file(self.filepath)
-            self.set_frame_to_ui()
-            self.loaded_frame_data = copy.deepcopy(self.frame_data)
-        else:
-            rospy.logwarn(f"Frame file {self.filepath} does not exist. Creating new frame data.")
-            self.loaded_frame_data = FrameData()
-            self.loaded_frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
+        self.frame_data = self.motion_file_manager.get_frame(self.filename)
+        self.set_frame_to_ui()
+        self.loaded_frame_data = copy.deepcopy(self.frame_data)
 
-        self.setWindowTitle(f"Frame: {os.path.basename(self.filepath)}")
+        self.setWindowTitle(f"Frame: {self.motion_file_manager._resolve_frame_path(self.filename)}")
 
-        # Set initial pose data to prev and next frames
+        # Set initial frame data to prev and next frames
         self.prev_frame_data = None
         self.next_frame_data = None
-        path = self.motion_file_manager.resolve_initial_pose_path()
-        if os.path.exists(path):
-            pose_data = InitialPoseData()
-            pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
-            pose_data.load_from_file(path)
-            frame = FrameData()
-            frame.set_joint_names(self.joint_data_manager.get_joint_names())
-            frame.set_joint_state(pose_data.get_joint_state())
-            frame.move_duration = 1.0
-            frame.wait_duration = 0.0
-            self.prev_frame_data = frame
-            self.next_frame_data = frame
+        initial_frame = self._get_initial_frame_data()
+        self.prev_frame_data = initial_frame
+        self.next_frame_data = initial_frame
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -250,14 +221,9 @@ class FrameEditorDialog(QDialog):
             cb.blockSignals(False)
 
     def reset_all_positions(self):
-        try:
-            path = self.motion_file_manager.resolve_initial_frame_path()
-            if os.path.exists(path):
-                self.frame_data.load_from_file(path)
-                self.set_frame_to_ui()
-                return
-        except Exception as e:
-            rospy.logwarn(f"[FrameEditorDialog] Failed to reset from initial_frame.yaml: {e}")
+        self.frame_data = self.motion_file_manager.get_initial_frame()
+        self.set_frame_to_ui()
+        return
 
     def open_pid_dialog(self, joint_name, button):
         current = self.frame_data.get_pid(joint_name)
@@ -375,7 +341,7 @@ class FrameEditorDialog(QDialog):
             self.frame_data.set_speed_scale(joint_name, vel_spin.value())
             self.frame_data.set_enable(joint_name, self.enable_checkbox_widgets[joint_name].isChecked())
 
-        self.frame_data.save_to_file(self.filepath)
+        self.motion_file_manager.set_frame(self.filename, self.frame_data)
         super().accept()
 
     def set_prev_frame_data(self, frame_data: FrameData):
@@ -395,30 +361,21 @@ class FrameEditorDialog(QDialog):
         return self._get_initial_frame_data()
 
     def _get_initial_frame_data(self):
-        try:
-            path = self.motion_file_manager.resolve_initial_frame_path()
-            if os.path.exists(path):
-                data = FrameData()
-                data.set_joint_names(self.joint_data_manager.get_joint_names())
-                data.load_from_file(path)
-                return data
-        except Exception as e:
-            rospy.logwarn(f"[FrameEditorDialog] Failed to load initial_frame: {e}")
-
-        try:
-            path = self.motion_file_manager.resolve_initial_pose_path()
-            if os.path.exists(path):
-                pose_data = InitialPoseData()
-                pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
-                pose_data.load_from_file(path)
-                frame = FrameData()
-                frame.set_joint_names(self.joint_data_manager.get_joint_names())
-                frame.set_joint_state(pose_data.get_joint_state())
-                frame.move_duration = 1.0
-                frame.wait_duration = 0.0
-                return frame
-        except Exception as e:
-            rospy.logwarn(f"[FrameEditorDialog] Failed to load initial_pose: {e}")
+        initial_frame = self.motion_file_manager.get_initial_frame()
+        initial_pose = self.motion_file_manager.get_initial_pose()
+        if initial_frame:
+            return initial_frame
+        elif initial_pose:
+            rospy.logwarn("[FrameEditorDialog] No initial frame found, using initial pose as fallback.")
+            frame = FrameData()
+            joint_names = self.joint_data_manager.get_joint_names()
+            frame.set_joint_names(joint_names)
+            frame.set_joint_state(initial_pose.get_joint_state())
+            frame.move_duration = 1.0
+            frame.wait_duration = 0.0
+            return frame
+        else:
+            rospy.logwarn("[FrameEditorDialog] No initial frame or pose found, creating a default frame.")
 
         frame = FrameData()
         joint_names = self.joint_data_manager.get_joint_names()

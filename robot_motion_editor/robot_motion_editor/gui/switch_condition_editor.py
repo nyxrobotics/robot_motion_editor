@@ -29,10 +29,8 @@ class SwitchConditionEditorDialog(QDialog):
         self.filename = filename
         self.condition_data = SwitchConditionData()
         self.init_ui()
-        self.filepath = self.motion_file_manager.resolve_switch_condition_path(self.filename)
-        if os.path.exists(self.filepath):
-            self.load_condition()
-        self.setWindowTitle(f"Switch: {os.path.basename(self.filepath)}")
+        self.load_condition()
+        self.setWindowTitle(f"Switch: {self.motion_file_manager._resolve_switch_condition_path(self.filename)}")
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -83,8 +81,7 @@ class SwitchConditionEditorDialog(QDialog):
                 self.joint_data_manager.get_available_variables()))
 
     def load_condition(self):
-        file_path = self.motion_file_manager.resolve_switch_condition_path(self.filename)
-        self.condition_data.load_from_file(file_path)
+        self.condition_data = self.motion_file_manager.get_switch(self.filename)
         self.expression_edit.setPlainText(self.condition_data.expression)
         self.condition_edit.setPlainText(self.condition_data.condition)
 
@@ -144,8 +141,7 @@ class SwitchConditionEditorDialog(QDialog):
         self.condition_data.condition = condition
         self.condition_data.case = case_dict
 
-        file_path = self.motion_file_manager.resolve_switch_condition_path(self.filename)
-        self.condition_data.save_to_file(file_path)
+        self.motion_file_manager.set_switch(self.filename, self.condition_data)
 
         self.result = {"num_cases": case_count + 1}
         self.accept()
