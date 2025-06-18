@@ -194,10 +194,7 @@ class AnimationVisualizer:
         if isinstance(block, FrameBlockItem):
             frame_name = block.filename
             try:
-                frame_path = self.motion_file_manager.resolve_frame_path(frame_name)
-                frame_data = FrameData()
-                frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
-                frame_data.load_from_file(frame_path)
+                frame_data = self.motion_file_manager.get_frame(frame_name)
                 target_joint_state = frame_data.get_joint_state()
                 move_duration = frame_data.move_duration
             except Exception as e:
@@ -210,10 +207,7 @@ class AnimationVisualizer:
 
         elif isinstance(block, StartBlockItem):
             try:
-                frame_path = self.motion_file_manager.resolve_initial_frame_path()
-                frame_data = FrameData()
-                frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
-                frame_data.load_from_file(frame_path)
+                frame_data = self.motion_file_manager.get_initial_frame()
                 target_joint_state = frame_data.get_joint_state()
                 move_duration = frame_data.move_duration
             except Exception as e:
@@ -224,16 +218,12 @@ class AnimationVisualizer:
             rospy.loginfo("[Visualizer] Played StartBlockItem.")
 
     def extract_joint_state_and_duration(self, block):
-
+        frame_data = FrameData()
         if isinstance(block, FrameBlockItem):
-            path = self.motion_file_manager.resolve_frame_path(block.filename)
+            frame_data = self.motion_file_manager.get_frame(block.filename)
         elif isinstance(block, StartBlockItem):
-            path = self.motion_file_manager.resolve_initial_frame_path()
+            frame_data = self.motion_file_manager.get_initial_frame()
         else:
             return None, 0.0, 0.0
-
-        frame_data = FrameData()
-        frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
-        frame_data.load_from_file(path)
 
         return frame_data.get_joint_state(), frame_data.move_duration, frame_data.wait_duration

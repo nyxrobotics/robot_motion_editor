@@ -40,7 +40,8 @@ class MainWindow(QWidget):
         self.trajectory_visualizer = TrajectoryVisualizer(use_state_mode=True, playback_rate=30.0)
         self.trajectory_commander = TrajectoryCommander(
             get_robot_name(), self.joint_data_manager.get_joint_names(), mode="position")
-        self.motion_file_manager = MotionFileManager(motion_directory=".")
+        self.motion_file_manager = MotionFileManager(
+            motion_directory=".", joint_names=self.joint_data_manager.get_joint_names())
 
         self.init_ui()
 

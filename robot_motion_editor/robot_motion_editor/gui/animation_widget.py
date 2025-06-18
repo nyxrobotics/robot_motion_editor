@@ -138,7 +138,7 @@ class AnimaitonWidget(QWidget):
             return True
 
         current_data = self.animation_flow_scene.get_animation_data().get_dict()
-        saved_data = self.motion_file_manager.get_animation_data(anim_name).get_dict()
+        saved_data = self.motion_file_manager.get_animation_data().get_dict()
 
         if current_data == saved_data:
             return True
@@ -219,8 +219,7 @@ class AnimaitonWidget(QWidget):
         self.animation_flow_scene.highlight_preview_path()
 
         try:
-            frame_data = FrameData(joint_names=self.joint_data_manager.get_joint_names())
-            frame_data.load_from_file(self.motion_file_manager.resolve_initial_frame_path())
+            frame_data = self.motion_file_manager.get_initial_frame()
             self.initial_joint_state = frame_data.get_joint_state()
             self.animation_visualizer.initial_joint_state = self.initial_joint_state
             self.animation_commander.initial_joint_state = self.initial_joint_state
