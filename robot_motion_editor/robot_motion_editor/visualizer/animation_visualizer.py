@@ -28,7 +28,7 @@ class AnimationVisualizer:
                  motion_file_manager: MotionFileManager,
                  joint_data_manager: JointDataManager):
         self.animation_flow_scene = animation_flow_scene
-        self.visualizer = trajectory_visualizer
+        self.trajectory_visualizer = trajectory_visualizer
         self.motion_file_manager = motion_file_manager
         self.joint_data_manager = joint_data_manager
 
@@ -49,7 +49,7 @@ class AnimationVisualizer:
         self._pause_event.set()
 
     def start(self, start_block=None):
-        self.visualizer.enable_loop(False)
+        self.trajectory_visualizer.enable_loop(False)
         with self._lock:
             if self._thread and self._thread.is_alive():
                 return
@@ -128,10 +128,10 @@ class AnimationVisualizer:
         self.current_block = start_block or self.animation_flow_scene.get_start_block()
         start_target, move_duration, wait_duration = self.extract_joint_state_and_duration(self.current_block)
 
-        if not self.check_same_joint_state(self.visualizer.get_current_target_state(), start_target):
+        if not self.check_same_joint_state(self.trajectory_visualizer.get_current_target_state(), start_target):
             rospy.loginfo("[AnimationCommander] Move to start target before playing animation.")
-            self.visualizer.send_joint_state(start_target, 1.0)
-            self.visualizer.visualize_goal_state(start_target)
+            self.trajectory_visualizer.send_joint_state(start_target, 1.0)
+            self.trajectory_visualizer.visualize_goal_state(start_target)
             time.sleep(1.0)
 
         while self.current_block and not self._stop_event.is_set() and not rospy.is_shutdown():
@@ -166,8 +166,8 @@ class AnimationVisualizer:
                 self.stop()
                 return
 
-            self.visualizer.send_joint_state(target_joint_state, move_duration)
-            self.visualizer.visualize_goal_state(target_joint_state)
+            self.trajectory_visualizer.send_joint_state(target_joint_state, move_duration)
+            self.trajectory_visualizer.visualize_goal_state(target_joint_state)
 
             total_duration = move_duration + wait_duration
             elapsed = 0.0
@@ -201,8 +201,8 @@ class AnimationVisualizer:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
                 return
 
-            self.visualizer.send_joint_state(target_joint_state, move_duration)
-            self.visualizer.visualize_goal_state(target_joint_state)
+            self.trajectory_visualizer.send_joint_state(target_joint_state, move_duration)
+            self.trajectory_visualizer.visualize_goal_state(target_joint_state)
             rospy.loginfo(f"[Visualizer] Played single frame: {frame_name}")
 
         elif isinstance(block, StartBlockItem):
@@ -213,8 +213,8 @@ class AnimationVisualizer:
             except Exception as e:
                 rospy.logwarn(f"[AnimationVisualizer] Failed to load initial frame: {e}")
 
-            self.visualizer.send_joint_state(target_joint_state, move_duration)
-            self.visualizer.visualize_goal_state(target_joint_state)
+            self.trajectory_visualizer.send_joint_state(target_joint_state, move_duration)
+            self.trajectory_visualizer.visualize_goal_state(target_joint_state)
             rospy.loginfo("[Visualizer] Played StartBlockItem.")
 
     def extract_joint_state_and_duration(self, block):
