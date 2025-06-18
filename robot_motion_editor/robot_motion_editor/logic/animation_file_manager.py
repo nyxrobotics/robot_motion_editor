@@ -4,6 +4,7 @@ from dataclasses import field
 from typing import Dict
 from typing import List
 
+import rospy
 import yaml
 
 
@@ -126,9 +127,9 @@ class AnimationFileManager:
         try:
             with open(filepath, 'w') as f:
                 yaml.safe_dump({"layout": layout_data}, f, allow_unicode=True)
-            print(f"[INFO] Animation saved to: {filepath}")
+            rospy.loginfo(f"[AnimationFileManager] Animation saved to: {filepath}")
         except Exception as e:
-            print(f"[ERROR] Failed to save animation to {filepath}: {e}")
+            rospy.logerr(f"[AnimationFileManager] Failed to save animation to {filepath}: {e}")
 
     @staticmethod
     def load_dict(filepath: str) -> dict:
@@ -142,7 +143,7 @@ class AnimationFileManager:
         - dict: Layout dictionary with keys 'block' and 'arrow'
         """
         if not os.path.isfile(filepath):
-            print(f"[WARN] Animation file not found: {filepath}")
+            rospy.logwarn(f"[AnimationFileManager] Animation file not found: {filepath}")
             return {"block": {}, "arrow": {}}
         try:
             with open(filepath, 'r') as f:
@@ -153,5 +154,5 @@ class AnimationFileManager:
                     raw, dict) else {
                     "block": {}, "arrow": {}}
         except Exception as e:
-            print(f"[ERROR] Failed to load animation: {e}")
+            rospy.logerr(f"[AnimationFileManager] Failed to load animation: {e}")
             return {"block": {}, "arrow": {}}

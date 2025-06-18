@@ -41,7 +41,7 @@ class MotionFileManager:
         if self.motion_directory == directory:
             return
         if not os.path.isdir(directory):
-            rospy.logerr(f"Provided motion directory does not exist: {directory}")
+            rospy.logerr(f"[MotionFileManager] Provided motion directory does not exist: {directory}")
             return
         self.motion_directory = directory
         self._clear_current_animation()
@@ -52,7 +52,7 @@ class MotionFileManager:
 
     def set_initial_pose(self, initial_pose_data):
         if not isinstance(initial_pose_data, InitialPoseData):
-            rospy.logwarn("Invalid initial_pose_data provided.")
+            rospy.logwarn("[MotionFileManager] Invalid initial_pose_data provided.")
             return
         if self.motion_initial_pose and initial_pose_data.get_dict() == self.motion_initial_pose.get_dict():
             return
@@ -77,18 +77,18 @@ class MotionFileManager:
 
     def get_animation_name(self):
         if not self.animation_name:
-            rospy.logwarn("No animation is currently loaded.")
+            rospy.logwarn("[MotionFileManager] get_animation_name: No animation is currently loaded.")
         return self.animation_name
 
     def set_animation_data(self, animation_data):
         if not self.animation_name:
-            rospy.logwarn("No animation loaded to save.")
+            rospy.logwarn("[MotionFileManager] No animation loaded to save.")
             return
         if not isinstance(animation_data, AnimationData):
-            rospy.logwarn("Invalid animation_data provided.")
+            rospy.logwarn("[MotionFileManager] Invalid animation_data provided.")
             return
         if self.animation_data and animation_data.get_dict() == self.animation_data.get_dict():
-            rospy.loginfo("No changes detected in animation; skipping save.")
+            rospy.loginfo("[MotionFileManager] No changes detected in animation; skipping save.")
             return
         yaml_path = self._resolve_animation_yaml_path()
         if not yaml_path:
@@ -96,19 +96,19 @@ class MotionFileManager:
         try:
             animation_data.save_to_file(yaml_path)
             self.animation_data = animation_data
-            rospy.loginfo(f"Saved animation: {self.animation_name}")
+            rospy.loginfo(f"[MotionFileManager] Saved animation: {self.animation_name}")
         except Exception as e:
-            rospy.logerr(f"Failed to save animation {self.animation_name}: {e}")
+            rospy.logerr(f"[MotionFileManager] Failed to save animation {self.animation_name}: {e}")
 
     def get_animation_data(self):
         if not self.animation_data:
-            rospy.logwarn("No animation is currently loaded.")
+            rospy.logwarn("[MotionFileManager] get_animation_data: No animation is currently loaded.")
         return self.animation_data
 
     def create_animation(self, animation_name):
         path = self._resolve_animation_path(animation_name)
         if os.path.exists(path):
-            rospy.logwarn(f"Animation already exists: {animation_name}")
+            rospy.logwarn(f"[MotionFileManager] Animation already exists: {animation_name}")
             return
         try:
             os.makedirs(os.path.join(path, "frames"))
@@ -116,36 +116,36 @@ class MotionFileManager:
             os.makedirs(os.path.join(path, "conditions", "switch"))
             anim_data = AnimationData()
             anim_data.save_to_file(os.path.join(path, "animation.yaml"))
-            rospy.loginfo(f"Created new animation: {animation_name}")
+            rospy.loginfo(f"[MotionFileManager] Created new animation: {animation_name}")
         except Exception as e:
-            rospy.logerr(f"Failed to create animation {animation_name}: {e}")
+            rospy.logerr(f"[MotionFileManager] Failed to create animation {animation_name}: {e}")
 
     def rename_animation(self, old_name, new_name):
         old_path = self._resolve_animation_path(old_name)
         new_path = self._resolve_animation_path(new_name)
         if os.path.exists(new_path):
-            rospy.logwarn(f"Cannot rename: target animation {new_name} already exists.")
+            rospy.logwarn(f"[MotionFileManager] Cannot rename: target animation {new_name} already exists.")
             return
         try:
             os.rename(old_path, new_path)
-            rospy.loginfo(f"Renamed animation: {old_name} -> {new_name}")
+            rospy.loginfo(f"[MotionFileManager] Renamed animation: {old_name} -> {new_name}")
             if self.animation_name == old_name:
                 self.animation_name = new_name
         except Exception as e:
-            rospy.logerr(f"Failed to rename animation {old_name} to {new_name}: {e}")
+            rospy.logerr(f"[MotionFileManager] Failed to rename animation {old_name} to {new_name}: {e}")
 
     def delete_animation(self, current_animation_name):
         path = self._resolve_animation_path(current_animation_name)
         if not os.path.exists(path):
-            rospy.logwarn(f"Animation does not exist: {current_animation_name}")
+            rospy.logwarn(f"[MotionFileManager] Animation does not exist: {current_animation_name}")
             return
         try:
             shutil.rmtree(path)
-            rospy.loginfo(f"Deleted animation: {current_animation_name}")
+            rospy.loginfo(f"[MotionFileManager] Deleted animation: {current_animation_name}")
             if self.animation_name == current_animation_name:
                 self._clear_current_animation()
         except Exception as e:
-            rospy.logerr(f"Failed to delete animation {current_animation_name}: {e}")
+            rospy.logerr(f"[MotionFileManager] Failed to delete animation {current_animation_name}: {e}")
 
     # === Initial Frame ===
     def set_initial_frame(self, frame_data):
@@ -231,7 +231,7 @@ class MotionFileManager:
     # === List Files ===
     def list_animation_directories(self):
         if not self.motion_directory or not os.path.isdir(self.motion_directory):
-            rospy.logwarn("Motion directory is not set or does not exist.")
+            rospy.logwarn("[MotionFileManager] Motion directory is not set or does not exist.")
             return []
         animation_dirs = []
         for name in os.listdir(self.motion_directory):
@@ -267,11 +267,14 @@ class MotionFileManager:
 
     # === Internal Utilities ===
     def _load_animation(self, name):
+        if name is None or not name.strip():
+            self._clear_current_animation()
+            return
         self.animation_name = name
         yaml_path = self._resolve_animation_yaml_path()
         if not yaml_path or not os.path.exists(yaml_path):
             self.animation_name = None
-            rospy.logwarn(f"Animation file not found: {yaml_path}")
+            rospy.logwarn(f"[MotionFileManager] Animation file not found: {yaml_path}")
             return
         try:
             self._clear_current_animation()
@@ -280,10 +283,10 @@ class MotionFileManager:
             self.animation_name = name
             self.animation_data = anim_data
             self._load_animation_items()
-            rospy.loginfo(f"Loaded animation: {name}")
+            rospy.loginfo(f"[MotionFileManager] Loaded animation: {name}")
         except Exception as e:
             self.animation_name = None
-            rospy.logerr(f"Failed to load animation {name}: {e}")
+            rospy.logerr(f"[MotionFileManager] Failed to load animation {name}: {e}")
 
     def _load_animation_items(self):
         self._load_initial_frame()
@@ -310,11 +313,11 @@ class MotionFileManager:
         - InitialPoseData: The loaded initial pose data.
         """
         if not self.motion_directory:
-            rospy.logwarn("Motion directory is not set.")
+            rospy.logwarn("[MotionFileManager] Motion directory is not set.")
             return None
         path = os.path.join(self.motion_directory, "initial_pose.yaml")
         if not os.path.exists(path):
-            rospy.logwarn(f"Initial pose file does not exist: {path}")
+            rospy.logwarn(f"[MotionFileManager] Initial pose file does not exist: {path}")
             return None
 
         initial_pose_data = InitialPoseData()
@@ -333,17 +336,17 @@ class MotionFileManager:
         Save the current initial pose to the motion directory.
         """
         if not self.motion_initial_pose:
-            rospy.logwarn("No initial pose set to save.")
+            rospy.logwarn("[MotionFileManager] No initial pose set to save.")
             return
         if not self.motion_directory:
-            rospy.logwarn("Motion directory is not set.")
+            rospy.logwarn("[MotionFileManager] Motion directory is not set.")
             return
         path = os.path.join(self.motion_directory, "initial_pose.yaml")
         try:
             self.motion_initial_pose.save_to_file(path)
-            rospy.loginfo(f"Saved initial pose to: {path}")
+            rospy.loginfo(f"[MotionFileManager] Saved initial pose to: {path}")
         except Exception as e:
-            rospy.logerr(f"Failed to save initial pose: {e}")
+            rospy.logerr(f"[MotionFileManager] Failed to save initial pose: {e}")
 
     def _load_initial_frame(self):
         frame = FrameData(joint_names=self.get_joint_names())
@@ -399,27 +402,27 @@ class MotionFileManager:
 
     def _rename_file(self, old_path, new_path):
         if os.path.exists(new_path):
-            rospy.logwarn(f"Cannot rename: target file {new_path} already exists.")
+            rospy.logwarn(f"[MotionFileManager] Cannot rename: target file {new_path} already exists.")
             return
         try:
             os.rename(old_path, new_path)
-            rospy.loginfo(f"Renamed file: {old_path} -> {new_path}")
+            rospy.loginfo(f"[MotionFileManager] Renamed file: {old_path} -> {new_path}")
         except Exception as e:
-            rospy.logerr(f"Failed to rename file {old_path} to {new_path}: {e}")
+            rospy.logerr(f"[MotionFileManager] Failed to rename file {old_path} to {new_path}: {e}")
 
     def _rename_directory(self, old_path, new_path):
         try:
             os.rename(old_path, new_path)
-            rospy.loginfo(f"Renamed directory: {old_path} -> {new_path}")
+            rospy.loginfo(f"[MotionFileManager] Renamed directory: {old_path} -> {new_path}")
             return True
         except Exception as e:
-            rospy.logerr(f"Failed to rename directory {old_path} to {new_path}: {e}")
+            rospy.logerr(f"[MotionFileManager] Failed to rename directory {old_path} to {new_path}: {e}")
             return False
 
     def _resolve_animation_path(self, name=None):
         anim_name = name or self.animation_name
         if not self.motion_directory or not anim_name:
-            rospy.logerr("motion_directory and animation name must be set before resolving paths.")
+            rospy.logerr("[MotionFileManager] motion_directory and animation name must be set before resolving paths.")
             return None
         return os.path.join(self.motion_directory, anim_name)
 

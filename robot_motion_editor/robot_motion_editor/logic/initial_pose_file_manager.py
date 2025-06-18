@@ -44,15 +44,15 @@ class InitialPoseFileManager:
         - dict: joint_data dictionary with same format as described in save_dict()
         """
         if not os.path.exists(filepath):
-            rospy.logwarn(f"[WARN] Initial pose file not found: {filepath}")
+            rospy.logwarn(f"[InitialPoseFileManager] Initial pose file not found: {filepath}")
             return {}
         try:
             with open(filepath, "r") as f:
                 data = yaml.safe_load(f)
-            rospy.loginfo(f"Initial pose successfully loaded from: {filepath}")
+            rospy.loginfo(f"[InitialPoseFileManager] Initial pose successfully loaded from: {filepath}")
             return data.get("joints", {})
         except Exception as e:
-            rospy.logwarn(f"[ERROR] Failed to load initial pose from: {filepath} — {e}")
+            rospy.logerr(f"[InitialPoseFileManager] Failed to load initial pose from: {filepath} — {e}")
             return {}
 
 
