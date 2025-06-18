@@ -65,10 +65,15 @@ class MotionFileManager:
         return self._load_initial_pose()
 
     # === Animation Management ===
-    def set_animation_name(self, name):
+    def set_animation_name(self, name, skip_load=False):
         if self.animation_name == name:
             return
-        self._load_animation(name)
+        if skip_load:
+            self._clear_current_animation()
+            self.animation_name = name
+            return
+        else:
+            self._load_animation(name)
 
     def get_animation_name(self):
         if not self.animation_name:

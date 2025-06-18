@@ -124,7 +124,7 @@ class AnimaitonWidget(QWidget):
         self.animation_tree.reload_animation_list()
         for i in range(self.animation_tree.topLevelItemCount()):
             animation_name = self.animation_tree.topLevelItem(i).text(0)
-            self.animation_tree.reload_animation_contents(animation_name)
+            self.animation_tree.reload_file_lists(animation_name)
         self.motion_file_manager.set_animation_name(None)
         self.animation_tree.setCurrentItem(None)
 
@@ -159,7 +159,7 @@ class AnimaitonWidget(QWidget):
 
     def on_new_animation_btn(self):
         name = self.animation_tree.create_new_animation()
-        self.animation_tree.reload_animation_contents(name)
+        self.animation_tree.reload_file_lists(name)
 
     def on_new_frame_btn(self):
         animation_name = self.motion_file_manager.get_animation_name()
@@ -167,7 +167,7 @@ class AnimaitonWidget(QWidget):
             QMessageBox.information(self, "Delete Frame", "No animation selected.")
             return
         self.animation_tree.create_new_frame(animation_name)
-        self.animation_tree.reload_animation_contents(animation_name)
+        self.animation_tree.reload_file_lists(animation_name)
 
     def on_delete_anim_btn(self):
         self.animation_tree.delete_animation()
@@ -179,7 +179,7 @@ class AnimaitonWidget(QWidget):
             QMessageBox.information(self, "Delete Frame", "No animation selected.")
             return
         self.animation_tree.delete_frame()
-        self.animation_tree.reload_animation_contents(animation_name)
+        self.animation_tree.reload_file_lists(animation_name)
 
     def on_tree_item_clicked(self, item):
         animation_item = item

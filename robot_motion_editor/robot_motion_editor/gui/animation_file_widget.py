@@ -137,7 +137,7 @@ class AnimationFileWidget(QTreeWidget):
                         self.motion_file_manager.rename_switch(old_name=old_name, new_name=new_name.strip())
                     else:
                         QMessageBox.warning(self, "Error", "Cannot rename this item.")
-                    self.reload_animation_contents(self.motion_file_manager.get_animation_name())
+                    self.reload_file_lists(self.motion_file_manager.get_animation_name())
 
             elif selected == delete_action:
                 if item.parent().text(0) == "frames":
@@ -148,7 +148,7 @@ class AnimationFileWidget(QTreeWidget):
                     self.motion_file_manager.delete_switch(item.text(0))
                 else:
                     QMessageBox.warning(self, "Error", "Cannot delete this item.")
-                self.reload_animation_contents(self.motion_file_manager.get_animation_name())
+                self.reload_file_lists(self.motion_file_manager.get_animation_name())
 
     def on_header_context_menu(self, pos):
         global_pos = self.header().mapToGlobal(pos)
@@ -163,60 +163,15 @@ class AnimationFileWidget(QTreeWidget):
         new_name, ok = QInputDialog.getText(self, "Rename Animation", f"Rename '{old_name}' to:", text=old_name)
         if not ok or not new_name or old_name == new_name:
             return
-
-        old_path = self.motion_file_manager.resolve_animation_path(old_name)
-        new_path = self.motion_file_manager.resolve_animation_path(new_name)
-
-        if os.path.exists(new_path):
-            QMessageBox.warning(self, "Error", f"'{new_name}' already exists.")
-            return
-
-        try:
-            os.rename(old_path, new_path)
-        except Exception as e:
-            QMessageBox.critical(self, "Rename Failed", str(e))
-            return
-
-        # アニメーション名の更新
-        if self.motion_file_manager.get_animation_name() == old_name:
-            self.motion_file_manager.set_animation_name(new_name)
-        else:
-            self.motion_file_manager.set_animation_name(None)
-
-        # 完全にリロード（←ここが重要）
-        self.clear()
-        self.reload_animation_list()
-        for i in range(self.topLevelItemCount()):
-            anim = self.topLevelItem(i).text(0)
-            self.reload_animation_contents(anim)
-
-        # シーンも更新
-        self.setCurrentItem(None)
-        self.reload_scene()
+        self.motion_file_manager.rename_animation(old_name=old_name, new_name=new_name.strip())
 
     def delete_animation_folder(self, item: QTreeWidgetItem):
         name = item.text(0)
-        path = self.motion_file_manager.resolve_animation_path(name)
-
-        reply = QMessageBox.question(
-            self, "Delete Animation", f"Are you sure you want to delete animation '{name}'?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        if reply == QMessageBox.Yes:
-            try:
-                shutil.rmtree(path)
-            except Exception as e:
-                QMessageBox.critical(self, "Delete Failed", str(e))
-                return
-
-            if self.motion_file_manager.get_animation_name() == name:
-                self.motion_file_manager.set_animation_name(None)
-
-            self.reload_animation_list()
+        self.motion_file_manager.delete_animation(name)
 
     def reload_scene(self):
         animation_name = self.motion_file_manager.get_animation_name()
-        self.reload_animation_contents(animation_name)
+        self.reload_file_lists(animation_name)
 
     def mouseMoveEvent(self, event):
         item = self.currentItem()
@@ -281,7 +236,8 @@ class AnimationFileWidget(QTreeWidget):
         if not ok or not name.strip():
             return
         name = name.strip()
-        self.motion_file_manager.set_initial_frame(name)
+        if_data = IfConditionData(expression="", condition="")
+        self.motion_file_manager.set_if(name, if_data)
 
     def create_new_switch(self, animation_name=None):
         if not animation_name:
@@ -299,7 +255,8 @@ class AnimationFileWidget(QTreeWidget):
         if not ok or not name.strip():
             return
         name = name.strip()
-        self.motion_file_manager.set_switch(name)
+        switch_data = SwitchConditionData(expression="", condition="", cases={})
+        self.motion_file_manager.set_switch(name, switch_data)
 
     def reload_animation_list(self):
         self.clear()
@@ -313,7 +270,7 @@ class AnimationFileWidget(QTreeWidget):
                 anim_item = QTreeWidgetItem([animation_name])
                 self.addTopLevelItem(anim_item)
 
-    def reload_animation_contents(self, animation_name: str):
+    def reload_file_lists(self, animation_name: str):
         base_dir = self.motion_file_manager.get_motion_directory()
         anim_path = os.path.join(base_dir, animation_name)
         if not os.path.isdir(anim_path):
@@ -334,7 +291,7 @@ class AnimationFileWidget(QTreeWidget):
 
         # frames
         frames_item = QTreeWidgetItem(parent_item, ["frames"])
-        self.motion_file_manager.set_animation_name(animation_name)
+        self.motion_file_manager.set_animation_name(name=animation_name, skip_load=True)
         for frame in self.motion_file_manager.list_frame_files():
             QTreeWidgetItem(frames_item, [frame])
 
