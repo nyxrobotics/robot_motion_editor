@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 
+import rospy
 import yaml
 
 
@@ -59,9 +60,9 @@ class IfConditionFileManager:
         try:
             with open(filepath, "w") as f:
                 yaml.safe_dump(data, f, default_flow_style=False)
-            print(f"[INFO] IfCondition data saved to: {filepath}")
+            rospy.loginfo(f"[IfConditionFileManager] IfCondition data saved to: {filepath}")
         except Exception as e:
-            print(f"[ERROR] Failed to save IfCondition data to {filepath}: {e}")
+            rospy.logerr(f"[IfConditionFileManager] Failed to save IfCondition data to {filepath}: {e}")
 
     @staticmethod
     def load_dict(filepath: str) -> dict:
@@ -75,13 +76,13 @@ class IfConditionFileManager:
         - dict: Loaded condition data.
         """
         if not os.path.exists(filepath):
-            print(f"[WARN] IfCondition file not found: {filepath}")
+            rospy.logwarn(f"[IfConditionFileManager] IfCondition file not found: {filepath}")
             return {}
         try:
             with open(filepath, "r") as f:
                 data = yaml.safe_load(f)
-            print(f"[INFO] IfCondition data loaded from: {filepath}")
+            rospy.loginfo(f"[IfConditionFileManager] IfCondition data loaded from: {filepath}")
             return data or {}
         except Exception as e:
-            print(f"[ERROR] Failed to load IfCondition data from {filepath}: {e}")
+            rospy.logerr(f"[IfConditionFileManager] Failed to load IfCondition data from {filepath}: {e}")
             return {}

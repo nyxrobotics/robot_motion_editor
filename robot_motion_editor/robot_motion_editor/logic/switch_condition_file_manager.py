@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from dataclasses import field
 from typing import Dict
 
+import rospy
 import yaml
 
 
@@ -78,9 +79,9 @@ class SwitchConditionFileManager:
         try:
             with open(filepath, "w") as f:
                 yaml.dump(quoted_data, f, sort_keys=False, allow_unicode=True)
-            print(f"[INFO] SwitchCondition saved to: {filepath}")
+            rospy.loginfo(f"[SwitchConditionFileManager] SwitchCondition saved to: {filepath}")
         except Exception as e:
-            print(f"[ERROR] Failed to save SwitchCondition to {filepath}: {e}")
+            rospy.logerr(f"[SwitchConditionFileManager] Failed to save SwitchCondition to {filepath}: {e}")
 
     @staticmethod
     def load_dict(filepath: str) -> dict:
@@ -94,13 +95,13 @@ class SwitchConditionFileManager:
         - dict: Loaded switch condition data.
         """
         if not os.path.exists(filepath):
-            print(f"[WARN] SwitchCondition file not found: {filepath}")
+            rospy.logwarn(f"[SwitchConditionFileManager] SwitchCondition file not found: {filepath}")
             return {}
         try:
             with open(filepath, "r") as f:
                 data = yaml.safe_load(f)
-            print(f"[INFO] SwitchCondition loaded from: {filepath}")
+            rospy.loginfo(f"[SwitchConditionFileManager] SwitchCondition loaded from: {filepath}")
             return data or {}
         except Exception as e:
-            print(f"[ERROR] Failed to load SwitchCondition from {filepath}: {e}")
+            rospy.logerr(f"[SwitchConditionFileManager] Failed to load SwitchCondition from {filepath}: {e}")
             return {}
