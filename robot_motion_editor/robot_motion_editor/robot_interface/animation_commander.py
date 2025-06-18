@@ -105,11 +105,11 @@ class AnimationCommander:
         return False
 
     def check_same_joint_state(self, start_joint_state: JointState, goal_joint_state: JointState, threshold=1e-2):
-        if start_joint_state is None or goal_joint_state is None:
-            rospy.logwarn("[AnimationVisualizer] One of the joint states is None.")
+        if start_joint_state is None:
+            rospy.logwarn("[AnimationVisualizer] Start joint state is None.")
             return False
-        if start_joint_state.name != goal_joint_state.name:
-            rospy.logwarn("[AnimationVisualizer] Joint names do not match.")
+        if goal_joint_state is None:
+            rospy.logwarn("[AnimationVisualizer] Goal joint state is None.")
             return False
         if len(start_joint_state.position) != len(goal_joint_state.position):
             rospy.logwarn("[AnimationVisualizer] Joint state lengths do not match.")

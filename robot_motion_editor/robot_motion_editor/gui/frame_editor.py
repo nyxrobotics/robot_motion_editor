@@ -60,18 +60,17 @@ class FrameEditorDialog(QDialog):
         self.enable_checkbox_widgets = {}
         self.frame_visualizer = FrameVisualizer(trajectory_visualizer)
 
-        self.init_ui()
-
         # Load frame data from file if it exists
         self.frame_data = self.motion_file_manager.get_frame(self.filename)
+        self.init_ui()
         self.set_frame_to_ui()
         self.loaded_frame_data = copy.deepcopy(self.frame_data)
 
         self.setWindowTitle(f"Frame: {self.motion_file_manager._resolve_frame_path(self.filename)}")
 
         # Set initial frame data to prev and next frames
-        self.prev_frame_data = None
-        self.next_frame_data = None
+        self.prev_frame_data = FrameData()
+        self.next_frame_data = FrameData()
         initial_frame = self._get_initial_frame_data()
         self.prev_frame_data = initial_frame
         self.next_frame_data = initial_frame
