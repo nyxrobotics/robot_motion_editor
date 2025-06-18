@@ -137,6 +137,8 @@ class AnimationFileWidget(QTreeWidget):
                         self.motion_file_manager.rename_switch(old_name=old_name, new_name=new_name.strip())
                     else:
                         QMessageBox.warning(self, "Error", "Cannot rename this item.")
+                    rospy.loginfo(
+                        f"[AnimationFileWidget] Renamed {item.parent().text(0)}: {old_name} -> {new_name.strip()}")
                     self.reload_file_lists(self.motion_file_manager.get_animation_name())
 
             elif selected == delete_action:
@@ -148,6 +150,7 @@ class AnimationFileWidget(QTreeWidget):
                     self.motion_file_manager.delete_switch(item.text(0))
                 else:
                     QMessageBox.warning(self, "Error", "Cannot delete this item.")
+                rospy.loginfo(f"[AnimationFileWidget] Deleted {item.parent().text(0)}: {item.text(0)}")
                 self.reload_file_lists(self.motion_file_manager.get_animation_name())
 
     def on_header_context_menu(self, pos):
@@ -170,6 +173,7 @@ class AnimationFileWidget(QTreeWidget):
         self.motion_file_manager.delete_animation(name)
 
     def reload_scene(self):
+        rospy.loginfo("[AnimationFileWidget] Reloading animation scene")
         animation_name = self.motion_file_manager.get_animation_name()
         self.reload_file_lists(animation_name)
 

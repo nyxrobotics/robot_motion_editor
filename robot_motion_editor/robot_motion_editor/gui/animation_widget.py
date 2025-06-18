@@ -133,6 +133,7 @@ class AnimaitonWidget(QWidget):
         self.motion_file_manager.set_animation_data(anim_data)
 
     def confirm_save_if_unsaved_changes(self):
+        rospy.loginfo("[MotionEditor] Checking for unsaved changes.")
         anim_name = self.motion_file_manager.get_animation_name()
         if not anim_name:
             return True
@@ -162,6 +163,7 @@ class AnimaitonWidget(QWidget):
         self.animation_tree.reload_file_lists(name)
 
     def on_new_frame_btn(self):
+        rospy.loginfo("[MotionEditor] Creating new frame.")
         animation_name = self.motion_file_manager.get_animation_name()
         if not animation_name:
             QMessageBox.information(self, "Delete Frame", "No animation selected.")
@@ -174,6 +176,7 @@ class AnimaitonWidget(QWidget):
         self.reload_animation_tree()
 
     def on_delete_frame_btn(self):
+        rospy.loginfo("[MotionEditor] Deleting frame.")
         animation_name = self.motion_file_manager.get_animation_name()
         if not animation_name:
             QMessageBox.information(self, "Delete Frame", "No animation selected.")
@@ -186,6 +189,7 @@ class AnimaitonWidget(QWidget):
         while animation_item.parent():
             animation_item = animation_item.parent()
         name = animation_item.text(0)
+        rospy.loginfo(f"[MotionEditor] Tree item clicked: {name}")
         if name == self.motion_file_manager.get_animation_name():
             return
         self.load_animation_by_name(name)

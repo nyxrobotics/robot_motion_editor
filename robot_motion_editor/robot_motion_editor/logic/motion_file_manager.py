@@ -76,8 +76,6 @@ class MotionFileManager:
             self._load_animation(name)
 
     def get_animation_name(self):
-        if not self.animation_name:
-            rospy.logwarn("[MotionFileManager] get_animation_name: No animation is currently loaded.")
         return self.animation_name
 
     def set_animation_data(self, animation_data):
