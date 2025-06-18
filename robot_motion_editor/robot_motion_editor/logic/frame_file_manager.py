@@ -4,6 +4,7 @@ from dataclasses import field
 from typing import Dict
 from typing import List
 
+import rospy
 import yaml
 from sensor_msgs.msg import JointState
 
@@ -141,20 +142,20 @@ class FrameFileManager:
         try:
             with open(filepath, "w") as f:
                 yaml.safe_dump(data, f, default_flow_style=False)
-            print(f"[INFO] Frame data saved to: {filepath}")
+            rospy.loginfo(f"[FrameFileManager] Frame data saved to: {filepath}")
         except Exception as e:
-            print(f"[ERROR] Failed to save frame data to {filepath}: {e}")
+            rospy.logerr(f"[FrameFileManager] Failed to save frame data to {filepath}: {e}")
 
     @staticmethod
     def load_dict(filepath: str) -> dict:
         if not os.path.exists(filepath):
-            print(f"[WARN] Frame data file not found: {filepath}")
+            rospy.logwarn(f"[FrameFileManager] Frame data file not found: {filepath}")
             return {}
         try:
             with open(filepath, "r") as f:
                 data = yaml.safe_load(f)
-            print(f"[INFO] Frame data loaded from: {filepath}")
+            rospy.loginfo(f"[FrameFileManager] Frame data loaded from: {filepath}")
             return data or {}
         except Exception as e:
-            print(f"[ERROR] Failed to load frame data from {filepath}: {e}")
+            rospy.logerr(f"[FrameFileManager] Failed to load frame data from {filepath}: {e}")
             return {}
