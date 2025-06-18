@@ -263,14 +263,7 @@ class AnimationFileWidget(QTreeWidget):
         if not ok or not name.strip():
             return
         name = name.strip()
-        path = self.motion_file_manager.resolve_frame_path(name)
-        if os.path.exists(path):
-            QMessageBox.warning(self, "Conflict", f"Frame '{name}' already exists.")
-            return
-        frame_data = FrameData(joint_names=self.motion_file_manager.get_joint_names())
-        frame_data.save_to_file(path)
-        self.reload_animation_contents(animation_name)
-        return name
+        self.motion_file_manager.set_frame(name)
 
     def create_new_if(self, animation_name=None):
         if not animation_name:
@@ -288,14 +281,7 @@ class AnimationFileWidget(QTreeWidget):
         if not ok or not name.strip():
             return
         name = name.strip()
-        path = self.motion_file_manager.resolve_if_condition_path(name)
-        if os.path.exists(path):
-            QMessageBox.warning(self, "Conflict", f"If condition '{name}' already exists.")
-            return
-        if_data = IfConditionData(expression="", condition="")
-        if_data.save_to_file(path)
-        self.reload_animation_contents(animation_name)
-        return name
+        self.motion_file_manager.set_initial_frame(name)
 
     def create_new_switch(self, animation_name=None):
         if not animation_name:
@@ -313,15 +299,7 @@ class AnimationFileWidget(QTreeWidget):
         if not ok or not name.strip():
             return
         name = name.strip()
-        path = self.motion_file_manager.resolve_switch_condition_path(name)
-        if os.path.exists(path):
-            QMessageBox.warning(self, "Conflict", f"Switch condition '{name}' already exists.")
-            return
-
-        switch_data = SwitchConditionData(expression="", condition="", case={"case_0": {"value": 0}})
-        switch_data.save_to_file(path)
-        self.reload_animation_contents(animation_name)
-        return name
+        self.motion_file_manager.set_switch(name)
 
     def reload_animation_list(self):
         self.clear()

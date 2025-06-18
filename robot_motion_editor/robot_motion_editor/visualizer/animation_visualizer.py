@@ -154,10 +154,7 @@ class AnimationVisualizer:
 
             frame_name = self.current_block.filename
             try:
-                frame_path = self.motion_file_manager.resolve_frame_path(frame_name)
-                frame_data = FrameData()
-                frame_data.set_joint_names(self.joint_data_manager.get_joint_names())
-                frame_data.load_from_file(frame_path)
+                frame_data = self.motion_file_manager.get_frame(frame_name)
                 target_joint_state = frame_data.get_joint_state()
                 move_duration = frame_data.move_duration
                 wait_duration = frame_data.wait_duration
