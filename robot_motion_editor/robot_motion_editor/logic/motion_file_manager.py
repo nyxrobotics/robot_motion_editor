@@ -1,4 +1,5 @@
 import os
+import shutil
 
 import rospy
 
@@ -131,6 +132,35 @@ class MotionFileManager:
             self.switches.pop(name, None)
 
     # ======== Animation Management ========
+    def create_animation(self, animation_name):
+        """
+        Create a new animation directory with default structure.
+        """
+        if not self.motion_directory:
+            rospy.logerr("Motion directory is not set.")
+            return False
+
+        anim_path = self._resolve_animation_path(animation_name)
+        if os.path.exists(anim_path):
+            rospy.logwarn(f"Animation '{animation_name}' already exists at {anim_path}.")
+            return False
+
+        try:
+            os.makedirs(os.path.join(anim_path, "frames"))
+            os.makedirs(os.path.join(anim_path, "conditions", "if"))
+            os.makedirs(os.path.join(anim_path, "conditions", "switch"))
+
+            # Create empty animation.yaml
+            anim_yaml_path = os.path.join(anim_path, "animation.yaml")
+            with open(anim_yaml_path, "w") as f:
+                f.write("# New animation\n")
+
+            rospy.loginfo(f"Created new animation directory at {anim_path}.")
+            return True
+        except Exception as e:
+            rospy.logerr(f"Failed to create animation '{animation_name}': {e}")
+            return False
+
     def rename_animation(self, old_name, new_name):
         old_path = self._resolve_animation_path(old_name)
         new_path = self._resolve_animation_path(new_name)
@@ -144,6 +174,34 @@ class MotionFileManager:
         if success and self.current_animation_name == old_name:
             self.current_animation_name = new_name
         return success
+
+    def delete_animation(self, animation_name):
+        """
+        Delete an animation directory.
+        """
+        if not self.motion_directory:
+            rospy.logerr("Motion directory is not set.")
+            return False
+
+        anim_path = self._resolve_animation_path(animation_name)
+        if not os.path.exists(anim_path):
+            rospy.logwarn(f"Animation '{animation_name}' does not exist at {anim_path}.")
+            return False
+
+        if self.current_animation_name == animation_name:
+            self.current_animation_name = None
+            self._clear_animation_items()
+
+        try:
+            shutil.rmtree(anim_path)
+            rospy.loginfo(f"Deleted animation directory at {anim_path}.")
+            if self.current_animation_name == animation_name:
+                self.current_animation_name = None
+                self._clear_animation_items()
+            return True
+        except Exception as e:
+            rospy.logerr(f"Failed to delete animation '{animation_name}': {e}")
+            return False
 
     def list_animation_directories(self):
         if not self.motion_directory or not os.path.isdir(self.motion_directory):
@@ -175,7 +233,7 @@ class MotionFileManager:
             return []
         return [f[:-5] for f in os.listdir(path) if f.endswith(".yaml")]
 
-    # ======== Helper Methods ========
+    # === Internal Utilities ===
     def _load_animation_items(self):
         self._load_initial_frame()
         for frame_name in self.list_frame_files():
@@ -191,7 +249,6 @@ class MotionFileManager:
         self.switches.clear()
         self.initial_frame = None
 
-    # === Internal Utilities ===
     def _rename_file(self, old_path, new_path):
         if os.path.exists(new_path):
             rospy.logwarn(f"Cannot rename: target file {new_path} already exists.")
