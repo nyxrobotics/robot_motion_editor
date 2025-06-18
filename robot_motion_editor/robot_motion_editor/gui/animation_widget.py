@@ -32,7 +32,6 @@ class AnimaitonWidget(QWidget):
             trajectory_commander: TrajectoryCommander):
         super().__init__()
         self.motion_file_manager = motion_file_manager
-        self.item_file_manager = item_file_manager
         self.joint_data_manager = joint_data_manager
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
@@ -40,7 +39,6 @@ class AnimaitonWidget(QWidget):
         self.editor_launcher = AnimationItemEditorLauncher(
             joint_data_manager=self.joint_data_manager,
             motion_file_manager=self.motion_file_manager,
-            item_file_manager=self.item_file_manager,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander,
         )
@@ -131,7 +129,7 @@ class AnimaitonWidget(QWidget):
         self.animation_tree.setCurrentItem(None)
 
     def on_save_anim_btn(self):
-        anim_name = self.motion_file_manager.get_current_animation()
+        anim_name = self.motion_file_manager.get_current_animation_name()
         if not anim_name:
             QMessageBox.information(self, "Save", "No animation selected to save.")
             return
@@ -139,7 +137,7 @@ class AnimaitonWidget(QWidget):
         anim_data.save_to_file(self.motion_file_manager.resolve_animation_yaml_path())
 
     def confirm_save_if_unsaved_changes(self):
-        anim_name = self.motion_file_manager.get_current_animation()
+        anim_name = self.motion_file_manager.get_current_animation_name()
         if not anim_name:
             return True
 
@@ -170,7 +168,7 @@ class AnimaitonWidget(QWidget):
         self.animation_tree.reload_animation_contents(name)
 
     def on_new_frame_btn(self):
-        animation_name = self.motion_file_manager.get_current_animation()
+        animation_name = self.motion_file_manager.get_current_animation_name()
         if not animation_name:
             QMessageBox.information(self, "Delete Frame", "No animation selected.")
             return
@@ -182,7 +180,7 @@ class AnimaitonWidget(QWidget):
         self.reload_animation_tree()
 
     def on_delete_frame_btn(self):
-        animation_name = self.motion_file_manager.get_current_animation()
+        animation_name = self.motion_file_manager.get_current_animation_name()
         if not animation_name:
             QMessageBox.information(self, "Delete Frame", "No animation selected.")
             return
@@ -194,7 +192,7 @@ class AnimaitonWidget(QWidget):
         while animation_item.parent():
             animation_item = animation_item.parent()
         name = animation_item.text(0)
-        if name == self.motion_file_manager.get_current_animation():
+        if name == self.motion_file_manager.get_current_animation_name():
             return
         self.load_animation_by_name(name)
 

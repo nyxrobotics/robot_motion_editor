@@ -164,7 +164,7 @@ class AnimationFileWidget(QTreeWidget):
             return
 
         # アニメーション名の更新
-        if self.motion_file_manager.get_current_animation() == old_name:
+        if self.motion_file_manager.get_current_animation_name() == old_name:
             self.motion_file_manager.set_current_animation(new_name)
         else:
             self.motion_file_manager.set_current_animation(None)
@@ -195,7 +195,7 @@ class AnimationFileWidget(QTreeWidget):
                 QMessageBox.critical(self, "Delete Failed", str(e))
                 return
 
-            if self.motion_file_manager.get_current_animation() == name:
+            if self.motion_file_manager.get_current_animation_name() == name:
                 self.motion_file_manager.set_current_animation(None)
 
             self.reload_animation_list()
@@ -208,7 +208,7 @@ class AnimationFileWidget(QTreeWidget):
                 animation_item = animation_item.parent()
             animation_name = animation_item.text(0)
         else:
-            animation_name = self.motion_file_manager.get_current_animation()
+            animation_name = self.motion_file_manager.get_current_animation_name()
 
         if not animation_name:
             return False
@@ -286,7 +286,7 @@ class AnimationFileWidget(QTreeWidget):
         return True
 
     def update_scene_after_rename(self):
-        animation_name = self.motion_file_manager.get_current_animation()
+        animation_name = self.motion_file_manager.get_current_animation_name()
         if not animation_name:
             return
 
@@ -403,7 +403,7 @@ class AnimationFileWidget(QTreeWidget):
         return name
 
     def delete_file_item(self, category, name):
-        animation_name = self.motion_file_manager.get_current_animation()
+        animation_name = self.motion_file_manager.get_current_animation_name()
         if not animation_name:
             return
         if category == "frames":
