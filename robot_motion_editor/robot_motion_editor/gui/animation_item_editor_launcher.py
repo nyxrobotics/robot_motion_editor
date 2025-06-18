@@ -26,7 +26,6 @@ class AnimationItemEditorLauncher:
             trajectory_commander: TrajectoryCommander):
         self.joint_data_manager = joint_data_manager
         self.motion_file_manager = motion_file_manager
-        self.item_file_manager = animtion_item_data
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
         self.open_editors = {}  # key: f"type:filename" or "initial_frame"

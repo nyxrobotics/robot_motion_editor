@@ -14,16 +14,16 @@ class MotionFileManager:
     def __init__(self, motion_directory=None, joint_names=None):
         # Set Joint names
         self.joint_names = joint_names or []
-        # Set Motion directory
+        # Current Motion Data
         self.motion_directory = motion_directory
-        self.initial_pose = None
-        # Store current animation data
-        self.current_animation_name = None
-        self.current_animation_data = None
-        self.current_animation_initial_frame = None
-        self.current_animation_frames = {}
-        self.current_animation_ifs = {}
-        self.current_animation_switches = {}
+        self.motion_initial_pose = None
+        # Current Animation Data
+        self.animation_name = None
+        self.animation_data = None
+        self.animation_initial_frame = None
+        self.animation_frames = {}
+        self.animation_ifs = {}
+        self.animation_switches = {}
 
     # === Public API ===
 
@@ -60,21 +60,77 @@ class MotionFileManager:
         if not isinstance(initial_pose_data, InitialPoseData):
             rospy.logwarn("Invalid initial_pose_data provided.")
             return
-        if self.initial_pose and initial_pose_data.get_dict() == self.initial_pose.get_dict():
+        if self.motion_initial_pose and initial_pose_data.get_dict() == self.motion_initial_pose.get_dict():
             return
-        self.initial_pose = initial_pose_data
+        self.motion_initial_pose = initial_pose_data
         self._save_initial_pose()
 
     def get_initial_pose(self):
-        if self.initial_pose:
-            return self.initial_pose
+        if self.motion_initial_pose:
+            return self.motion_initial_pose
         return self._load_initial_pose()
 
     # === Animation Management ===
-    def set_current_animation(self, name):
-        if self.current_animation_name == name:
+    def set_current_animation_name(self, name):
+        if self.animation_name == name:
             return
         self.load_animation(name)
+
+    def get_current_animation_name(self):
+        """
+        Return the name of the currently loaded animation.
+        """
+        if not self.animation_name:
+            rospy.logwarn("No animation is currently loaded.")
+        return self.animation_name
+
+    def set_current_animation_data(self, animation_data):
+        """
+        Save the current animation if there are differences from the loaded data.
+
+        Parameters:
+        - animation_data (AnimationData): The animation data to save.
+        """
+        if not self.animation_name:
+            rospy.logwarn("No animation loaded to save.")
+            return
+        if not isinstance(animation_data, AnimationData):
+            rospy.logwarn("Invalid animation_data provided.")
+            return
+        if self.animation_data and animation_data.get_dict() == self.animation_data.get_dict():
+            rospy.loginfo("No changes detected in animation; skipping save.")
+            return
+        yaml_path = self._resolve_animation_yaml_path()
+        if not yaml_path:
+            return
+        try:
+            animation_data.save_to_file(yaml_path)
+            self.animation_data = animation_data
+            rospy.loginfo(f"Saved animation: {self.animation_name}")
+        except Exception as e:
+            rospy.logerr(f"Failed to save animation {self.animation_name}: {e}")
+
+    def get_current_animation_data(self):
+        """
+        Return the currently loaded AnimationData instance.
+        """
+        if not self.animation_data:
+            rospy.logwarn("No animation is currently loaded.")
+        return self.animation_data
+
+    def rename_animation(self, old_name, new_name):
+        old_path = self._resolve_animation_path(old_name)
+        new_path = self._resolve_animation_path(new_name)
+        if os.path.exists(new_path):
+            rospy.logwarn(f"Cannot rename: target animation {new_name} already exists.")
+            return
+        try:
+            os.rename(old_path, new_path)
+            rospy.loginfo(f"Renamed animation: {old_name} -> {new_name}")
+            if self.animation_name == old_name:
+                self.animation_name = new_name
+        except Exception as e:
+            rospy.logerr(f"Failed to rename animation {old_name} to {new_name}: {e}")
 
     def create_animation(self, current_animation_name):
         path = self._resolve_animation_path(current_animation_name)
@@ -91,20 +147,6 @@ class MotionFileManager:
         except Exception as e:
             rospy.logerr(f"Failed to create animation {current_animation_name}: {e}")
 
-    def rename_animation(self, old_name, new_name):
-        old_path = self._resolve_animation_path(old_name)
-        new_path = self._resolve_animation_path(new_name)
-        if os.path.exists(new_path):
-            rospy.logwarn(f"Cannot rename: target animation {new_name} already exists.")
-            return
-        try:
-            os.rename(old_path, new_path)
-            rospy.loginfo(f"Renamed animation: {old_name} -> {new_name}")
-            if self.current_animation_name == old_name:
-                self.current_animation_name = new_name
-        except Exception as e:
-            rospy.logerr(f"Failed to rename animation {old_name} to {new_name}: {e}")
-
     def delete_animation(self, current_animation_name):
         path = self._resolve_animation_path(current_animation_name)
         if not os.path.exists(path):
@@ -113,9 +155,9 @@ class MotionFileManager:
         try:
             shutil.rmtree(path)
             rospy.loginfo(f"Deleted animation: {current_animation_name}")
-            if self.current_animation_name == current_animation_name:
-                self.current_animation_name = None
-                self.current_animation_data = None
+            if self.animation_name == current_animation_name:
+                self.animation_name = None
+                self.animation_data = None
         except Exception as e:
             rospy.logerr(f"Failed to delete animation {current_animation_name}: {e}")
 
@@ -128,135 +170,93 @@ class MotionFileManager:
             self._clear_current_animation()
             anim_data = AnimationData()
             anim_data.load_from_file(yaml_path)
-            self.current_animation_name = name
-            self.current_animation_data = anim_data
+            self.animation_name = name
+            self.animation_data = anim_data
             self._load_animation_items()
             rospy.loginfo(f"Loaded animation: {name}")
         except Exception as e:
             rospy.logerr(f"Failed to load animation {name}: {e}")
 
-    def save_current_animation(self, animation_data):
-        """
-        Save the current animation if there are differences from the loaded data.
-
-        Parameters:
-        - animation_data (AnimationData): The animation data to save.
-        """
-        if not self.current_animation_name:
-            rospy.logwarn("No animation loaded to save.")
-            return
-        if not isinstance(animation_data, AnimationData):
-            rospy.logwarn("Invalid animation_data provided.")
-            return
-        if self.current_animation_data and animation_data.get_dict() == self.current_animation_data.get_dict():
-            rospy.loginfo("No changes detected in animation; skipping save.")
-            return
-        yaml_path = self._resolve_animation_yaml_path()
-        if not yaml_path:
-            return
-        try:
-            animation_data.save_to_file(yaml_path)
-            self.current_animation_data = animation_data
-            rospy.loginfo(f"Saved animation: {self.current_animation_name}")
-        except Exception as e:
-            rospy.logerr(f"Failed to save animation {self.current_animation_name}: {e}")
-
-    def get_current_animation_data(self):
-        """
-        Return the currently loaded AnimationData instance.
-        """
-        if not self.current_animation_data:
-            rospy.logwarn("No animation is currently loaded.")
-        return self.current_animation_data
-
-    def get_current_animation_name(self):
-        """
-        Return the name of the currently loaded animation.
-        """
-        if not self.current_animation_name:
-            rospy.logwarn("No animation is currently loaded.")
-        return self.current_animation_name
-
     # === Frame ===
-    def get_frame(self, filename):
-        if filename in self.current_animation_frames:
-            return self.current_animation_frames[filename]
-        return self._load_frame(filename)
-
     def set_frame(self, filename, frame_data):
-        old_data = self.current_animation_frames.get(filename)
+        old_data = self.animation_frames.get(filename)
         if old_data and frame_data.get_dict() == old_data.get_dict():
             return
-        self.current_animation_frames[filename] = frame_data
+        self.animation_frames[filename] = frame_data
         self._save_frame(filename)
+
+    def get_frame(self, filename):
+        if filename in self.animation_frames:
+            return self.animation_frames[filename]
+        return self._load_frame(filename)
 
     def rename_frame(self, old_name, new_name):
         self._rename_file(self._resolve_frame_path(old_name), self._resolve_frame_path(new_name))
-        self.current_animation_frames[new_name] = self.current_animation_frames.pop(old_name, None)
+        self.animation_frames[new_name] = self.animation_frames.pop(old_name, None)
 
     def delete_frame(self, name):
         path = self._resolve_frame_path(name)
         if os.path.exists(path):
             os.remove(path)
-            self.current_animation_frames.pop(name, None)
+            self.animation_frames.pop(name, None)
 
     # === Initial Frame ===
-    def get_initial_frame(self):
-        if self.current_animation_initial_frame:
-            return self.current_animation_initial_frame
-        return self._load_initial_frame()
-
     def set_initial_frame(self, frame_data):
-        if self.current_animation_initial_frame and frame_data.get_dict() == self.current_animation_initial_frame.get_dict():
+        if self.animation_initial_frame and frame_data.get_dict() == self.animation_initial_frame.get_dict():
             return
-        self.current_animation_initial_frame = frame_data
+        self.animation_initial_frame = frame_data
         self._save_initial_frame()
 
-    # === If Condition ===
-    def get_if(self, filename):
-        if filename in self.current_animation_ifs:
-            return self.current_animation_ifs[filename]
-        return self._load_if(filename)
+    def get_initial_frame(self):
+        if self.animation_initial_frame:
+            return self.animation_initial_frame
+        return self._load_initial_frame()
 
+    # === If Condition ===
     def set_if(self, filename, if_data):
-        old_data = self.current_animation_ifs.get(filename)
+        old_data = self.animation_ifs.get(filename)
         if old_data and if_data.get_dict() == old_data.get_dict():
             return
-        self.current_animation_ifs[filename] = if_data
+        self.animation_ifs[filename] = if_data
         self._save_if(filename)
+
+    def get_if(self, filename):
+        if filename in self.animation_ifs:
+            return self.animation_ifs[filename]
+        return self._load_if(filename)
 
     def rename_if(self, old_name, new_name):
         self._rename_file(self._resolve_if_condition_path(old_name), self._resolve_if_condition_path(new_name))
-        self.current_animation_ifs[new_name] = self.current_animation_ifs.pop(old_name, None)
+        self.animation_ifs[new_name] = self.animation_ifs.pop(old_name, None)
 
     def delete_if(self, name):
         path = self._resolve_if_condition_path(name)
         if os.path.exists(path):
             os.remove(path)
-            self.current_animation_ifs.pop(name, None)
+            self.animation_ifs.pop(name, None)
 
     # === Switch Condition ===
-    def get_switch(self, filename):
-        if filename in self.current_animation_switches:
-            return self.current_animation_switches[filename]
-        return self._load_switch(filename)
-
     def set_switch(self, filename, switch_data):
-        old_data = self.current_animation_switches.get(filename)
+        old_data = self.animation_switches.get(filename)
         if old_data and switch_data.get_dict() == old_data.get_dict():
             return
-        self.current_animation_switches[filename] = switch_data
+        self.animation_switches[filename] = switch_data
         self._save_switch(filename)
+
+    def get_switch(self, filename):
+        if filename in self.animation_switches:
+            return self.animation_switches[filename]
+        return self._load_switch(filename)
 
     def rename_switch(self, old_name, new_name):
         self._rename_file(self._resolve_switch_condition_path(old_name), self._resolve_switch_condition_path(new_name))
-        self.current_animation_switches[new_name] = self.current_animation_switches.pop(old_name, None)
+        self.animation_switches[new_name] = self.animation_switches.pop(old_name, None)
 
     def delete_switch(self, name):
         path = self._resolve_switch_condition_path(name)
         if os.path.exists(path):
             os.remove(path)
-            self.current_animation_switches.pop(name, None)
+            self.animation_switches.pop(name, None)
 
     # === List Files ===
     def list_animation_directories(self):
@@ -272,19 +272,19 @@ class MotionFileManager:
         return sorted(animation_dirs)
 
     def list_frame_files(self):
-        path = os.path.join(self.motion_directory, self.current_animation_name, "frames")
+        path = os.path.join(self.motion_directory, self.animation_name, "frames")
         if not os.path.exists(path):
             return []
         return [f[:-5] for f in os.listdir(path) if f.endswith(".yaml")]
 
     def list_if_condition_files(self):
-        path = os.path.join(self.motion_directory, self.current_animation_name, "conditions", "if")
+        path = os.path.join(self.motion_directory, self.animation_name, "conditions", "if")
         if not os.path.exists(path):
             return []
         return [f[:-5] for f in os.listdir(path) if f.endswith(".yaml")]
 
     def list_switch_condition_files(self):
-        path = os.path.join(self.motion_directory, self.current_animation_name, "conditions", "switch")
+        path = os.path.join(self.motion_directory, self.animation_name, "conditions", "switch")
         if not os.path.exists(path):
             return []
         return [f[:-5] for f in os.listdir(path) if f.endswith(".yaml")]
@@ -313,14 +313,14 @@ class MotionFileManager:
         elif self.joint_names != initial_pose_data.get_joint_names():
             initial_pose_data.set_joint_names(self.joint_names)
 
-        self.initial_pose = initial_pose_data
+        self.motion_initial_pose = initial_pose_data
         return initial_pose_data
 
     def _save_initial_pose(self):
         """
         Save the current initial pose to the motion directory.
         """
-        if not self.initial_pose:
+        if not self.motion_initial_pose:
             rospy.logwarn("No initial pose set to save.")
             return
         if not self.motion_directory:
@@ -328,7 +328,7 @@ class MotionFileManager:
             return
         path = os.path.join(self.motion_directory, "initial_pose.yaml")
         try:
-            self.initial_pose.save_to_file(path)
+            self.motion_initial_pose.save_to_file(path)
             rospy.loginfo(f"Saved initial pose to: {path}")
         except Exception as e:
             rospy.logerr(f"Failed to save initial pose: {e}")
@@ -338,52 +338,52 @@ class MotionFileManager:
         path = self._resolve_initial_frame_path()
         if os.path.exists(path):
             frame.load_from_file(path)
-        self.current_animation_initial_frame = frame
+        self.animation_initial_frame = frame
         return frame
 
     def _save_initial_frame(self):
-        if self.current_animation_initial_frame:
+        if self.animation_initial_frame:
             path = self.resolve_initial_frame_path()
-            self.current_animation_initial_frame.save_to_file(path)
+            self.animation_initial_frame.save_to_file(path)
 
     def _load_frame(self, filename):
         frame = FrameData(joint_names=self.get_joint_names())
         path = self._resolve_frame_path(filename)
         if os.path.exists(path):
             frame.load_from_file(path)
-        self.current_animation_frames[filename] = frame
+        self.animation_frames[filename] = frame
         return frame
 
     def _save_frame(self, filename):
-        if filename in self.current_animation_frames:
+        if filename in self.animation_frames:
             path = self.resolve_frame_path(filename)
-            self.current_animation_frames[filename].save_to_file(path)
+            self.animation_frames[filename].save_to_file(path)
 
     def _load_if(self, filename):
         cond = IfConditionData()
         path = self._resolve_if_condition_path(filename)
         if os.path.exists(path):
             cond.load_from_file(path)
-        self.current_animation_ifs[filename] = cond
+        self.animation_ifs[filename] = cond
         return cond
 
     def _save_if(self, filename):
-        if filename in self.current_animation_ifs:
+        if filename in self.animation_ifs:
             path = self.resolve_if_condition_path(filename)
-            self.current_animation_ifs[filename].save_to_file(path)
+            self.animation_ifs[filename].save_to_file(path)
 
     def _load_switch(self, filename):
         cond = SwitchConditionData()
         path = self._resolve_switch_condition_path(filename)
         if os.path.exists(path):
             cond.load_from_file(path)
-        self.current_animation_switches[filename] = cond
+        self.animation_switches[filename] = cond
         return cond
 
     def _save_switch(self, filename):
-        if filename in self.current_animation_switches:
+        if filename in self.animation_switches:
             path = self.resolve_switch_condition_path(filename)
-            self.current_animation_switches[filename].save_to_file(path)
+            self.animation_switches[filename].save_to_file(path)
 
     def _load_animation_items(self):
         self._load_initial_frame()
@@ -395,12 +395,12 @@ class MotionFileManager:
             self._load_switch(switch_name)
 
     def _clear_current_animation(self):
-        self.current_animation_name = None
-        self.current_animation_data = None
-        self.current_animation_frames.clear()
-        self.current_animation_ifs.clear()
-        self.current_animation_switches.clear()
-        self.current_animation_initial_frame = None
+        self.animation_name = None
+        self.animation_data = None
+        self.animation_frames.clear()
+        self.animation_ifs.clear()
+        self.animation_switches.clear()
+        self.animation_initial_frame = None
 
     def _rename_file(self, old_path, new_path):
         if os.path.exists(new_path):
@@ -422,26 +422,26 @@ class MotionFileManager:
             return False
 
     def _resolve_animation_path(self, name=None):
-        anim_name = name or self.current_animation_name
+        anim_name = name or self.animation_name
         if not self.motion_directory or not anim_name:
             rospy.logerr("motion_directory and animation name must be set before resolving paths.")
             return None
         return os.path.join(self.motion_directory, anim_name)
 
     def _resolve_animation_yaml_path(self):
-        return os.path.join(self.motion_directory, self.current_animation_name, "animation.yaml")
+        return os.path.join(self.motion_directory, self.animation_name, "animation.yaml")
 
     def _resolve_initial_pose_path(self):
         return os.path.join(self.motion_directory, "initial_pose.yaml")
 
     def _resolve_initial_frame_path(self):
-        return os.path.join(self.motion_directory, self.current_animation_name, "initial_frame.yaml")
+        return os.path.join(self.motion_directory, self.animation_name, "initial_frame.yaml")
 
     def _resolve_frame_path(self, name):
-        return os.path.join(self.motion_directory, self.current_animation_name, "frames", f"{name}.yaml")
+        return os.path.join(self.motion_directory, self.animation_name, "frames", f"{name}.yaml")
 
     def _resolve_if_condition_path(self, name):
-        return os.path.join(self.motion_directory, self.current_animation_name, "conditions", "if", f"{name}.yaml")
+        return os.path.join(self.motion_directory, self.animation_name, "conditions", "if", f"{name}.yaml")
 
     def _resolve_switch_condition_path(self, name):
-        return os.path.join(self.motion_directory, self.current_animation_name, "conditions", "switch", f"{name}.yaml")
+        return os.path.join(self.motion_directory, self.animation_name, "conditions", "switch", f"{name}.yaml")
