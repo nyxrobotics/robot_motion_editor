@@ -14,6 +14,7 @@ from ..logic.frame_file_manager import FrameData
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_file_manager import MotionFileManager
 from ..robot_interface.animation_commander import AnimationCommander
+from ..robot_interface.joint_state_subscriber import JointStateSubscriber
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..visualizer.animation_visualizer import AnimationVisualizer
 from ..visualizer.trajectory_visualizer import TrajectoryVisualizer
@@ -29,11 +30,13 @@ class AnimaitonWidget(QWidget):
             self,
             motion_file_manager: MotionFileManager,
             joint_data_manager: JointDataManager,
+            joint_state_subscriber: JointStateSubscriber,
             trajectory_visualizer: TrajectoryVisualizer,
             trajectory_commander: TrajectoryCommander):
         super().__init__()
         self.motion_file_manager = motion_file_manager
         self.joint_data_manager = joint_data_manager
+        self.joint_state_subscriber = joint_state_subscriber
         self.trajectory_visualizer = trajectory_visualizer
         self.trajectory_commander = trajectory_commander
         self.reset_current_target_state()
@@ -251,9 +254,12 @@ class AnimaitonWidget(QWidget):
             return initial_joint_state
 
     def move_initial_pose(self):
-        initial_joint_state = self.motion_file_manager.get_initial_pose().get_joint_state()
-        self.set_current_target_state(initial_joint_state)
-        self.trajectory_visualizer.visualize_goal_state(initial_joint_state)
-        self.trajectory_visualizer.send_state2state(initial_joint_state, initial_joint_state, duration=0.0)
-        self.trajectory_commander.send_joint_state(initial_joint_state, duration=0.0)
+        goal_joint_state = self.motion_file_manager.get_initial_pose().get_joint_state()
+        start_joint_state = self.joint_state_subscriber.wait_for_joint_state(timeout=1.0)
+        if start_joint_state is None:
+            rospy.logwarn("[MotionEditor] No joint state received, using initial pose.")
+            start_joint_state = goal_joint_state
+        self.trajectory_visualizer.visualize_goal_state(goal_joint_state)
+        self.trajectory_visualizer.send_state2state(start_joint_state, goal_joint_state, duration=1.0)
+        self.trajectory_commander.send_state2state(start_joint_state, goal_joint_state, duration=1.0)
         rospy.loginfo("[MotionEditor] Moved to initial pose.")

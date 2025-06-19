@@ -203,7 +203,7 @@ class AnimationVisualizer:
 
             self.trajectory_visualizer.send_joint_state(target_joint_state, move_duration)
             self.trajectory_visualizer.visualize_goal_state(target_joint_state)
-            rospy.loginfo(f"[Visualizer] Played single frame: {frame_name}")
+            rospy.loginfo(f"[AnimationVisualizer] Played single frame: {frame_name}")
 
         elif isinstance(block, StartBlockItem):
             try:
@@ -215,7 +215,28 @@ class AnimationVisualizer:
 
             self.trajectory_visualizer.send_joint_state(target_joint_state, move_duration)
             self.trajectory_visualizer.visualize_goal_state(target_joint_state)
-            rospy.loginfo("[Visualizer] Played StartBlockItem.")
+            rospy.loginfo("[AnimationVisualizer] Played StartBlockItem.")
+
+    def play_single_block_slow(self, block, duration=1.0):
+        if isinstance(block, FrameBlockItem):
+            frame_name = block.filename
+            try:
+                frame_data = self.motion_file_manager.get_frame(frame_name)
+                target_joint_state = frame_data.get_joint_state()
+            except Exception as e:
+                rospy.logwarn(f"[AnimationVisualizer] Failed to load frame '{frame_name}': {e}")
+                return
+        elif isinstance(block, StartBlockItem):
+            try:
+                frame_data = self.motion_file_manager.get_initial_frame()
+                target_joint_state = frame_data.get_joint_state()
+            except Exception as e:
+                rospy.logwarn(f"[AnimationVisualizer] Failed to load initial frame: {e}")
+
+        if not self.check_same_joint_state(self.trajectory_visualizer.get_current_target_state(), target_joint_state):
+            self.trajectory_visualizer.send_joint_state(target_joint_state, duration)
+            self.trajectory_visualizer.visualize_goal_state(target_joint_state)
+            rospy.loginfo("[AnimationVisualizer] Played StartBlockItem slowly.")
 
     def extract_joint_state_and_duration(self, block):
         frame_data = FrameData()

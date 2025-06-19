@@ -22,3 +22,14 @@ class JointStateSubscriber:
     def reset_joint_state(self):
         with self._lock:
             self._joint_state = None
+
+    def wait_for_joint_state(self, timeout=5.0):
+        start_time = rospy.Time.now()
+        timeout_duration = rospy.Duration(timeout)
+        self.reset_joint_state
+        while rospy.Time.now() - start_time < timeout_duration:
+            if self._joint_state is not None:
+                with self._lock:
+                    return self._joint_state
+            rospy.sleep(0.1)
+        return None

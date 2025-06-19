@@ -10,8 +10,8 @@ from .animation_editor_widget import FrameBlockItem
 
 
 class AnimationPreviewButtonWidget(QWidget):
-    def __init__(self, animation_visualizer: AnimationVisualizer = None,
-                 animation_commander: AnimationCommander = None, parent=None):
+    def __init__(self, animation_visualizer: AnimationVisualizer,
+                 animation_commander: AnimationCommander, parent=None):
         super().__init__(parent)
         self.animation_visualizer = animation_visualizer
         self.animation_commander = animation_commander
@@ -57,7 +57,7 @@ class AnimationPreviewButtonWidget(QWidget):
                 selected = self.animation_visualizer.animation_flow_scene.selectedItems()
                 if len(selected) == 1:
                     block = selected[0]
-                    self.animation_visualizer.play_single_block(block)
+                    self.animation_visualizer.play_single_block_slow(block, duration=1.0)
 
         if self.animation_commander:
             if self.animation_commander and self.animation_commander.state == 'playing':
@@ -66,7 +66,7 @@ class AnimationPreviewButtonWidget(QWidget):
                 selected = self.animation_commander.animation_flow_scene.selectedItems()
                 if len(selected) == 1:
                     block = selected[0]
-                    self.animation_commander.play_single_block(block)
+                    self.animation_commander.play_single_block_slow(block, duration=1.0)
 
     def stop(self):
         self.animation_visualizer.stop()

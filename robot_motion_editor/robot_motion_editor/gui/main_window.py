@@ -1,6 +1,7 @@
 import glob
 import os
 
+import rospy
 from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtWidgets import QComboBox
 from PyQt5.QtWidgets import QFileDialog
@@ -14,6 +15,7 @@ from PyQt5.QtWidgets import QWidget
 
 from ..logic.joint_data_manager import JointDataManager
 from ..logic.motion_file_manager import MotionFileManager
+from ..robot_interface.joint_state_subscriber import JointStateSubscriber
 from ..robot_interface.trajectory_commander import TrajectoryCommander
 from ..urdf_interface.urdf_joint_extractor import get_joint_limit
 from ..urdf_interface.urdf_joint_extractor import get_robot_name
@@ -42,6 +44,7 @@ class MainWindow(QWidget):
             get_robot_name(), self.joint_data_manager.get_joint_names(), mode="position")
         self.motion_file_manager = MotionFileManager(
             motion_directory=".", joint_names=self.joint_data_manager.get_joint_names())
+        self.joint_state_subscriber = JointStateSubscriber(topic=get_robot_name() + "/joint_states")
 
         self.init_ui()
 
@@ -72,7 +75,7 @@ class MainWindow(QWidget):
         self.torque_checkbox = QCheckBox("Torque ON")
         self.torque_checkbox.setChecked(False)
         self.torque_checkbox.stateChanged.connect(
-            lambda state: self.trajectory_commander.torque_on() if state else self.trajectory_commander.torque_off()
+            lambda state: self.on_torque_checkbox_changed(state)
         )
 
         self.init_pose_button = QPushButton("Move to Initial Pose")
@@ -86,7 +89,7 @@ class MainWindow(QWidget):
         self.hardware_checkbox = QCheckBox("Use Real Robot")
         self.hardware_checkbox.setChecked(False)
         self.hardware_checkbox.stateChanged.connect(
-            lambda state: self.trajectory_commander.enable() if state else self.trajectory_commander.disable()
+            lambda state: self.on_hardware_checkbox_changed(state)
         )
 
         checkbox_row = QHBoxLayout()
@@ -118,6 +121,7 @@ class MainWindow(QWidget):
         self.animation_widget = AnimaitonWidget(
             motion_file_manager=self.motion_file_manager,
             joint_data_manager=self.joint_data_manager,
+            joint_state_subscriber=self.joint_state_subscriber,
             trajectory_visualizer=self.trajectory_visualizer,
             trajectory_commander=self.trajectory_commander
         )
@@ -126,3 +130,25 @@ class MainWindow(QWidget):
 
         layout.addWidget(self.tabs)
         self.setLayout(layout)
+
+    def on_torque_checkbox_changed(self, state):
+        if state:
+            self.trajectory_commander.torque_on()
+            joint_state = self.joint_state_subscriber.wait_for_joint_state(timeout=1.0)
+            if joint_state:
+                self.animation_widget.set_current_target_state(joint_state)
+            else:
+                rospy.logwarn("[MainWindow] Failed to get joint state on torque ON")
+        else:
+            self.trajectory_commander.torque_off()
+
+    def on_hardware_checkbox_changed(self, state):
+        if state:
+            self.trajectory_commander.enable()
+            joint_state = self.joint_state_subscriber.wait_for_joint_state(timeout=1.0)
+            if joint_state:
+                self.animation_widget.set_current_target_state(joint_state)
+            else:
+                rospy.logwarn("[MainWindow] Failed to get joint state on hardware mode")
+        else:
+            self.trajectory_commander.disable()
