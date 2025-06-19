@@ -68,6 +68,9 @@ class AnimationPreviewButtonWidget(QWidget):
                     block = selected[0]
                     self.animation_commander.play_single_block_slow(block, duration=1.0)
 
+        if self.animation_visualizer and self.animation_commander and self.animation_commander.current_block:
+            self.animation_visualizer.play_single_block(self.animation_commander.current_block)
+
     def stop(self):
         self.animation_visualizer.stop()
         if self.animation_commander:

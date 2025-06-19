@@ -44,7 +44,8 @@ class MainWindow(QWidget):
             get_robot_name(), self.joint_data_manager.get_joint_names(), mode="position")
         self.motion_file_manager = MotionFileManager(
             motion_directory=".", joint_names=self.joint_data_manager.get_joint_names())
-        self.joint_state_subscriber = JointStateSubscriber(topic=get_robot_name() + "/joint_states")
+        self.joint_state_subscriber = JointStateSubscriber(topic=get_robot_name() + "/joint_states",
+                                                           joint_names=self.joint_data_manager.get_joint_names())
 
         self.init_ui()
 
