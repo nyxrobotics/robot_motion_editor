@@ -53,7 +53,7 @@ class AnimationPreviewButtonWidget(QWidget):
         if self.animation_visualizer:
             if self.animation_visualizer.state == 'playing':
                 self.animation_visualizer.pause()
-            elif self.animation_visualizer.state == 'stopped':
+            elif self.animation_visualizer.state == 'stopped' or self.animation_visualizer.state == 'paused':
                 selected = self.animation_visualizer.animation_flow_scene.selectedItems()
                 if len(selected) == 1:
                     block = selected[0]
@@ -62,14 +62,13 @@ class AnimationPreviewButtonWidget(QWidget):
         if self.animation_commander:
             if self.animation_commander and self.animation_commander.state == 'playing':
                 self.animation_commander.pause()
-            elif self.animation_commander.state == 'stopped':
+                if self.animation_visualizer and self.animation_commander.current_block:
+                    self.animation_visualizer.play_single_block(self.animation_commander.current_block)
+            elif self.animation_commander.state == 'stopped' or self.animation_visualizer.state == 'paused':
                 selected = self.animation_commander.animation_flow_scene.selectedItems()
                 if len(selected) == 1:
                     block = selected[0]
                     self.animation_commander.play_single_block_slow(block, duration=1.0)
-
-        if self.animation_visualizer and self.animation_commander and self.animation_commander.current_block:
-            self.animation_visualizer.play_single_block(self.animation_commander.current_block)
 
     def stop(self):
         self.animation_visualizer.stop()

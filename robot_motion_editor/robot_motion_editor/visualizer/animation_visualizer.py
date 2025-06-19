@@ -179,7 +179,7 @@ class AnimationVisualizer:
                 if self.state == 'paused':
                     self._pause_event.wait()
                     start_time = time.perf_counter() - elapsed
-                time.sleep(0.001)
+                time.sleep(0.0001)
                 elapsed = time.perf_counter() - start_time
 
             self.current_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
