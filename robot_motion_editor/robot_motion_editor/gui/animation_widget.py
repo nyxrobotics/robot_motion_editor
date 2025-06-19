@@ -254,5 +254,6 @@ class AnimaitonWidget(QWidget):
         initial_joint_state = self.motion_file_manager.get_initial_pose().get_joint_state()
         self.set_current_target_state(initial_joint_state)
         self.trajectory_visualizer.visualize_goal_state(initial_joint_state)
-        self.trajectory_commander.send_joint_state(initial_joint_state, move_duration=0.0)
+        self.trajectory_visualizer.send_state2state(initial_joint_state, initial_joint_state, duration=0.0)
+        self.trajectory_commander.send_joint_state(initial_joint_state, duration=0.0)
         rospy.loginfo("[MotionEditor] Moved to initial pose.")

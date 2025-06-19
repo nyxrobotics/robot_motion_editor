@@ -122,6 +122,7 @@ class MainWindow(QWidget):
             trajectory_commander=self.trajectory_commander
         )
         self.tabs.addTab(self.animation_widget, "Motion Editor")
+        self.init_pose_button.clicked.connect(self.animation_widget.move_initial_pose)
 
         layout.addWidget(self.tabs)
         self.setLayout(layout)
