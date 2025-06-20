@@ -61,7 +61,7 @@ class FrameEditorDialog(QDialog):
         self.frame_visualizer = FrameVisualizer(trajectory_visualizer)
 
         # Load frame data from file if it exists
-        self.frame_data = self.motion_file_manager.get_frame(self.filename)
+        self.frame_data = copy.deepcopy(self.motion_file_manager.get_frame(self.filename))
         self.init_ui()
         self.set_frame_to_ui()
         self.loaded_frame_data = copy.deepcopy(self.frame_data)

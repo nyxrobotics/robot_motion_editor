@@ -61,7 +61,7 @@ class InitialFrameEditorDialog(QDialog):
         self.init_ui()
 
         # Load frame data from initial_frame.yaml
-        self.frame_data = self._get_initial_frame_data()
+        self.frame_data = copy.deepcopy(self._get_initial_frame_data())
         self.set_frame_to_ui()
         self.loaded_frame_data = copy.deepcopy(self.frame_data)
 
@@ -358,12 +358,8 @@ class InitialFrameEditorDialog(QDialog):
         return self._get_initial_frame_data()
 
     def _get_initial_frame_data(self):
-        initial_frame = self.motion_file_manager.get_initial_frame()
         initial_pose = self.motion_file_manager.get_initial_pose()
-        if initial_frame:
-            return initial_frame
-        elif initial_pose:
-            rospy.logwarn("[InitialFrameEditorDialog] No initial frame found, using initial pose as fallback.")
+        if initial_pose:
             frame = FrameData()
             joint_names = self.joint_data_manager.get_joint_names()
             frame.set_joint_names(joint_names)
@@ -372,7 +368,7 @@ class InitialFrameEditorDialog(QDialog):
             frame.wait_duration = 0.0
             return frame
         else:
-            rospy.logwarn("[InitialFrameEditorDialog] No initial frame or pose found, creating a default frame.")
+            rospy.logwarn("[InitialFrameEditorDialog] No initial pose found, creating a default frame.")
 
         frame = FrameData()
         joint_names = self.joint_data_manager.get_joint_names()

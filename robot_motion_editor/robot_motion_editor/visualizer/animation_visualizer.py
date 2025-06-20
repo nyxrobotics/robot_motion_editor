@@ -67,6 +67,10 @@ class AnimationVisualizer:
         self.state = 'stopped'
         if self._thread:
             self._thread.join()
+        if self.animation_flow_scene is not None:
+            for item in self.animation_flow_scene.selectedItems():
+                if hasattr(item, 'setSelected') and hasattr(item, 'isSelected') and item.isSelected():
+                    item.setSelected(False)
 
     def pause(self):
         with self._lock:
@@ -153,17 +157,21 @@ class AnimationVisualizer:
             # Select next block
             if self.animation_flow_scene is not None:
                 for item in self.animation_flow_scene.selectedItems():
-                    item.setSelected(False)
-                if hasattr(self.current_block, 'setSelected'):
+                    if hasattr(item, 'setSelected') and hasattr(item, 'isSelected') and item.isSelected():
+                        item.setSelected(False)
+                if hasattr(
+                        self.current_block,
+                        'setSelected') and hasattr(
+                        self.current_block,
+                        'isSelected') and not self.current_block.isSelected():
                     self.current_block.setSelected(True)
-                    self.current_block.update()
 
             # Check if the scene has changed
             self._pause_event.wait()
 
             if self._scene_changed():
                 rospy.logwarn("[AnimationVisualizer] Scene changed. Stopping.")
-                self.stop()
+                self.state = 'stopped'
                 return
 
             next_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
@@ -174,7 +182,11 @@ class AnimationVisualizer:
                     StartBlockItem) and next_block is not None:
                 next_block = self.animation_flow_scene.get_next_frame_block(next_block)
             if next_block is None:
-                self.stop()
+                if self.animation_flow_scene is not None:
+                    for item in self.animation_flow_scene.selectedItems():
+                        if hasattr(item, 'setSelected') and hasattr(item, 'isSelected') and item.isSelected():
+                            item.setSelected(False)
+                self.state = 'stopped'
                 return
 
             next_target_state, next_move_duration, next_wait_duration = self.extract_joint_state_and_duration(
@@ -198,9 +210,6 @@ class AnimationVisualizer:
             current_move_duration = next_move_duration
             current_wait_duration = next_wait_duration
 
-        if self.animation_flow_scene is not None:
-            for item in self.animation_flow_scene.selectedItems():
-                item.setSelected(False)
         self.state = 'stopped'
 
     def play_single_block(self, block):
@@ -231,13 +240,12 @@ class AnimationVisualizer:
             rospy.loginfo("[AnimationVisualizer] Played StartBlockItem.")
 
         # Select next block
-        self.current_block = block
         if self.animation_flow_scene is not None:
             for item in self.animation_flow_scene.selectedItems():
-                item.setSelected(False)
-            if hasattr(self.current_block, 'setSelected'):
-                self.current_block.setSelected(True)
-                self.current_block.update()
+                if hasattr(item, 'setSelected') and hasattr(item, 'isSelected') and item.isSelected():
+                    item.setSelected(False)
+            if hasattr(block, 'setSelected') and hasattr(block, 'isSelected') and not block.isSelected():
+                block.setSelected(True)
 
     def play_single_block_slow(self, block, duration=1.0):
         if isinstance(block, FrameBlockItem):
@@ -261,13 +269,12 @@ class AnimationVisualizer:
             rospy.loginfo("[AnimationVisualizer] Played StartBlockItem slowly.")
 
         # Select next block
-        self.current_block = block
         if self.animation_flow_scene is not None:
             for item in self.animation_flow_scene.selectedItems():
-                item.setSelected(False)
-            if hasattr(self.current_block, 'setSelected'):
-                self.current_block.setSelected(True)
-                self.current_block.update()
+                if hasattr(item, 'setSelected') and hasattr(item, 'isSelected') and item.isSelected():
+                    item.setSelected(False)
+            if hasattr(block, 'setSelected') and hasattr(block, 'isSelected') and not block.isSelected():
+                block.setSelected(True)
 
     def extract_joint_state_and_duration(self, block):
         frame_data = FrameData()

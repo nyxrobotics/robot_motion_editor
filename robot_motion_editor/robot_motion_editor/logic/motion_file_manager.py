@@ -161,7 +161,9 @@ class MotionFileManager:
     def set_frame(self, filename, frame_data):
         old_data = self.animation_frames.get(filename)
         if old_data and frame_data.get_dict() == old_data.get_dict():
+            rospy.loginfo(f"[MotionFileManager] No changes detected in frame {filename}; skipping save.")
             return
+        rospy.loginfo(f"[MotionFileManager] Saving frame: {filename}")
         self.animation_frames[filename] = frame_data
         self._save_frame(filename)
 
@@ -356,7 +358,7 @@ class MotionFileManager:
 
     def _save_initial_frame(self):
         if self.animation_initial_frame:
-            path = self.resolve_initial_frame_path()
+            path = self._resolve_initial_frame_path()
             self.animation_initial_frame.save_to_file(path)
 
     def _load_frame(self, filename):
@@ -369,7 +371,7 @@ class MotionFileManager:
 
     def _save_frame(self, filename):
         if filename in self.animation_frames:
-            path = self.resolve_frame_path(filename)
+            path = self._resolve_frame_path(filename)
             self.animation_frames[filename].save_to_file(path)
 
     def _load_if(self, filename):

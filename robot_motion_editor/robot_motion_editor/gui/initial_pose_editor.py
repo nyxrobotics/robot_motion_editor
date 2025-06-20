@@ -1,3 +1,4 @@
+import copy
 import math
 import os
 
@@ -38,9 +39,7 @@ class InitialPoseEditor(QWidget):
 
         self.joint_data_manager = joint_data_manager
         self.motion_file_manager = motion_file_manager
-
-        self.initial_pose_data = InitialPoseData()
-        self.initial_pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
+        self.initial_pose_data = copy.deepcopy(self.motion_file_manager.get_initial_pose())
 
         self.initial_pose_visualizer = InitialPoseVisualizer(
             self.joint_data_manager.get_joint_names(), trajectory_visualizer)
@@ -153,7 +152,7 @@ class InitialPoseEditor(QWidget):
             self.initial_pose_data.set_pose(joint_name, position_rad)
             self.initial_pose_data.set_enable(joint_name, self.enable_checkboxes[joint_name].isChecked())
 
-        self.initial_pose_data.save_to_file(self.motion_file_manager.resolve_initial_pose_path())
+        self.initial_pose_data.save_to_file(self.motion_file_manager._resolve_initial_pose_path())
         self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
 
     def get_gui_joints(self):

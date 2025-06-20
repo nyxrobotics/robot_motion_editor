@@ -149,7 +149,7 @@ class AnimationCommander:
 
             if self._scene_changed():
                 rospy.logwarn("[AnimationCommander] Scene changed. Stopping.")
-                self.stop()
+                self.state = 'stopped'
                 return
 
             next_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
@@ -160,7 +160,7 @@ class AnimationCommander:
                     StartBlockItem) and next_block is not None:
                 next_block = self.animation_flow_scene.get_next_frame_block(next_block)
             if next_block is None:
-                self.stop()
+                self.state = 'stopped'
                 return
 
             next_target_state, next_move_duration, next_wait_duration = self.extract_joint_state_and_duration(

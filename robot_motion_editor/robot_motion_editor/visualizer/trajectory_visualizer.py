@@ -55,6 +55,9 @@ class TrajectoryVisualizer:
             rospy.logwarn("Looping is only supported in state mode.")
 
     def set_current_target_state(self, joint_state: JointState):
+        if not joint_state or not joint_state.name or not joint_state.position:
+            rospy.logwarn("[TrajectoryVisualizer] Invalid joint state provided.")
+            return
         if joint_state.name and joint_state.position:
             self._current_target_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
 
@@ -62,13 +65,13 @@ class TrajectoryVisualizer:
         return self._current_target_state
 
     def visualize_goal_state(self, joint_state: JointState):
-        if not self._enabled or not joint_state.name or not joint_state.position:
+        if not self._enabled or not joint_state or not joint_state.name or not joint_state.position:
             return
         state_msg = RobotState(joint_state=joint_state)
         self.goal_state_pub.publish(DisplayRobotState(state=state_msg))
 
     def send_joint_state(self, joint_state: JointState, duration: float = 1.0):
-        if not self._enabled or not joint_state.name or not joint_state.position:
+        if not self._enabled or not joint_state or not joint_state.name or not joint_state.position:
             return
 
         if not self._current_target_state:
@@ -202,6 +205,9 @@ class TrajectoryVisualizer:
 
     def send_trajectory(self, trajectory: JointTrajectory):
         if not self._enabled:
+            return
+
+        if not trajectory or not trajectory.joint_names or not trajectory.points:
             return
 
         interpolated_traj = self._interpolate(trajectory, self.playback_rate)

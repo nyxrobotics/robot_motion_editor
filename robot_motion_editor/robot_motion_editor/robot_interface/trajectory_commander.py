@@ -61,6 +61,9 @@ class TrajectoryCommander:
         return self._torque_on
 
     def set_current_target_state(self, joint_state: JointState):
+        if not joint_state or not joint_state.name or not joint_state.position:
+            rospy.logwarn("[TrajectoryCommander] Invalid joint state provided.")
+            return
         if joint_state.name and joint_state.position:
             self._current_target_state = JointState(name=joint_state.name[:], position=joint_state.position[:])
 
@@ -70,7 +73,7 @@ class TrajectoryCommander:
     def send_joint_state(self, joint_state: JointState, duration: float = 1.0):
         if not self._enabled or not self._torque_on:
             return
-        if not joint_state.name or not joint_state.position:
+        if not joint_state or not joint_state.name or not joint_state.position:
             return
 
         if not self._current_target_state:
@@ -205,7 +208,7 @@ class TrajectoryCommander:
     def send_trajectory(self, trajectory: JointTrajectory):
         if not self._enabled or not self._torque_on:
             return
-        if not trajectory.joint_names or not trajectory.points:
+        if not trajectory or not trajectory.joint_names or not trajectory.points:
             return
 
         interpolated_traj = self._interpolate(trajectory, self.playback_rate)
