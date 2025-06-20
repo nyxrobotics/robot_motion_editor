@@ -150,6 +150,14 @@ class AnimationVisualizer:
             self.trajectory_visualizer.send_joint_state(current_target_state, current_move_duration)
             self.trajectory_visualizer.visualize_goal_state(current_target_state)
 
+            # Select next block
+            if self.animation_flow_scene is not None:
+                for item in self.animation_flow_scene.selectedItems():
+                    item.setSelected(False)
+                if hasattr(self.current_block, 'setSelected'):
+                    self.current_block.setSelected(True)
+                    self.current_block.update()
+
             # Check if the scene has changed
             self._pause_event.wait()
 
@@ -189,14 +197,6 @@ class AnimationVisualizer:
             current_target_state = next_target_state
             current_move_duration = next_move_duration
             current_wait_duration = next_wait_duration
-
-            # Select next block
-            if self.animation_flow_scene is not None:
-                for item in self.animation_flow_scene.selectedItems():
-                    item.setSelected(False)
-                if hasattr(self.current_block, 'setSelected'):
-                    self.current_block.setSelected(True)
-                    self.current_block.update()
 
         if self.animation_flow_scene is not None:
             for item in self.animation_flow_scene.selectedItems():
