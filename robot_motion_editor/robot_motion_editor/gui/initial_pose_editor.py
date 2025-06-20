@@ -129,7 +129,7 @@ class InitialPoseEditor(QWidget):
         self.setLayout(main_layout)
 
     def load_pose(self):
-        self.initial_pose_data = self.motion_file_manager.get_initial_pose()
+        self.initial_pose_data = copy.deepcopy(self.motion_file_manager.get_initial_pose())
 
         for joint_name in self.initial_pose_data.get_joint_names():
             if joint_name not in self.joint_widgets:
@@ -152,7 +152,7 @@ class InitialPoseEditor(QWidget):
             self.initial_pose_data.set_pose(joint_name, position_rad)
             self.initial_pose_data.set_enable(joint_name, self.enable_checkboxes[joint_name].isChecked())
 
-        self.initial_pose_data.save_to_file(self.motion_file_manager._resolve_initial_pose_path())
+        self.motion_file_manager.set_initial_pose(self.initial_pose_data)
         self.initial_pose_visualizer.set_start_pose(self.initial_pose_data.get_joint_state())
 
     def get_gui_joints(self):

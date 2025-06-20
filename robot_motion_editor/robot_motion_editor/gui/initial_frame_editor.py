@@ -65,7 +65,7 @@ class InitialFrameEditorDialog(QDialog):
         self.set_frame_to_ui()
         self.loaded_frame_data = copy.deepcopy(self.frame_data)
 
-        self.setWindowTitle(f"InitialFrame: {self.motion_file_manager._resolve_initial_pose_path()}")
+        self.setWindowTitle(f"InitialFrame: {self.motion_file_manager._resolve_initial_frame_path()}")
 
         # Set initial frame data to prev and next frames
         self.prev_frame_data = None

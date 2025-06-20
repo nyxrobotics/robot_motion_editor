@@ -1,3 +1,4 @@
+import copy
 import os
 import shutil
 
@@ -55,8 +56,10 @@ class MotionFileManager:
             rospy.logwarn("[MotionFileManager] Invalid initial_pose_data provided.")
             return
         if self.motion_initial_pose and initial_pose_data.get_dict() == self.motion_initial_pose.get_dict():
+            rospy.loginfo("[MotionFileManager] No changes detected in initial pose; skipping save.")
             return
-        self.motion_initial_pose = initial_pose_data
+        rospy.loginfo("[MotionFileManager] Saving initial pose.")
+        self.motion_initial_pose = copy.deepcopy(initial_pose_data)
         self._save_initial_pose()
 
     def get_initial_pose(self):
@@ -328,8 +331,8 @@ class MotionFileManager:
         elif self.joint_names != initial_pose_data.get_joint_names():
             initial_pose_data.set_joint_names(self.joint_names)
 
-        self.motion_initial_pose = initial_pose_data
-        return initial_pose_data
+        self.motion_initial_pose = copy.deepcopy(initial_pose_data)
+        return self.motion_initial_pose
 
     def _save_initial_pose(self):
         """
