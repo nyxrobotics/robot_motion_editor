@@ -175,7 +175,7 @@ class AnimationCommander:
                 if self.state == 'paused':
                     self._pause_event.wait()
                     start_time = time.perf_counter() - elapsed
-                time.sleep(0.0001)
+                time.sleep(0.001)
                 elapsed = time.perf_counter() - start_time
             start_time += elapsed
 
