@@ -129,7 +129,22 @@ class AnimationCommander:
             self.trajectory_commander.send_joint_state(start_target, duration=1.0)
             time.sleep(1.0)
 
+        # Set start frame
+        current_target_state = start_target
+        current_move_duration = move_duration
+        current_wait_duration = wait_duration
+
+        next_target_state = current_target_state
+        next_move_duration = current_move_duration
+        next_wait_duration = current_wait_duration
+
+        start_time = time.perf_counter()
+
         while self.current_block and not self._stop_event.is_set() and not rospy.is_shutdown():
+            # Send the target joint state
+            self.trajectory_commander.send_joint_state(current_target_state, duration=current_move_duration)
+
+            # Check if the scene has changed
             self._pause_event.wait()
 
             if self._scene_changed():
@@ -137,27 +152,23 @@ class AnimationCommander:
                 self.stop()
                 return
 
-            if not isinstance(self.current_block, FrameBlockItem):
-                self.current_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
-                continue
-
-            frame_name = self.current_block.filename
-            try:
-                frame_data = self.motion_file_manager.get_frame(frame_name)
-                target_joint_state = frame_data.get_joint_state()
-                move_duration = frame_data.move_duration
-                wait_duration = frame_data.wait_duration
-            except Exception as e:
-                rospy.logwarn(f"[AnimationCommander] Failed to load frame '{frame_name}': {e}")
+            next_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
+            while not isinstance(
+                    next_block,
+                    FrameBlockItem) and not isinstance(
+                    next_block,
+                    StartBlockItem) and next_block is not None:
+                next_block = self.animation_flow_scene.get_next_frame_block(next_block)
+            if next_block is None:
                 self.stop()
                 return
 
-            self.trajectory_commander.send_joint_state(target_joint_state, duration=move_duration)
+            next_target_state, next_move_duration, next_wait_duration = self.extract_joint_state_and_duration(
+                next_block)
 
-            total_duration = move_duration + wait_duration
-            elapsed = 0.0
-            start_time = time.perf_counter()
-
+            # Wait for the move duration and then the wait duration
+            total_duration = current_move_duration + current_wait_duration
+            elapsed = time.perf_counter() - start_time
             while elapsed < total_duration:
                 if self._stop_event.is_set() or rospy.is_shutdown():
                     return
@@ -166,8 +177,12 @@ class AnimationCommander:
                     start_time = time.perf_counter() - elapsed
                 time.sleep(0.0001)
                 elapsed = time.perf_counter() - start_time
+            start_time += elapsed
 
-            self.current_block = self.animation_flow_scene.get_next_frame_block(self.current_block)
+            self.current_block = next_block
+            current_target_state = next_target_state
+            current_move_duration = next_move_duration
+            current_wait_duration = next_wait_duration
 
         self.state = 'stopped'
 
