@@ -169,7 +169,6 @@ class AnimationVisualizer:
 
             # Check if the scene has changed
             self._pause_event.wait()
-            self.update_scene()
 
             if self._scene_changed():
                 rospy.logwarn("[AnimationVisualizer] Scene changed. Stopping.")
@@ -202,7 +201,6 @@ class AnimationVisualizer:
                     return
                 if self.state == 'paused':
                     self._pause_event.wait()
-                    self.update_scene()
                     start_time = time.perf_counter() - elapsed
                 time.sleep(0.001)
                 elapsed = time.perf_counter() - start_time
@@ -289,10 +287,3 @@ class AnimationVisualizer:
             return None, 0.0, 0.0
 
         return frame_data.get_joint_state(), frame_data.move_duration, frame_data.wait_duration
-
-    def update_scene(self):
-        QApplication.processEvents()
-        if self.animation_flow_scene:
-            self.animation_flow_scene.update()
-            for view in self.animation_flow_scene.views():
-                view.viewport().update()

@@ -4,6 +4,7 @@ import yaml
 from PyQt5.QtCore import QPointF
 from PyQt5.QtCore import QRectF
 from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QAction
 from PyQt5.QtWidgets import QGraphicsScene
@@ -41,6 +42,15 @@ class AnimationEditorWidget(QGraphicsScene):
         self.block_objects = {}
         self.arrow_objects = {}
         self.setSceneRect(0, 0, 1000, 1000)
+
+        # Repaint timer to prevent stopping
+        # TODO: It seems to be a workaround for a bug in PyQt5 where the scene does not repaint correctly.
+        self.repaint_timer = QTimer()
+        self.repaint_timer.timeout.connect(self.force_repaint)
+        self.repaint_timer.start(33)
+
+    def force_repaint(self):
+        self.update()
 
     def _generate_block_id(self):
         used_ids = {block.id for block in self.block_objects.values()}
