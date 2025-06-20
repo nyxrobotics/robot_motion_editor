@@ -387,7 +387,7 @@ class MotionFileManager:
 
     def _save_if(self, filename):
         if filename in self.animation_ifs:
-            path = self.resolve_if_condition_path(filename)
+            path = self._resolve_if_condition_path(filename)
             self.animation_ifs[filename].save_to_file(path)
 
     def _load_switch(self, filename):
@@ -400,7 +400,7 @@ class MotionFileManager:
 
     def _save_switch(self, filename):
         if filename in self.animation_switches:
-            path = self.resolve_switch_condition_path(filename)
+            path = self._resolve_switch_condition_path(filename)
             self.animation_switches[filename].save_to_file(path)
 
     def _rename_file(self, old_path, new_path):

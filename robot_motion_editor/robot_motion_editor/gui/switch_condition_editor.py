@@ -1,3 +1,4 @@
+import copy
 import os
 
 from PyQt5.QtCore import Qt
@@ -81,7 +82,7 @@ class SwitchConditionEditorDialog(QDialog):
                 self.joint_data_manager.get_available_variables()))
 
     def load_condition(self):
-        self.condition_data = self.motion_file_manager.get_switch(self.filename)
+        self.condition_data = copy.deepcopy(self.motion_file_manager.get_switch(self.filename))
         self.expression_edit.setPlainText(self.condition_data.expression)
         self.condition_edit.setPlainText(self.condition_data.condition)
 
