@@ -68,12 +68,8 @@ class FrameEditorDialog(QDialog):
 
         self.setWindowTitle(f"Frame: {self.motion_file_manager._resolve_frame_path(self.filename)}")
 
-        # Set initial frame data to prev and next frames
-        self.prev_frame_data = FrameData()
-        self.next_frame_data = FrameData()
-        initial_frame = self._get_initial_frame_data()
-        self.prev_frame_data = initial_frame
-        self.next_frame_data = initial_frame
+        self.prev_frame_data = self._get_initial_frame_data()
+        self.next_frame_data = self._get_initial_frame_data()
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -117,9 +113,18 @@ class FrameEditorDialog(QDialog):
         self.all_enable_checkbox.stateChanged.connect(self.set_all_enable_checkboxes)
         all_enable_row.addWidget(self.all_enable_checkbox)
 
+        self.copy_previous_button = QPushButton("Copy Previous")
+        self.copy_previous_button.clicked.connect(self.copy_previous_frame)
+        all_enable_row.addWidget(self.copy_previous_button)
+
         self.reset_all_button = QPushButton("Reset All")
         self.reset_all_button.clicked.connect(self.reset_all_positions)
         all_enable_row.addWidget(self.reset_all_button)
+
+        self.copy_next_button = QPushButton("Copy Next")
+        self.copy_next_button.clicked.connect(self.copy_next_frame)
+        all_enable_row.addWidget(self.copy_next_button)
+
         form.addRow(all_enable_row)
 
         joint_names = self.joint_data_manager.get_joint_names()
@@ -152,13 +157,9 @@ class FrameEditorDialog(QDialog):
             spin.setRange(lower_deg, upper_deg)
 
             slider.valueChanged.connect(
-                lambda val,
-                s=spin: (
-                    s.setValue(
-                        float(val)),
-                    self.publish_goal_state_from_gui()))
-            spin.valueChanged.connect(lambda val, sl=slider: (
-                sl.setValue(int(round(val))), self.publish_goal_state_from_gui()))
+                lambda val, s=spin: (s.setValue(float(val)), self.publish_goal_state_from_gui()))
+            spin.valueChanged.connect(
+                lambda val, sl=slider: (sl.setValue(int(round(val))), self.publish_goal_state_from_gui()))
 
             vel_spin = QDoubleSpinBox()
             vel_spin.setDecimals(2)
@@ -196,6 +197,18 @@ class FrameEditorDialog(QDialog):
         layout.addWidget(buttons)
 
         self.setLayout(layout)
+
+    def copy_previous_frame(self):
+        prev = self._get_prev_frame_data()
+        if prev:
+            self.frame_data = copy.deepcopy(prev)
+            self.set_frame_to_ui()
+
+    def copy_next_frame(self):
+        next_ = self._get_next_frame_data()
+        if next_:
+            self.frame_data = copy.deepcopy(next_)
+            self.set_frame_to_ui()
 
     def focusInEvent(self, event):
         if self.trajectory_visualizer:
