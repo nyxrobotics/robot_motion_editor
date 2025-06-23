@@ -180,7 +180,11 @@ class AnimaitonWidget(QWidget):
         self.animation_tree.reload_file_lists(animation_name)
 
     def on_delete_anim_btn(self):
-        self.animation_tree.delete_animation()
+        animation_name = self.motion_file_manager.get_animation_name()
+        if not animation_name:
+            QMessageBox.information(self, "Delete Frame", "No animation selected.")
+            return
+        self.motion_file_manager.delete_animation(animation_name)
         self.reload_animation_tree()
 
     def on_delete_frame_btn(self):

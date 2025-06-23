@@ -95,10 +95,9 @@ class AnimationFileWidget(QTreeWidget):
             selected = menu.exec_(self.viewport().mapToGlobal(pos))
 
             if selected == rename_action:
-                self.rename_animation_folder(item)
-
+                self.rename_animation_folder()
             elif selected == delete_action:
-                self.delete_animation_folder(item)
+                self.delete_animation_folder()
             return
 
         if text in {"frames", "if", "switch"}:
@@ -161,17 +160,21 @@ class AnimationFileWidget(QTreeWidget):
         if selected == action:
             self.create_new_animation()
 
-    def rename_animation_folder(self, item: QTreeWidgetItem):
-        old_name = item.text(0)
+    def rename_animation_folder(self):
+        old_name = self.motion_file_manager.get_animation_name()
         new_name, ok = QInputDialog.getText(self, "Rename Animation", f"Rename '{old_name}' to:", text=old_name)
         if not ok or not new_name or old_name == new_name:
             return
         self.motion_file_manager.rename_animation(old_name=old_name, new_name=new_name.strip())
         self.reload_animation_list()
 
-    def delete_animation_folder(self, item: QTreeWidgetItem):
-        name = item.text(0)
-        self.motion_file_manager.delete_animation(name)
+    def delete_animation_folder(self):
+        animation_name = self.motion_file_manager.get_animation_name()
+        if not animation_name:
+            QMessageBox.information(self, "Delete Frame", "No animation selected.")
+            return
+        self.motion_file_manager.delete_animation(animation_name)
+        self.reload_animation_tree()
 
     def reload_scene(self):
         rospy.loginfo("[AnimationFileWidget] Reloading animation scene")

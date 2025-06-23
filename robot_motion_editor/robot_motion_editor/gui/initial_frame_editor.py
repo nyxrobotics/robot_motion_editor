@@ -364,7 +364,7 @@ class InitialFrameEditorDialog(QDialog):
             joint_names = self.joint_data_manager.get_joint_names()
             frame.set_joint_names(joint_names)
             frame.set_joint_state(initial_pose.get_joint_state())
-            frame.move_duration = 1.0
+            frame.move_duration = 0.0
             frame.wait_duration = 0.0
             return frame
         else:
