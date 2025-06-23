@@ -110,7 +110,7 @@ class MotionFileManager:
         path = self._resolve_animation_path(animation_name)
         if os.path.exists(path):
             rospy.logwarn(f"[MotionFileManager] Animation already exists: {animation_name}")
-            return
+            return False
         try:
             os.makedirs(os.path.join(path, "frames"))
             os.makedirs(os.path.join(path, "conditions", "if"))
@@ -118,8 +118,10 @@ class MotionFileManager:
             anim_data = AnimationData()
             anim_data.save_to_file(os.path.join(path, "animation.yaml"))
             rospy.loginfo(f"[MotionFileManager] Created new animation: {animation_name}")
+            return True
         except Exception as e:
             rospy.logerr(f"[MotionFileManager] Failed to create animation {animation_name}: {e}")
+            return False
 
     def rename_animation(self, old_name, new_name):
         old_path = self._resolve_animation_path(old_name)

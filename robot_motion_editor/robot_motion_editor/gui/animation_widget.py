@@ -139,10 +139,13 @@ class AnimaitonWidget(QWidget):
 
     def confirm_save_if_unsaved_changes(self):
         rospy.loginfo("[MotionEditor] Checking for unsaved changes.")
-        anim_name = self.motion_file_manager.get_animation_name()
-        if not anim_name:
+        if not self.motion_file_manager or not self.motion_file_manager.get_animation_name(
+        ) or not self.motion_file_manager.get_animation_data():
+            return True
+        if not self.animation_flow_scene or not self.animation_flow_scene.get_animation_data():
             return True
 
+        anim_name = self.motion_file_manager.get_animation_name()
         current_data = self.animation_flow_scene.get_animation_data().get_dict()
         saved_data = self.motion_file_manager.get_animation_data().get_dict()
 

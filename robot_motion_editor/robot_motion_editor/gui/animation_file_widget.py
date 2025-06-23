@@ -167,6 +167,7 @@ class AnimationFileWidget(QTreeWidget):
         if not ok or not new_name or old_name == new_name:
             return
         self.motion_file_manager.rename_animation(old_name=old_name, new_name=new_name.strip())
+        self.reload_animation_list()
 
     def delete_animation_folder(self, item: QTreeWidgetItem):
         name = item.text(0)
@@ -205,6 +206,17 @@ class AnimationFileWidget(QTreeWidget):
         mime.setText(mime_text)
         drag.setMimeData(mime)
         drag.exec_(Qt.CopyAction)
+
+    def create_new_animation(self):
+        name, ok = QInputDialog.getText(self, "New Animation", "Enter animation name:")
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+        if self.motion_file_manager.create_animation(name):
+            self.reload_animation_list()
+        else:
+            QMessageBox.warning(self, "Error", f"Failed to create animation '{name}'.")
+        return name
 
     def create_new_frame(self, animation_name=None):
         if not animation_name:
@@ -273,6 +285,7 @@ class AnimationFileWidget(QTreeWidget):
             if os.path.isdir(path):
                 anim_item = QTreeWidgetItem([animation_name])
                 self.addTopLevelItem(anim_item)
+                self.reload_file_lists(animation_name)
 
     def reload_file_lists(self, animation_name: str):
         base_dir = self.motion_file_manager.get_motion_directory()
