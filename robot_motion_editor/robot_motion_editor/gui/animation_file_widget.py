@@ -174,7 +174,7 @@ class AnimationFileWidget(QTreeWidget):
             QMessageBox.information(self, "Delete Frame", "No animation selected.")
             return
         self.motion_file_manager.delete_animation(animation_name)
-        self.reload_animation_tree()
+        self.reload_animation_list()
 
     def reload_scene(self):
         rospy.loginfo("[AnimationFileWidget] Reloading animation scene")
