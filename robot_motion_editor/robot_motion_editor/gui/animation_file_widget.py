@@ -237,7 +237,9 @@ class AnimationFileWidget(QTreeWidget):
         if not ok or not name.strip():
             return
         name = name.strip()
-        self.motion_file_manager.set_frame(name)
+        frame_data = FrameData()
+        self.motion_file_manager.set_frame(name, frame_data)
+        self.reload_file_lists(animation_name)
 
     def create_new_if(self, animation_name=None):
         if not animation_name:
@@ -257,6 +259,7 @@ class AnimationFileWidget(QTreeWidget):
         name = name.strip()
         if_data = IfConditionData(expression="", condition="")
         self.motion_file_manager.set_if(name, if_data)
+        self.reload_file_lists(animation_name)
 
     def create_new_switch(self, animation_name=None):
         if not animation_name:
@@ -276,6 +279,7 @@ class AnimationFileWidget(QTreeWidget):
         name = name.strip()
         switch_data = SwitchConditionData(expression="", condition="", cases={})
         self.motion_file_manager.set_switch(name, switch_data)
+        self.reload_file_lists(animation_name)
 
     def reload_animation_list(self):
         self.clear()
