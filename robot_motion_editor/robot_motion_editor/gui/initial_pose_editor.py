@@ -75,10 +75,10 @@ class InitialPoseEditor(QWidget):
 
         layout.addLayout(header_layout)
 
-        max_label_width = QLabel(max(self.initial_pose_data.get_joint_names(), key=len)
-                                 ).sizeHint().width() if self.initial_pose_data.get_joint_names() else 80
+        joint_names = self.joint_data_manager.get_joint_names()
+        max_label_width = max(QLabel(j).sizeHint().width() for j in joint_names) if joint_names else 100
 
-        for joint_name in self.initial_pose_data.get_joint_names():
+        for joint_name in joint_names:
             row = QHBoxLayout()
 
             enable_cb = QCheckBox()
@@ -130,6 +130,10 @@ class InitialPoseEditor(QWidget):
 
     def load_pose(self):
         self.initial_pose_data = copy.deepcopy(self.motion_file_manager.get_initial_pose())
+        if not self.initial_pose_data:
+            rospy.logwarn("No initial pose data found. Using default values.")
+            self.initial_pose_data = InitialPoseData()
+            self.initial_pose_data.set_joint_names(self.joint_data_manager.get_joint_names())
 
         for joint_name in self.initial_pose_data.get_joint_names():
             if joint_name not in self.joint_widgets:

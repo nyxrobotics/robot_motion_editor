@@ -319,19 +319,35 @@ class MotionFileManager:
         """
         if not self.motion_directory:
             rospy.logwarn("[MotionFileManager] Motion directory is not set.")
-            return None
+            if self.joint_names:
+                initial_pose_data = InitialPoseData()
+                initial_pose_data.set_joint_names(self.joint_names)
+                return initial_pose_data
+            else:
+                return InitialPoseData()
         path = os.path.join(self.motion_directory, "initial_pose.yaml")
         if not os.path.exists(path):
             rospy.logwarn(f"[MotionFileManager] Initial pose file does not exist: {path}")
-            return None
+            if self.joint_names:
+                initial_pose_data = InitialPoseData()
+                initial_pose_data.set_joint_names(self.joint_names)
+                return initial_pose_data
+            else:
+                return InitialPoseData()
 
         initial_pose_data = InitialPoseData()
         initial_pose_data.load_from_file(path)
-
-        if not self.joint_names and initial_pose_data.get_joint_names():
-            self.joint_names = initial_pose_data.get_joint_names()
-        elif self.joint_names != initial_pose_data.get_joint_names():
+        if initial_pose_data:
+            if not self.joint_names and initial_pose_data.get_joint_names():
+                self.joint_names = initial_pose_data.get_joint_names()
+            elif self.joint_names != initial_pose_data.get_joint_names():
+                initial_pose_data.set_joint_names(self.joint_names)
+        elif self.joint_names:
+            rospy.logwarn("[MotionFileManager] No initial pose data found, using joint names to create empty initial pose.")
             initial_pose_data.set_joint_names(self.joint_names)
+        else:
+            rospy.logerr("[MotionFileManager] No joint names set and no initial pose data found. Cannot create initial pose.")
+            return InitialPoseData()
 
         self.motion_initial_pose = copy.deepcopy(initial_pose_data)
         return self.motion_initial_pose
