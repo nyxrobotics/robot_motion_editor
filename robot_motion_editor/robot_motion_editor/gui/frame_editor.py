@@ -333,6 +333,14 @@ class FrameEditorDialog(QDialog):
             slider, spin, vel_spin = self.joint_widgets[joint_name]
 
             deg = math.degrees(self.frame_data.get_pose(joint_name))
+            lower_deg = spin.minimum()
+            upper_deg = spin.maximum()
+            if deg < lower_deg - 0.1 or deg > upper_deg + 0.1:
+                rospy.logwarn(
+                    f"[FrameEditorDialog] Joint '{joint_name}' has out-of-range value {deg:.2f}°. "
+                    f"Clamping to [{lower_deg:.2f}°, {upper_deg:.2f}°]."
+                )
+            deg = max(min(deg, upper_deg), lower_deg)
             spin.blockSignals(True)
             slider.blockSignals(True)
             spin.setValue(deg)
